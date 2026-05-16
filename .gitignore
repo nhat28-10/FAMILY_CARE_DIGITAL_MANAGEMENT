@@ -1,0 +1,46 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+
+# Test
+coverage/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker/local data
+docker-data/
+postgres-data/
+redis-data/
+minio-data/
+pgdata/
+
+# Uploads/local storage
+uploads/
+storage/
+public/uploads/
+
+# Keys/certificates
+*.pem
+*.key
+*.crt
+*.cert
