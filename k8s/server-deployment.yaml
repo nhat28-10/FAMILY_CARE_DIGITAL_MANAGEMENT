@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: family-care-server
+  namespace: family-care
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: family-care-server
+  template:
+    metadata:
+      labels:
+        app: family-care-server
+    spec:
+      containers:
+        - name: server
+          image: family-care-server:demo
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: family-care-server-config
+            - secretRef:
+                name: family-care-server-secret
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20

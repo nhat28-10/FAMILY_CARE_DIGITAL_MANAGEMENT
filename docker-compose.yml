@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: family-care-postgres
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - family-care-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - family-care-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: family-care-server:latest
+    container_name: family-care-server
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      APP_PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - family-care-network
+
+volumes:
+  family-care-postgres-data:
+
+networks:
+  family-care-network:
+    driver: bridge
+
+# depends_on + healthcheck: Backend chỉ start sau khi PostgreSQL sẵn sàng.
+
+# DB_HOST=postgres: Trong Docker network, backend không gọi localhost mà gọi tên service postgres.
+
+# ports "3000:3000": Mở backend ra ngoài để FE/Mobile/tester gọi API.
+
+# volumes: Giữ dữ liệu PostgreSQL không mất khi restart container.

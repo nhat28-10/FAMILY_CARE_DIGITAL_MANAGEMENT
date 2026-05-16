@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: family-care-postgres-pvc
+  namespace: family-care
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+#PVC dùng để lưu data PostgreSQL ổn định trong Kubernetes demo.
+#Khi PostgreSQL container bị xóa hoặc restart, data vẫn còn trong PVC và sẽ được gắn lại khi container mới tạo ra.
