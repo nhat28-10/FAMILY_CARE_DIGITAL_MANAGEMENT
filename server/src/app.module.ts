@@ -27,10 +27,13 @@ import { AlbumsModule } from './modules/albums/albums.module';
 import { AiChatbotModule } from './modules/ai-chatbot/ai-chatbot.module';
 import { AdminModule } from './modules/admin/admin.module';
 
+const env = process.env.NODE_ENV || process.env.APP_ENV || 'local';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [`.env.${env}`, '.env'],
       load: [configuration],
     }),
 

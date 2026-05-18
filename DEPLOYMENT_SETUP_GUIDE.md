@@ -133,7 +133,7 @@ kubectl logs -f deployment/family-care-server -n family-care
 Swagger qua NodePort:
 
 ```text
-http://localhost:30080/api/docs
+http://localhost:3000/api/docs
 ```
 
 Hoặc dùng port-forward:
