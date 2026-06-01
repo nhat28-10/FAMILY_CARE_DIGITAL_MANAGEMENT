@@ -5,8 +5,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./server/.env.docker
-    ports:
-      - "5433:5432"
     volumes:
       - family-care-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,11 +25,13 @@ services:
     env_file:
       - ./server/.env.docker
     environment:
+      APP_ENV: docker
       APP_PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-    ports:
-      - "3000:3000"
+      SWAGGER_ENABLED: "false"
+    expose:
+      - "3000"
     depends_on:
       postgres:
         condition: service_healthy

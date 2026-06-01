@@ -6,11 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 function parseCorsOrigins(value?: string): boolean | string[] {
-  if (!value || value.trim() === '') {
-    return true;
-  }
-
-  if (value.trim() === '*') {
+  if (!value || value.trim() === '' || value.trim() === '*') {
     return true;
   }
 
@@ -26,11 +22,9 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
   const prefix = configService.get<string>('app.prefix') || 'api/v1';
-
   const corsOrigins = parseCorsOrigins(
     configService.get<string>('cors.origins'),
   );
-
   const swaggerEnabled = configService.get<boolean>('swagger.enabled') ?? true;
 
   app.setGlobalPrefix(prefix);
@@ -63,6 +57,8 @@ async function bootstrap() {
   }
 
   await app.listen(port, '0.0.0.0');
+  console.log(`Family Care API is running on port ${port}`);
+  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap().catch((error) => {
