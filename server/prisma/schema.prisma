@@ -1,0 +1,34 @@
+// Prisma schema for Family Finance Management Platform
+// Docs: https://www.prisma.io/docs
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FAMILY_MANAGER
+  FAMILY_MEMBER
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String
+  fullName     String?
+  role         Role    @default(FAMILY_MANAGER)
+  isActive     Boolean @default(true)
+
+  // Hash of the currently active refresh token (rotated on every refresh).
+  refreshTokenHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}

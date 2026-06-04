@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
 import configuration from './config/configuration';
-import { typeOrmConfig } from './database/typeorm.config';
+import { PrismaModule } from './prisma/prisma.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -34,7 +33,7 @@ import { AdminModule } from './modules/admin/admin.module';
       load: [configuration],
     }),
 
-    TypeOrmModule.forRoot(typeOrmConfig()),
+    PrismaModule,
 
     AuthModule,
     UsersModule,
