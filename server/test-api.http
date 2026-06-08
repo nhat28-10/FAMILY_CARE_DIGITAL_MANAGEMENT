@@ -1,0 +1,74 @@
+### Family Care API - Auth endpoints
+### How to use: install the VS Code extension "REST Client" (humao.rest-client),
+### then click the "Send Request" link that appears above each request.
+### Run #1 (register) or #2 (login) first — the tokens are captured automatically
+### into variables and reused by the requests below.
+
+@baseUrl = http://localhost:3000/api/v1
+@email = john.doe@example.com
+@password = StrongP@ss1
+
+### 1. Register (default role FAMILY_MANAGER)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "fullName": "John Doe"
+}
+
+### 2. Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Capture tokens from the login (or register) response
+@accessToken = {{login.response.body.data.accessToken}}
+@refreshToken = {{login.response.body.data.refreshToken}}
+
+### 3. Get current user (protected)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 4. Refresh tokens (rotation)
+# @name refresh
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 5. Logout (protected) — clears the stored refresh token
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### --- Negative cases ---
+
+### 6. Weak password -> 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "weak@example.com",
+  "password": "123"
+}
+
+### 7. Wrong password -> 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "WrongPass1!"
+}
+
+### 8. No token -> 401
+GET {{baseUrl}}/auth/me

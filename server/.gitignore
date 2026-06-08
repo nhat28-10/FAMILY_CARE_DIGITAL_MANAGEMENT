@@ -40,6 +40,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # temp directory
 .temp

@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
 import configuration from './config/configuration';
-import { typeOrmConfig } from './database/typeorm.config';
+import { PrismaModule } from './prisma/prisma.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { FamiliesModule } from './modules/families/families.module';
 import { FamilyMembersModule } from './modules/family-members/family-members.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 import { RolesPermissionsModule } from './modules/roles-permissions/roles-permissions.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -25,28 +25,24 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { AlbumsModule } from './modules/albums/albums.module';
 import { AiChatbotModule } from './modules/ai-chatbot/ai-chatbot.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { FinanceModule } from './modules/finance/wallets.module';
-
-const env = process.env.NODE_ENV || process.env.APP_ENV || 'local';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${env}`, '.env'],
       load: [configuration],
     }),
 
-    TypeOrmModule.forRoot(typeOrmConfig()),
+    PrismaModule,
 
     AuthModule,
     UsersModule,
     FamiliesModule,
     FamilyMembersModule,
+    InvitationsModule,
     RolesPermissionsModule,
     SubscriptionPlansModule,
     SubscriptionsModule,
-    FinanceModule,
     TasksModule,
     RewardsModule,
     ChatsModule,

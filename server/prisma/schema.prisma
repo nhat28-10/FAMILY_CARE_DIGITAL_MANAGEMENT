@@ -1,0 +1,136 @@
+// Prisma schema for Family Finance Management Platform
+// Docs: https://www.prisma.io/docs
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================================================
+// Enums — 3-layer role model
+// ===========================================================================
+
+/// System-wide role used for global authentication/authorization.
+enum SystemRole {
+  ADMIN
+  FAMILY_MANAGER
+  FAMILY_MEMBER
+}
+
+/// Role of a user inside a specific family.
+enum FamilyRole {
+  MANAGER
+  MEMBER
+}
+
+/// Family relationship — display only.
+enum Relationship {
+  FATHER
+  MOTHER
+  CHILD
+  GRANDFATHER
+  GRANDMOTHER
+  OTHER
+}
+
+/// Lifecycle status of a family invitation.
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// ===========================================================================
+// Models
+// ===========================================================================
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  fullName     String?
+  systemRole   SystemRole @default(FAMILY_MEMBER)
+  isActive     Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  memberships     FamilyMember[]
+  refreshTokens   RefreshToken[]
+  sentInvitations Invitation[]   @relation("InvitedBy")
+
+  @@map("users")
+}
+
+/// One row per active refresh token (per device/session). The raw token is
+/// never stored — only its bcrypt hash. Supports multi-device + per-session
+/// revocation and rotation.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Family {
+  id          String   @id @default(uuid())
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     FamilyMember[]
+  invitations Invitation[]
+
+  @@map("families")
+}
+
+model FamilyMember {
+  id           String       @id @default(uuid())
+  familyId     String
+  userId       String
+  familyRole   FamilyRole   @default(MEMBER)
+  relationship Relationship @default(OTHER)
+  joinedAt     DateTime     @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@index([userId])
+  @@map("family_members")
+}
+
+model Invitation {
+  id           String           @id @default(uuid())
+  familyId     String
+  email        String
+  /// sha256 hash of the opaque invitation token (raw token returned once).
+  tokenHash    String           @unique
+  familyRole   FamilyRole       @default(MEMBER)
+  relationship Relationship     @default(OTHER)
+  status       InvitationStatus @default(PENDING)
+  invitedById  String
+  expiresAt    DateTime
+  createdAt    DateTime         @default(now())
+
+  family    Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@map("invitations")
+}

@@ -1,33 +1,27 @@
 node_modules
 dist
-build
 coverage
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.git
+.gitignore
 
+# Never bake secrets into the image
 .env
 .env.*
 !.env.example
+!.env.production.example
 
-.git
-.gitignore
-README.md
-
-Dockerfile*
-docker-compose*.yml
-
+# Dev artifacts
+*.log
 .vscode
-.idea
-.DS_Store
-Thumbs.db
+test
+test-api.http
 
-docker-data
-postgres-data
-redis-data
-minio-data
-uploads
-storage
-public/uploads
+# Lint/format/docs not needed for the build
+.prettierrc
+.prettierignore
+eslint.config.mjs
+.eslintrc*
+.editorconfig
+*.md
+docker-compose*.yml
+Dockerfile
