@@ -18,4 +18,7 @@ export default () => ({
   bcrypt: {
     saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10),
   },
+  invitation: {
+    expiresInDays: parseInt(process.env.INVITATION_EXPIRES_IN_DAYS || '7', 10),
+  },
 });

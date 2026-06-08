@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, SystemRole, User } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -25,23 +25,10 @@ export class UsersService {
   }
 
   /**
-   * Persists the hash of the latest refresh token (token rotation).
+   * Promotes a user to a new system role (e.g. FAMILY_MEMBER → FAMILY_MANAGER
+   * when they create their first family).
    */
-  setRefreshTokenHash(id: string, refreshTokenHash: string): Promise<User> {
-    return this.prisma.user.update({
-      where: { id },
-      data: { refreshTokenHash },
-    });
-  }
-
-  /**
-   * Clears the stored refresh-token hash, effectively logging the user out
-   * of every device using a refresh token.
-   */
-  clearRefreshToken(id: string): Promise<User> {
-    return this.prisma.user.update({
-      where: { id },
-      data: { refreshTokenHash: null },
-    });
+  updateSystemRole(id: string, systemRole: SystemRole): Promise<User> {
+    return this.prisma.user.update({ where: { id }, data: { systemRole } });
   }
 }

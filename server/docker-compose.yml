@@ -1,0 +1,47 @@
+# Local development: a Postgres identical on every dev machine.
+# Compose auto-reads variable values from `server/.env`.
+#
+#   docker compose up -d db        # start only the database (run BE via npm)
+#   docker compose --profile full up --build   # also run the API in Docker
+#
+# NOTE: this publishes 5432 on the host so `DATABASE_URL=...@localhost:5432`
+# keeps working. If you already run a native Postgres on 5432, stop it first
+# (or change the left side of the port mapping, e.g. "5433:5432").
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: familycare_db_dev
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-family_care_dev}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-family_care_dev}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Optional: run the API in Docker too. Enable with `--profile full`.
+  api:
+    profiles: ['full']
+    build: .
+    env_file: .env
+    environment:
+      # Inside the Docker network the DB host is the service name `db`.
+      DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_DATABASE:-family_care_dev}?schema=public
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata_dev:

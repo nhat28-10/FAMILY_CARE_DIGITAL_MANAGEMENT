@@ -2,16 +2,14 @@ import { User } from '@prisma/client';
 
 /**
  * User representation that is safe to return over the API: it never contains
- * the password hash or the refresh-token hash.
+ * the password hash. (Refresh tokens live in their own table, not on User.)
  */
-export type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
+export type SafeUser = Omit<User, 'passwordHash'>;
 
 /**
  * Strips all sensitive fields from a User record.
  */
 export function sanitizeUser(user: User): SafeUser {
-  // Intentionally destructure-and-drop the sensitive fields.
-  const { passwordHash: _passwordHash, refreshTokenHash: _refreshTokenHash, ...safe } =
-    user;
+  const { passwordHash: _passwordHash, ...safe } = user;
   return safe;
 }

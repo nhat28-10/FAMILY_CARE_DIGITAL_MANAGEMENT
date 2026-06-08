@@ -1,0 +1,27 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+
+# Never bake secrets into the image
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Dev artifacts
+*.log
+.vscode
+test
+test-api.http
+
+# Lint/format/docs not needed for the build
+.prettierrc
+.prettierignore
+eslint.config.mjs
+.eslintrc*
+.editorconfig
+*.md
+docker-compose*.yml
+Dockerfile

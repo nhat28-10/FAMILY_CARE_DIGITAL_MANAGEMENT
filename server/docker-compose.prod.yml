@@ -1,0 +1,37 @@
+# Production: API + self-hosted Postgres (data persisted in a named volume).
+# All values come from `.env.production` (NOT committed).
+#
+#   docker compose -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.prod.yml down      # keep data
+#   docker compose -f docker-compose.prod.yml down -v    # ALSO delete data
+#
+# The api container runs `prisma migrate deploy` on start (see Dockerfile CMD).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: familycare_db
+    env_file: .env.production
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # DB port is NOT published — only the api service (same network) can reach it.
+
+  api:
+    build: .
+    container_name: familycare_api
+    env_file: .env.production
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

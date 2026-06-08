@@ -20,6 +20,7 @@ import type { SafeUser } from '../users/users.types';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -68,11 +69,15 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Logout successfully')
-  @ApiOperation({ summary: 'Invalidate the stored refresh token' })
+  @ApiOperation({
+    summary:
+      'Log out. Pass refreshToken to revoke only this device, omit to revoke all',
+  })
+  @ApiBody({ type: LogoutDto, required: false })
   @ApiResponse({ status: 200, description: 'Logged out' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
-  logout(@CurrentUser('id') userId: string) {
-    return this.authService.logout(userId);
+  logout(@CurrentUser('id') userId: string, @Body() dto: LogoutDto) {
+    return this.authService.logout(userId, dto);
   }
 
   @Get('me')
