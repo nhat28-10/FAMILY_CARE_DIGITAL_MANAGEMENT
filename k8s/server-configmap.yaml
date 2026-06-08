@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: family-care-server-config
+  namespace: family-care
+data:
+  APP_NAME: Family Care API
+  APP_ENV: development
+  APP_PORT: "3000"
+  APP_PREFIX: api/v1
+  DB_HOST: family-care-postgres
+  DB_PORT: "5432"
+  DB_DATABASE: family_care_dev
+  SWAGGER_ENABLED: "true"
+  CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost:8081,http://localhost:19006"

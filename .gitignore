@@ -45,3 +45,8 @@ public/uploads/
 *.key
 *.crt
 *.cert
+
+# Archives / submission packages
+*.zip
+*.rar
+*.7z

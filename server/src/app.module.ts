@@ -12,8 +12,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
 import { RolesPermissionsModule } from './modules/roles-permissions/roles-permissions.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
-import { WalletsModule } from './modules/wallets/wallets.module';
-import { TransactionsModule } from './modules/transactions/transactions.module';
+
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ChatsModule } from './modules/chats/chats.module';
@@ -44,8 +43,6 @@ import { AdminModule } from './modules/admin/admin.module';
     RolesPermissionsModule,
     SubscriptionPlansModule,
     SubscriptionsModule,
-    WalletsModule,
-    TransactionsModule,
     TasksModule,
     RewardsModule,
     ChatsModule,
@@ -60,4 +57,4 @@ import { AdminModule } from './modules/admin/admin.module';
     AdminModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

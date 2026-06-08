@@ -5,6 +5,14 @@ export default () => ({
     port: parseInt(process.env.APP_PORT || '3000', 10),
     prefix: process.env.APP_PREFIX || 'api/v1',
   },
+  cors: {
+    origins:
+      process.env.CORS_ORIGINS ||
+      'http://localhost:5173,http://localhost:8081,http://localhost:19006',
+  },
+  swagger: {
+    enabled: process.env.SWAGGER_ENABLED !== 'false',
+  },
   database: {
     // Prisma reads DATABASE_URL directly from env; exposed here for reference.
     url: process.env.DATABASE_URL,
