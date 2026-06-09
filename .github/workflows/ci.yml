@@ -1,0 +1,42 @@
+name: CI - Server
+
+on:
+  pull_request:
+    branches:
+      - Staging
+      - main
+  push:
+    branches:
+      - Staging
+      - main
+
+jobs:
+  check-server:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build project
+        run: npm run build

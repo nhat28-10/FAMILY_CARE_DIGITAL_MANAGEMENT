@@ -2,7 +2,9 @@ export default () => ({
   app: {
     name: process.env.APP_NAME || 'Family Care API',
     env: process.env.APP_ENV || 'development',
-    port: parseInt(process.env.APP_PORT || '3000', 10),
+    // Railway/Render/Heroku inject the listen port via PORT; APP_PORT is the
+    // local fallback so dev keeps using the value from .env.
+    port: parseInt(process.env.PORT || process.env.APP_PORT || '3000', 10),
     prefix: process.env.APP_PREFIX || 'api/v1',
   },
   cors: {

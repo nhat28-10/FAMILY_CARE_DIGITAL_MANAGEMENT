@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FamilyRole, Relationship, SystemRole } from '@prisma/client';
+import { FamilyRole, Relationship } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
@@ -14,7 +14,13 @@ const memberInclude = {
   members: {
     include: {
       user: {
-        select: { id: true, email: true, fullName: true, systemRole: true },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          avatarUrl: true,
+          userType: true,
+        },
       },
     },
     orderBy: { joinedAt: 'asc' as const },
@@ -29,29 +35,28 @@ export class FamiliesService {
   ) {}
 
   /**
-   * Creates a family, makes the creator its MANAGER member, and promotes the
-   * creator to FAMILY_MANAGER system role if they were still a FAMILY_MEMBER.
-   * All three steps run in a single transaction.
+   * Creates a family and makes the creator its FAMILY_MANAGER member. The
+   * family role lives entirely on FamilyMember (not on the user account).
+   * Both steps run in a single transaction.
    */
   async create(userId: string, dto: CreateFamilyDto) {
     return this.prisma.$transaction(async (tx) => {
       const family = await tx.family.create({
-        data: { name: dto.name, createdById: userId },
+        data: {
+          name: dto.name,
+          description: dto.description ?? null,
+          avatarUrl: dto.avatarUrl ?? null,
+          createdById: userId,
+        },
       });
 
       await tx.familyMember.create({
         data: {
           familyId: family.id,
           userId,
-          familyRole: FamilyRole.MANAGER,
+          familyRole: FamilyRole.FAMILY_MANAGER,
           relationship: dto.relationship ?? Relationship.OTHER,
         },
-      });
-
-      // Promote only if still a plain member (don't downgrade an ADMIN).
-      await tx.user.updateMany({
-        where: { id: userId, systemRole: SystemRole.FAMILY_MEMBER },
-        data: { systemRole: SystemRole.FAMILY_MANAGER },
       });
 
       return tx.family.findUniqueOrThrow({
@@ -79,7 +84,12 @@ export class FamiliesService {
   async update(familyId: string, dto: UpdateFamilyDto) {
     return this.prisma.family.update({
       where: { id: familyId },
-      data: { name: dto.name },
+      // undefined fields are ignored by Prisma, so only provided ones update.
+      data: {
+        name: dto.name,
+        description: dto.description,
+        avatarUrl: dto.avatarUrl,
+      },
       include: memberInclude,
     });
   }
@@ -96,7 +106,7 @@ export class FamiliesService {
     if (!target) {
       throw new NotFoundException('Member not found in this family');
     }
-    if (target.familyRole === FamilyRole.MANAGER) {
+    if (target.familyRole === FamilyRole.FAMILY_MANAGER) {
       throw new BadRequestException('Cannot remove a family manager');
     }
 

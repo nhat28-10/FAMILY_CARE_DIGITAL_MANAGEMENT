@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { SystemRole, User } from '@prisma/client';
+import { AccountStatus, User, UserType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
@@ -54,8 +54,10 @@ export class AuthService {
       email: dto.email,
       passwordHash,
       fullName: dto.fullName ?? null,
-      // New accounts start as FAMILY_MEMBER; creating a family promotes them.
-      systemRole: SystemRole.FAMILY_MEMBER,
+      phone: dto.phone ?? null,
+      avatarUrl: dto.avatarUrl ?? null,
+      // Account-level type only; family roles live on FamilyMember.familyRole.
+      userType: UserType.NORMAL_USER,
     });
 
     return this.buildAuthResult(user);
@@ -69,11 +71,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!user.isActive) {
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
       throw new ForbiddenException('Account is locked');
     }
 
-    return this.buildAuthResult(user);
+    // Stamp last login, then issue tokens with the updated record.
+    const loggedInUser = await this.usersService.updateLastLogin(user.id);
+    return this.buildAuthResult(loggedInUser);
   }
 
   async refresh(dto: RefreshTokenDto): Promise<AuthResult> {
@@ -103,7 +107,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-    if (!user.isActive) {
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
       throw new ForbiddenException('Account is locked');
     }
 
@@ -161,7 +165,7 @@ export class AuthService {
     const basePayload: JwtPayload = {
       sub: user.id,
       email: user.email,
-      systemRole: user.systemRole,
+      userType: user.userType,
     };
 
     // Pre-generate the refresh session id so it can be embedded as `jti`.
