@@ -1,15 +1,15 @@
-import { SystemRole } from '@prisma/client';
+import { UserType } from '@prisma/client';
 
 /**
  * Claims embedded in the JWTs.
- * - Access token: { sub, email, systemRole }
+ * - Access token: { sub, email, userType }
  * - Refresh token: same + `jti` (id of the refresh_tokens row) for rotation.
  */
 export interface JwtPayload {
   /** Subject — the user id. */
   sub: string;
   email: string;
-  systemRole: SystemRole;
+  userType: UserType;
   /** Refresh-token row id; only present on refresh tokens. */
   jti?: string;
 }

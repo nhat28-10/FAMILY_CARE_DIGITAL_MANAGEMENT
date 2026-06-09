@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentFamilyMember } from '../family-members/decorators/current-family-member.decorator';
 import { FamilyRoles } from '../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import type { SafeUser } from '../users/users.types';
@@ -27,19 +28,19 @@ export class InvitationsController {
 
   @Post('families/:familyId/invitations')
   @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
-  @FamilyRoles(FamilyRole.MANAGER)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Invitation created successfully')
-  @ApiOperation({ summary: 'Invite a member to a family (MANAGER only)' })
+  @ApiOperation({ summary: 'Invite a member to a family (FAMILY_MANAGER only)' })
   @ApiResponse({ status: 201, description: 'Invitation created (token returned once)' })
-  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
   create(
     @Param('familyId') familyId: string,
-    @CurrentUser('id') userId: string,
+    @CurrentFamilyMember('id') memberId: string,
     @Body() dto: CreateInvitationDto,
   ) {
-    return this.invitationsService.create(familyId, userId, dto);
+    return this.invitationsService.create(familyId, memberId, dto);
   }
 
   @Get('invitations/:token')

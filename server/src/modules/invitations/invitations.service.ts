@@ -38,7 +38,7 @@ export class InvitationsService {
    */
   async create(
     familyId: string,
-    invitedById: string,
+    createdByMemberId: string,
     dto: CreateInvitationDto,
   ): Promise<{ invitation: SafeInvitation; token: string }> {
     const token = randomBytes(32).toString('hex');
@@ -49,10 +49,11 @@ export class InvitationsService {
       data: {
         familyId,
         email: dto.email.toLowerCase(),
+        invitedPhone: dto.invitedPhone ?? null,
         tokenHash: this.hashToken(token),
-        familyRole: dto.familyRole ?? FamilyRole.MEMBER,
+        familyRole: dto.familyRole ?? FamilyRole.FAMILY_MEMBER,
         relationship: dto.relationship ?? Relationship.OTHER,
-        invitedById,
+        createdByMemberId,
         expiresAt,
       },
     });
@@ -96,14 +97,18 @@ export class InvitationsService {
       }),
       this.prisma.invitation.update({
         where: { id: invitation.id },
-        data: { status: InvitationStatus.ACCEPTED },
+        data: {
+          status: InvitationStatus.ACCEPTED,
+          acceptedById: user.id,
+          acceptedAt: new Date(),
+        },
       }),
     ]);
 
     return member;
   }
 
-  /** Current user rejects an invitation → marked REJECTED. */
+  /** Current user declines an invitation → marked CANCELED. */
   async reject(token: string, user: SafeUser): Promise<SafeInvitation> {
     const invitation = await this.findByTokenOrThrow(token);
     this.assertPendingAndFresh(invitation);
@@ -111,7 +116,7 @@ export class InvitationsService {
 
     const updated = await this.prisma.invitation.update({
       where: { id: invitation.id },
-      data: { status: InvitationStatus.REJECTED },
+      data: { status: InvitationStatus.CANCELED },
     });
     return this.sanitize(updated);
   }
