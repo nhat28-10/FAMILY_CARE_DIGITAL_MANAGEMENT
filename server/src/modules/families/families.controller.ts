@@ -56,7 +56,7 @@ export class FamiliesController {
 
   @Patch(':familyId')
   @UseGuards(FamilyPermissionGuard)
-  @FamilyRoles(FamilyRole.MANAGER)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ResponseMessage('Family updated successfully')
   @ApiOperation({ summary: 'Update a family (family MANAGER only)' })
   @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
@@ -66,7 +66,7 @@ export class FamiliesController {
 
   @Delete(':familyId/members/:userId')
   @UseGuards(FamilyPermissionGuard)
-  @FamilyRoles(FamilyRole.MANAGER)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ResponseMessage('Member removed successfully')
   @ApiOperation({ summary: 'Remove a member from the family (MANAGER only)' })
   @ApiResponse({ status: 400, description: 'Cannot remove a family manager' })

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, SystemRole, User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -24,11 +24,11 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  /**
-   * Promotes a user to a new system role (e.g. FAMILY_MEMBER → FAMILY_MANAGER
-   * when they create their first family).
-   */
-  updateSystemRole(id: string, systemRole: SystemRole): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data: { systemRole } });
+  /** Records a successful login by stamping `lastLoginAt`. */
+  updateLastLogin(id: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { lastLoginAt: new Date() },
+    });
   }
 }

@@ -14,26 +14,36 @@ datasource db {
 // Enums — 3-layer role model
 // ===========================================================================
 
-/// System-wide role used for global authentication/authorization.
-enum SystemRole {
-  ADMIN
+/// Account-level user type (ERD: user_type). System-wide; family roles live on
+/// FamilyMember.familyRole, not here.
+enum UserType {
+  NORMAL_USER
+  SYSTEM_ADMIN
+}
+
+/// Account lifecycle status (ERD: account_status).
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Role of a user inside a specific family (ERD: family_role).
+enum FamilyRole {
   FAMILY_MANAGER
+  DEPUTY_MEMBER
   FAMILY_MEMBER
 }
 
-/// Role of a user inside a specific family.
-enum FamilyRole {
-  MANAGER
-  MEMBER
-}
-
-/// Family relationship — display only.
+/// Family relationship — display only (ERD: relationship_type).
 enum Relationship {
   FATHER
   MOTHER
+  SPOUSE
   CHILD
-  GRANDFATHER
-  GRANDMOTHER
+  SISTER
+  BROTHER
+  GRANDPARENT
   OTHER
 }
 
@@ -41,8 +51,36 @@ enum Relationship {
 enum InvitationStatus {
   PENDING
   ACCEPTED
-  REJECTED
   EXPIRED
+  CANCELED
+}
+
+/// Email/phone verification status of a user account (ERD: verification_status).
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+/// Operational lifecycle of a family workspace (ERD: workspace_status).
+enum WorkspaceStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  EXPIRED
+}
+
+/// Provisioning/activation result of a family workspace (ERD: activation_status).
+enum ActivationStatus {
+  ACTIVE
+  PENDING
+  FAILED
+}
+
+/// Membership lifecycle of a family member (ERD: member_status).
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
 }
 
 // ===========================================================================
@@ -54,18 +92,45 @@ model User {
   email        String     @unique
   passwordHash String
   fullName     String?
-  systemRole   SystemRole @default(FAMILY_MEMBER)
-  isActive     Boolean    @default(true)
+  /// ERD: phone_number — optional, unique when present.
+  phone        String?    @unique
+  /// ERD: avatar_url.
+  avatarUrl    String?
+  /// ERD: user_type — NORMAL_USER vs SYSTEM_ADMIN (not a family role).
+  userType     UserType   @default(NORMAL_USER)
+  /// ERD: account_status.
+  accountStatus AccountStatus @default(ACTIVE)
+  /// ERD: verification_status.
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  /// ERD: last_login_at — set on each successful login.
+  lastLoginAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  memberships     FamilyMember[]
-  refreshTokens   RefreshToken[]
-  sentInvitations Invitation[]   @relation("InvitedBy")
+  memberships         FamilyMember[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  acceptedInvitations Invitation[]         @relation("AcceptedBy")
 
   @@map("users")
+}
+
+/// One-time password reset tokens (ERD: PasswordResetToken). The raw token is
+/// never stored — only its sha256/bcrypt hash. `usedAt` marks single use.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// One row per active refresh token (per device/session). The raw token is
@@ -88,6 +153,14 @@ model RefreshToken {
 model Family {
   id          String   @id @default(uuid())
   name        String
+  /// ERD: description.
+  description String?
+  /// ERD: avatar_url.
+  avatarUrl   String?
+  /// ERD: workspace_status.
+  status      WorkspaceStatus  @default(ACTIVE)
+  /// ERD: activation_status.
+  activationStatus ActivationStatus @default(ACTIVE)
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -103,12 +176,23 @@ model FamilyMember {
   id           String       @id @default(uuid())
   familyId     String
   userId       String
-  familyRole   FamilyRole   @default(MEMBER)
+  /// ERD: display_name — per-family display name override.
+  displayName  String?
+  familyRole   FamilyRole   @default(FAMILY_MEMBER)
   relationship Relationship @default(OTHER)
+  /// ERD: member_status.
+  status       MemberStatus @default(ACTIVE)
   joinedAt     DateTime     @default(now())
+  /// ERD: left_at — set when the member leaves/is removed.
+  leftAt       DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Invitations created by this member (ERD: created_by_member_id).
+  createdInvitations Invitation[] @relation("CreatedByMember")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -119,17 +203,25 @@ model Invitation {
   id           String           @id @default(uuid())
   familyId     String
   email        String
+  /// ERD: invited_phone — optional alternative contact.
+  invitedPhone String?
   /// sha256 hash of the opaque invitation token (raw token returned once).
   tokenHash    String           @unique
-  familyRole   FamilyRole       @default(MEMBER)
+  familyRole   FamilyRole       @default(FAMILY_MEMBER)
   relationship Relationship     @default(OTHER)
   status       InvitationStatus @default(PENDING)
-  invitedById  String
+  /// ERD: created_by_member_id — the family member who issued the invite.
+  createdByMemberId String
+  /// ERD: accepted_by_user_id — who accepted the invitation.
+  acceptedById String?
   expiresAt    DateTime
   createdAt    DateTime         @default(now())
+  /// ERD: accepted_at.
+  acceptedAt   DateTime?
 
-  family    Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  invitedBy User   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedByMember", fields: [createdByMemberId], references: [id], onDelete: Cascade)
+  acceptedBy      User?        @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
 
   @@index([familyId])
   @@map("invitations")

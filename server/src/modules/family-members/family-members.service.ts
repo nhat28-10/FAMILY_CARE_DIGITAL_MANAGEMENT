@@ -7,7 +7,7 @@ const memberUserSelect = {
   id: true,
   email: true,
   fullName: true,
-  systemRole: true,
+  userType: true,
 } as const;
 
 export interface CreateFamilyMemberInput {
