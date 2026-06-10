@@ -132,6 +132,20 @@ enum LedgerEntryStatus {
   VOIDED
 }
 
+/// Allocation strategy used by a family for its internal finance planning.
+enum FinanceModelType {
+  FIVE_JARS
+  EIGHTY_TWENTY
+  CUSTOM
+}
+
+/// Lifecycle of a family's finance allocation configuration.
+enum FinanceModelStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
 // ===========================================================================
 // Models
 // ===========================================================================
@@ -219,6 +233,7 @@ model Family {
   invitations       Invitation[]
   financeLedger     FinanceLedger?
   financeCategories FinanceCategory[]
+  financeModels     FinanceModel[]
 
   @@map("families")
 }
@@ -337,6 +352,44 @@ model FinanceCategory {
   @@unique([familyId, name, categoryType])
   @@index([familyId, categoryType, status])
   @@map("finance_categories")
+}
+
+/// Historical finance allocation configuration for a family. Only one model
+/// may be active for a family at a time.
+model FinanceModel {
+  id        String             @id @default(uuid())
+  familyId  String
+  modelType FinanceModelType
+  name      String
+  status    FinanceModelStatus @default(DRAFT)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  family Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  jars   FinanceJar[]
+
+  @@index([familyId, status])
+  @@map("finance_models")
+}
+
+/// Jar/fund allocation belonging to one finance model. Percentages are
+/// planning values only and never represent stored real money.
+model FinanceJar {
+  id                   String   @id @default(uuid())
+  financeModelId       String
+  name                 String
+  jarCode              String
+  allocationPercentage Decimal  @db.Decimal(5, 2)
+  description          String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  financeModel FinanceModel @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+
+  @@unique([financeModelId, jarCode])
+  @@index([financeModelId, isActive])
+  @@map("finance_jars")
 }
 
 /// Immutable-style record in the shared family ledger. Corrections should be
