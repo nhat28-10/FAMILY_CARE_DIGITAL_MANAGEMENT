@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,13 +8,19 @@ import {
   EssentialType,
   FinanceCategoryStatus,
   FinanceLedgerStatus,
+  FinanceModelStatus,
+  FinanceModelType,
+  FamilyRole,
   LedgerEntryStatus,
   LedgerEntryType,
   Prisma,
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { FINANCE_MODEL_TEMPLATES } from '../constants/finance-model-templates.constant';
 import { CreateFinanceCategoryDto } from '../dto/create-finance-category.dto';
+import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
+import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { CreateMemberMonthlyFinanceDto } from '../dto/create-member-monthly-finance.dto';
 import {
@@ -21,6 +28,7 @@ import {
   RequiredFinancePeriodDto,
 } from '../dto/finance-period.dto';
 import { UpdateMemberMonthlyFinanceDto } from '../dto/update-member-monthly-finance.dto';
+import { UpdateFinanceJarDto } from '../dto/update-finance-jar.dto';
 
 @Injectable()
 export class FinanceService {
@@ -84,6 +92,198 @@ export class FinanceService {
       }
       throw error;
     }
+  }
+
+  listFinanceModelTemplates() {
+    return FINANCE_MODEL_TEMPLATES;
+  }
+
+  listFinanceModels(familyId: string, familyRole: FamilyRole) {
+    return this.prisma.financeModel.findMany({
+      where: {
+        familyId,
+        status: this.isFinanceManager(familyRole)
+          ? undefined
+          : FinanceModelStatus.ACTIVE,
+      },
+      include: { _count: { select: { jars: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  createFinanceModel(familyId: string, dto: CreateFinanceModelDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const model = await tx.financeModel.create({
+        data: {
+          familyId,
+          modelType: dto.modelType,
+          name: dto.name.trim(),
+        },
+      });
+
+      await this.createDefaultJars(tx, model.id, dto.modelType);
+
+      return tx.financeModel.findUniqueOrThrow({
+        where: { id: model.id },
+        include: { jars: { orderBy: { createdAt: 'asc' } } },
+      });
+    });
+  }
+
+  activateFinanceModel(familyId: string, modelId: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const model = await tx.financeModel.findFirst({
+          where: { id: modelId, familyId },
+          include: { _count: { select: { jars: true } } },
+        });
+        if (!model) {
+          throw new NotFoundException(
+            'Không tìm thấy mô hình tài chính trong gia đình này',
+          );
+        }
+
+        if (model._count.jars === 0) {
+          await this.createDefaultJars(tx, model.id, model.modelType);
+        }
+        await this.assertJarAllocationWithinLimit(tx, model.id);
+
+        await tx.financeModel.updateMany({
+          where: {
+            familyId,
+            status: FinanceModelStatus.ACTIVE,
+            id: { not: modelId },
+          },
+          data: { status: FinanceModelStatus.INACTIVE },
+        });
+
+        return tx.financeModel.update({
+          where: { id: modelId },
+          data: { status: FinanceModelStatus.ACTIVE },
+          include: { jars: { orderBy: { createdAt: 'asc' } } },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  listFinanceJars(familyId: string, familyRole: FamilyRole) {
+    const manager = this.isFinanceManager(familyRole);
+    return this.prisma.financeJar.findMany({
+      where: {
+        financeModel: {
+          familyId,
+          status: manager ? undefined : FinanceModelStatus.ACTIVE,
+        },
+        isActive: manager ? undefined : true,
+      },
+      include: {
+        financeModel: {
+          select: { id: true, name: true, modelType: true, status: true },
+        },
+      },
+      orderBy: [{ financeModel: { createdAt: 'desc' } }, { createdAt: 'asc' }],
+    });
+  }
+
+  createFinanceJar(familyId: string, dto: CreateFinanceJarDto) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const model = await this.requireFamilyFinanceModel(
+          tx,
+          familyId,
+          dto.financeModelId,
+        );
+        this.assertDraftFinanceModel(model.status);
+
+        const isActive = dto.isActive ?? true;
+        if (isActive) {
+          await this.assertJarAllocationWithinLimit(
+            tx,
+            dto.financeModelId,
+            new Prisma.Decimal(dto.allocationPercentage),
+          );
+        }
+
+        try {
+          return await tx.financeJar.create({
+            data: {
+              financeModelId: dto.financeModelId,
+              name: dto.name.trim(),
+              jarCode: dto.jarCode.trim().toUpperCase(),
+              allocationPercentage: new Prisma.Decimal(
+                dto.allocationPercentage,
+              ),
+              description: dto.description?.trim(),
+              isActive,
+            },
+            include: { financeModel: true },
+          });
+        } catch (error) {
+          if (this.isUniqueConstraintError(error)) {
+            throw new ConflictException(
+              'Mã hũ tài chính đã tồn tại trong mô hình này',
+            );
+          }
+          throw error;
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  updateFinanceJar(familyId: string, jarId: string, dto: UpdateFinanceJarDto) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const jar = await tx.financeJar.findFirst({
+          where: { id: jarId, financeModel: { familyId } },
+          include: { financeModel: { select: { status: true } } },
+        });
+        if (!jar) {
+          throw new NotFoundException(
+            'Không tìm thấy hũ tài chính trong gia đình này',
+          );
+        }
+        this.assertDraftFinanceModel(jar.financeModel.status);
+
+        const isActive = dto.isActive ?? jar.isActive;
+        const allocationPercentage =
+          dto.allocationPercentage === undefined
+            ? jar.allocationPercentage
+            : new Prisma.Decimal(dto.allocationPercentage);
+        if (isActive) {
+          await this.assertJarAllocationWithinLimit(
+            tx,
+            jar.financeModelId,
+            allocationPercentage,
+            jar.id,
+          );
+        }
+
+        try {
+          return await tx.financeJar.update({
+            where: { id: jar.id },
+            data: {
+              name: dto.name?.trim(),
+              jarCode: dto.jarCode?.trim().toUpperCase(),
+              allocationPercentage,
+              description:
+                dto.description === null ? null : dto.description?.trim(),
+              isActive: dto.isActive,
+            },
+            include: { financeModel: true },
+          });
+        } catch (error) {
+          if (this.isUniqueConstraintError(error)) {
+            throw new ConflictException(
+              'Mã hũ tài chính đã tồn tại trong mô hình này',
+            );
+          }
+          throw error;
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   listCategories(familyId: string) {
@@ -288,6 +488,78 @@ export class FinanceService {
       start: new Date(Date.UTC(year, month - 1, 1)),
       end: new Date(Date.UTC(year, month, 1)),
     };
+  }
+
+  private isFinanceManager(familyRole: FamilyRole) {
+    return (
+      familyRole === FamilyRole.FAMILY_MANAGER ||
+      familyRole === FamilyRole.DEPUTY_MEMBER
+    );
+  }
+
+  private async requireFamilyFinanceModel(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    modelId: string,
+  ) {
+    const model = await tx.financeModel.findFirst({
+      where: { id: modelId, familyId },
+    });
+    if (!model) {
+      throw new NotFoundException(
+        'Không tìm thấy mô hình tài chính trong gia đình này',
+      );
+    }
+    return model;
+  }
+
+  private async createDefaultJars(
+    tx: Prisma.TransactionClient,
+    financeModelId: string,
+    modelType: FinanceModelType,
+  ) {
+    const template = FINANCE_MODEL_TEMPLATES.find(
+      (item) => item.modelType === modelType,
+    );
+    if (!template?.jars.length) {
+      return;
+    }
+    await tx.financeJar.createMany({
+      data: template.jars.map((jar) => ({ ...jar, financeModelId })),
+      skipDuplicates: true,
+    });
+  }
+
+  private assertDraftFinanceModel(status: FinanceModelStatus) {
+    if (status !== FinanceModelStatus.DRAFT) {
+      throw new BadRequestException(
+        'Chỉ có thể chỉnh sửa hũ tài chính khi mô hình đang ở trạng thái DRAFT',
+      );
+    }
+  }
+
+  private async assertJarAllocationWithinLimit(
+    tx: Prisma.TransactionClient,
+    financeModelId: string,
+    addedAllocation = new Prisma.Decimal(0),
+    excludedJarId?: string,
+  ) {
+    const current = await tx.financeJar.aggregate({
+      where: {
+        financeModelId,
+        isActive: true,
+        id: excludedJarId ? { not: excludedJarId } : undefined,
+      },
+      _sum: { allocationPercentage: true },
+    });
+    const total = (
+      current._sum.allocationPercentage ?? new Prisma.Decimal(0)
+    ).plus(addedAllocation);
+    if (total.greaterThan(100)) {
+      throw new BadRequestException(
+        'Tổng tỷ lệ phân bổ của các hũ hoạt động không được vượt quá 100%',
+      );
+    }
   }
 
   private isUniqueConstraintError(
