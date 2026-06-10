@@ -101,8 +101,13 @@ export class FinanceController {
   }
 
   @Get('categories')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Lấy danh sách danh mục tài chính thành công')
   @ApiOperation({ summary: 'Lấy danh sách danh mục tài chính của gia đình' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền quản lý tài chính gia đình',
+  })
   listCategories(@Param('familyId') familyId: string) {
     return this.financeService.listCategories(familyId);
   }
@@ -128,8 +133,13 @@ export class FinanceController {
   }
 
   @Get('ledger/entries')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Lấy danh sách giao dịch sổ tài chính chung thành công')
   @ApiOperation({ summary: 'Lấy danh sách giao dịch trong sổ tài chính chung' })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền quản lý tài chính gia đình',
+  })
   listLedgerEntries(
     @Param('familyId') familyId: string,
     @Query() period: OptionalFinancePeriodDto,
@@ -157,10 +167,15 @@ export class FinanceController {
   }
 
   @Get('overview')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Lấy tổng quan tài chính gia đình thành công')
   @ApiOperation({
     summary:
       'Lấy tổng quan sổ tài chính chung và thông tin tháng của thành viên hiện tại',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền quản lý tài chính gia đình',
   })
   getOverview(
     @Param('familyId') familyId: string,
