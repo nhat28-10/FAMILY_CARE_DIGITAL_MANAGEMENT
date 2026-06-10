@@ -3,7 +3,8 @@ import { IsJWT, IsNotEmpty, IsString } from 'class-validator';
 
 export class RefreshTokenDto {
   @ApiProperty({
-    description: 'A valid, non-expired refresh token previously issued by the API',
+    description:
+      'A valid, non-expired refresh token previously issued by the API',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   @IsString()

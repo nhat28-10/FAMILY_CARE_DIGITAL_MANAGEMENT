@@ -24,9 +24,10 @@ export interface ApiSuccessResponse<T> {
  * "Success" when none is provided.
  */
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, ApiSuccessResponse<T>>
-{
+export class TransformInterceptor<T> implements NestInterceptor<
+  T,
+  ApiSuccessResponse<T>
+> {
   constructor(private readonly reflector: Reflector) {}
 
   intercept(
