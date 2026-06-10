@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { AccountStatus, User, UserType } from '@prisma/client';
+import { AccountStatus, Prisma, User, UserType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
@@ -47,18 +47,39 @@ export class AuthService {
     if (existing) {
       throw new ConflictException('Email is already registered');
     }
+    if (dto.phone && (await this.usersService.findByPhone(dto.phone))) {
+      throw new ConflictException('Phone number is already registered');
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, this.saltRounds);
 
-    const user = await this.usersService.create({
-      email: dto.email,
-      passwordHash,
-      fullName: dto.fullName ?? null,
-      phone: dto.phone ?? null,
-      avatarUrl: dto.avatarUrl ?? null,
-      // Account-level type only; family roles live on FamilyMember.familyRole.
-      userType: UserType.NORMAL_USER,
-    });
+    let user: User;
+    try {
+      user = await this.usersService.create({
+        email: dto.email,
+        passwordHash,
+        fullName: dto.fullName ?? null,
+        phone: dto.phone ?? null,
+        avatarUrl: dto.avatarUrl ?? null,
+        // Account-level type only; family roles live on FamilyMember.familyRole.
+        userType: UserType.NORMAL_USER,
+      });
+    } catch (err) {
+      // Safety net for the race between the pre-checks above and the insert.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const target = err.meta?.target;
+        const field = Array.isArray(target) ? target.join(',') : String(target);
+        throw new ConflictException(
+          field.includes('phone')
+            ? 'Phone number is already registered'
+            : 'Email is already registered',
+        );
+      }
+      throw err;
+    }
 
     return this.buildAuthResult(user);
   }
