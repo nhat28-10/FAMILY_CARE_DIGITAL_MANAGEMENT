@@ -14,26 +14,36 @@ datasource db {
 // Enums — 3-layer role model
 // ===========================================================================
 
-/// System-wide role used for global authentication/authorization.
-enum SystemRole {
-  ADMIN
+/// Account-level user type (ERD: user_type). System-wide; family roles live on
+/// FamilyMember.familyRole, not here.
+enum UserType {
+  NORMAL_USER
+  SYSTEM_ADMIN
+}
+
+/// Account lifecycle status (ERD: account_status).
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Role of a user inside a specific family (ERD: family_role).
+enum FamilyRole {
   FAMILY_MANAGER
+  DEPUTY_MEMBER
   FAMILY_MEMBER
 }
 
-/// Role of a user inside a specific family.
-enum FamilyRole {
-  MANAGER
-  MEMBER
-}
-
-/// Family relationship — display only.
+/// Family relationship — display only (ERD: relationship_type).
 enum Relationship {
   FATHER
   MOTHER
+  SPOUSE
   CHILD
-  GRANDFATHER
-  GRANDMOTHER
+  SISTER
+  BROTHER
+  GRANDPARENT
   OTHER
 }
 
@@ -41,8 +51,85 @@ enum Relationship {
 enum InvitationStatus {
   PENDING
   ACCEPTED
-  REJECTED
   EXPIRED
+  CANCELED
+}
+
+/// Email/phone verification status of a user account (ERD: verification_status).
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+/// Operational lifecycle of a family workspace (ERD: workspace_status).
+enum WorkspaceStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  EXPIRED
+}
+
+/// Provisioning/activation result of a family workspace (ERD: activation_status).
+enum ActivationStatus {
+  ACTIVE
+  PENDING
+  FAILED
+}
+
+/// Membership lifecycle of a family member (ERD: member_status).
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+/// Controls whether a member's monthly finance summary is private or visible
+/// within their family workspace.
+enum FinanceVisibility {
+  PRIVATE
+  FAMILY
+}
+
+/// Lifecycle status of the single shared finance ledger owned by a family.
+enum FinanceLedgerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Whether a finance category records incoming or outgoing money.
+enum FinanceCategoryType {
+  INCOME
+  EXPENSE
+}
+
+/// Essential classification used for family expense analysis.
+enum EssentialType {
+  ESSENTIAL
+  NON_ESSENTIAL
+  NEUTRAL
+}
+
+/// Lifecycle status of a family-defined finance category.
+enum FinanceCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Business classification of a shared family ledger entry.
+enum LedgerEntryType {
+  INCOME
+  EXPENSE
+  CONTRIBUTION
+  ALLOWANCE
+  REWARD
+  SUPPORT
+  ADJUSTMENT
+}
+
+/// Ledger entries are retained for traceability and voided instead of deleted.
+enum LedgerEntryStatus {
+  ACTIVE
+  VOIDED
 }
 
 // ===========================================================================
@@ -50,22 +137,49 @@ enum InvitationStatus {
 // ===========================================================================
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  fullName     String?
-  systemRole   SystemRole @default(FAMILY_MEMBER)
-  isActive     Boolean    @default(true)
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  passwordHash       String
+  fullName           String?
+  /// ERD: phone_number — optional, unique when present.
+  phone              String?            @unique
+  /// ERD: avatar_url.
+  avatarUrl          String?
+  /// ERD: user_type — NORMAL_USER vs SYSTEM_ADMIN (not a family role).
+  userType           UserType           @default(NORMAL_USER)
+  /// ERD: account_status.
+  accountStatus      AccountStatus      @default(ACTIVE)
+  /// ERD: verification_status.
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  /// ERD: last_login_at — set on each successful login.
+  lastLoginAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  memberships     FamilyMember[]
-  refreshTokens   RefreshToken[]
-  sentInvitations Invitation[]   @relation("InvitedBy")
+  memberships         FamilyMember[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  acceptedInvitations Invitation[]         @relation("AcceptedBy")
 
   @@map("users")
+}
+
+/// One-time password reset tokens (ERD: PasswordResetToken). The raw token is
+/// never stored — only its sha256/bcrypt hash. `usedAt` marks single use.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// One row per active refresh token (per device/session). The raw token is
@@ -86,15 +200,25 @@ model RefreshToken {
 }
 
 model Family {
-  id          String   @id @default(uuid())
-  name        String
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String           @id @default(uuid())
+  name             String
+  /// ERD: description.
+  description      String?
+  /// ERD: avatar_url.
+  avatarUrl        String?
+  /// ERD: workspace_status.
+  status           WorkspaceStatus  @default(ACTIVE)
+  /// ERD: activation_status.
+  activationStatus ActivationStatus @default(ACTIVE)
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // Relations
-  members     FamilyMember[]
-  invitations Invitation[]
+  members           FamilyMember[]
+  invitations       Invitation[]
+  financeLedger     FinanceLedger?
+  financeCategories FinanceCategory[]
 
   @@map("families")
 }
@@ -103,12 +227,25 @@ model FamilyMember {
   id           String       @id @default(uuid())
   familyId     String
   userId       String
-  familyRole   FamilyRole   @default(MEMBER)
+  /// ERD: display_name — per-family display name override.
+  displayName  String?
+  familyRole   FamilyRole   @default(FAMILY_MEMBER)
   relationship Relationship @default(OTHER)
+  /// ERD: member_status.
+  status       MemberStatus @default(ACTIVE)
   joinedAt     DateTime     @default(now())
+  /// ERD: left_at — set when the member leaves/is removed.
+  leftAt       DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Invitations created by this member (ERD: created_by_member_id).
+  createdInvitations   Invitation[]           @relation("CreatedByMember")
+  monthlyFinances      MemberMonthlyFinance[]
+  createdLedgerEntries LedgerEntry[]          @relation("CreatedLedgerEntries")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -116,21 +253,118 @@ model FamilyMember {
 }
 
 model Invitation {
-  id           String           @id @default(uuid())
-  familyId     String
-  email        String
+  id                String           @id @default(uuid())
+  familyId          String
+  email             String
+  /// ERD: invited_phone — optional alternative contact.
+  invitedPhone      String?
   /// sha256 hash of the opaque invitation token (raw token returned once).
-  tokenHash    String           @unique
-  familyRole   FamilyRole       @default(MEMBER)
-  relationship Relationship     @default(OTHER)
-  status       InvitationStatus @default(PENDING)
-  invitedById  String
-  expiresAt    DateTime
-  createdAt    DateTime         @default(now())
+  tokenHash         String           @unique
+  familyRole        FamilyRole       @default(FAMILY_MEMBER)
+  relationship      Relationship     @default(OTHER)
+  status            InvitationStatus @default(PENDING)
+  /// ERD: created_by_member_id — the family member who issued the invite.
+  createdByMemberId String
+  /// ERD: accepted_by_user_id — who accepted the invitation.
+  acceptedById      String?
+  expiresAt         DateTime
+  createdAt         DateTime         @default(now())
+  /// ERD: accepted_at.
+  acceptedAt        DateTime?
 
-  family    Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  invitedBy User   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedByMember", fields: [createdByMemberId], references: [id], onDelete: Cascade)
+  acceptedBy      User?        @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
 
   @@index([familyId])
   @@map("invitations")
+}
+
+/// Monthly personal income and expense summary for a family member. This is a
+/// summary only; personal ledger entries are intentionally not modeled.
+model MemberMonthlyFinance {
+  id                      String            @id @default(uuid())
+  memberId                String
+  periodMonth             Int
+  periodYear              Int
+  expectedIncome          Decimal?          @db.Decimal(18, 2)
+  actualIncome            Decimal?          @db.Decimal(18, 2)
+  expectedPersonalExpense Decimal?          @db.Decimal(18, 2)
+  actualPersonalExpense   Decimal?          @db.Decimal(18, 2)
+  incomeVisibility        FinanceVisibility @default(PRIVATE)
+  expenseVisibility       FinanceVisibility @default(PRIVATE)
+  note                    String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, periodMonth, periodYear])
+  @@index([periodYear, periodMonth])
+  @@map("member_monthly_finances")
+}
+
+/// The single shared finance ledger for a family workspace. Family finance is
+/// an internal record system and does not represent a real-money wallet.
+model FinanceLedger {
+  id         String              @id @default(uuid())
+  familyId   String              @unique
+  ledgerName String
+  status     FinanceLedgerStatus @default(ACTIVE)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries LedgerEntry[]
+
+  @@map("finance_ledgers")
+}
+
+/// Family-defined classification for shared ledger entries.
+model FinanceCategory {
+  id            String                @id @default(uuid())
+  familyId      String
+  name          String
+  categoryType  FinanceCategoryType
+  essentialType EssentialType         @default(NEUTRAL)
+  status        FinanceCategoryStatus @default(ACTIVE)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries LedgerEntry[]
+
+  @@unique([familyId, name, categoryType])
+  @@index([familyId, categoryType, status])
+  @@map("finance_categories")
+}
+
+/// Immutable-style record in the shared family ledger. Corrections should be
+/// represented by voiding or adjustment entries rather than deleting history.
+model LedgerEntry {
+  id                String            @id @default(uuid())
+  ledgerId          String
+  categoryId        String?
+  createdByMemberId String
+  entryType         LedgerEntryType
+  amount            Decimal           @db.Decimal(18, 2)
+  description       String
+  note              String?
+  entryDate         DateTime
+  status            LedgerEntryStatus @default(ACTIVE)
+  sourceType        String?
+  sourceId          String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  ledger          FinanceLedger    @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdByMember FamilyMember     @relation("CreatedLedgerEntries", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([ledgerId, entryDate])
+  @@index([ledgerId, entryType, status])
+  @@index([categoryId])
+  @@index([createdByMemberId])
+  @@index([sourceType, sourceId])
+  @@map("ledger_entries")
 }

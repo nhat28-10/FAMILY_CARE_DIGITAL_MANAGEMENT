@@ -9,11 +9,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FamilyRole } from '@prisma/client';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentFamilyMember } from '../family-members/decorators/current-family-member.decorator';
 import { FamilyRoles } from '../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import type { SafeUser } from '../users/users.types';
@@ -27,19 +33,27 @@ export class InvitationsController {
 
   @Post('families/:familyId/invitations')
   @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
-  @FamilyRoles(FamilyRole.MANAGER)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Invitation created successfully')
-  @ApiOperation({ summary: 'Invite a member to a family (MANAGER only)' })
-  @ApiResponse({ status: 201, description: 'Invitation created (token returned once)' })
-  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  @ApiOperation({
+    summary: 'Invite a member to a family (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Invitation created (token returned once)',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Requires family FAMILY_MANAGER role',
+  })
   create(
     @Param('familyId') familyId: string,
-    @CurrentUser('id') userId: string,
+    @CurrentFamilyMember('id') memberId: string,
     @Body() dto: CreateInvitationDto,
   ) {
-    return this.invitationsService.create(familyId, userId, dto);
+    return this.invitationsService.create(familyId, memberId, dto);
   }
 
   @Get('invitations/:token')
@@ -56,8 +70,14 @@ export class InvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Invitation accepted successfully')
   @ApiOperation({ summary: 'Accept an invitation (joins the family)' })
-  @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
-  @ApiResponse({ status: 403, description: 'Invitation sent to a different email' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation expired or not pending',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Invitation sent to a different email',
+  })
   @ApiResponse({ status: 409, description: 'Already a member of this family' })
   accept(@Param('token') token: string, @CurrentUser() user: SafeUser) {
     return this.invitationsService.accept(token, user);
@@ -69,7 +89,10 @@ export class InvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Invitation rejected successfully')
   @ApiOperation({ summary: 'Reject an invitation' })
-  @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation expired or not pending',
+  })
   reject(@Param('token') token: string, @CurrentUser() user: SafeUser) {
     return this.invitationsService.reject(token, user);
   }
