@@ -11,7 +11,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FamilyRole } from '@prisma/client';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';

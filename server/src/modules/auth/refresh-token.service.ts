@@ -36,7 +36,11 @@ export class RefreshTokenService {
    * Returns true only if the token row exists, belongs to the user, is not
    * revoked, not expired, and the raw token matches the stored hash.
    */
-  async isValid(id: string, userId: string, rawToken: string): Promise<boolean> {
+  async isValid(
+    id: string,
+    userId: string,
+    rawToken: string,
+  ): Promise<boolean> {
     const row = await this.prisma.refreshToken.findUnique({ where: { id } });
     if (
       !row ||
