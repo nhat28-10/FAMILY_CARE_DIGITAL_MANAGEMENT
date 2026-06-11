@@ -35,7 +35,7 @@ export class AdminInvitationsController {
   constructor(private readonly admin: AdminService) {}
 
   @Get()
-  @ResponseMessage('Fetched invitations successfully')
+  @ResponseMessage('Lấy danh sách lời mời thành công')
   @ApiOperation({ summary: 'List invitations (paginated, SYSTEM_ADMIN only)' })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListInvitationsQueryDto) {
@@ -43,7 +43,7 @@ export class AdminInvitationsController {
   }
 
   @Get(':id')
-  @ResponseMessage('Fetched invitation successfully')
+  @ResponseMessage('Lấy thông tin lời mời thành công')
   @ApiOperation({ summary: 'Get an invitation by id' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   get(@Param('id') id: string) {
@@ -51,7 +51,7 @@ export class AdminInvitationsController {
   }
 
   @Patch(':id')
-  @ResponseMessage('Invitation updated successfully')
+  @ResponseMessage('Cập nhật lời mời thành công')
   @ApiOperation({ summary: 'Update an invitation status' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateInvitationDto) {
@@ -60,7 +60,7 @@ export class AdminInvitationsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Invitation deleted successfully')
+  @ResponseMessage('Xóa lời mời thành công')
   @ApiOperation({ summary: 'Delete an invitation' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   remove(@Param('id') id: string) {

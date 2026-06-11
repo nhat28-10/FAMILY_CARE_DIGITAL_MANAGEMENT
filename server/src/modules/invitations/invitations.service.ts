@@ -83,7 +83,7 @@ export class InvitationsService {
       user.id,
     );
     if (existing) {
-      throw new ConflictException('You are already a member of this family');
+      throw new ConflictException('Bạn đã là thành viên của gia đình này');
     }
 
     const [member] = await this.prisma.$transaction([
@@ -138,7 +138,7 @@ export class InvitationsService {
       ...(include ? { include } : {}),
     });
     if (!invitation) {
-      throw new NotFoundException('Invitation not found');
+      throw new NotFoundException('Không tìm thấy lời mời');
     }
     return invitation;
   }
@@ -152,11 +152,11 @@ export class InvitationsService {
           data: { status: InvitationStatus.EXPIRED },
         })
         .catch(() => undefined);
-      throw new BadRequestException('Invitation has expired');
+      throw new BadRequestException('Lời mời đã hết hạn');
     }
     if (invitation.status !== InvitationStatus.PENDING) {
       throw new BadRequestException(
-        `Invitation is no longer pending (status: ${invitation.status})`,
+        `Lời mời không còn hiệu lực (trạng thái: ${invitation.status})`,
       );
     }
   }
@@ -164,7 +164,7 @@ export class InvitationsService {
   private assertEmailMatches(invitation: Invitation, user: SafeUser): void {
     if (invitation.email.toLowerCase() !== user.email.toLowerCase()) {
       throw new ForbiddenException(
-        'This invitation was sent to a different email address',
+        'Lời mời được gửi tới một email khác',
       );
     }
   }

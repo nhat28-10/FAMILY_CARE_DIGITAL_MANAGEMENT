@@ -21,7 +21,7 @@ export interface ApiSuccessResponse<T> {
  *   { success: true, message: string, data: T }
  *
  * The message comes from the @ResponseMessage() decorator, defaulting to
- * "Success" when none is provided.
+ * "Thành công" when none is provided.
  */
 @Injectable()
 export class TransformInterceptor<T>
@@ -37,7 +37,7 @@ export class TransformInterceptor<T>
       this.reflector.getAllAndOverride<string>(RESPONSE_MESSAGE_KEY, [
         context.getHandler(),
         context.getClass(),
-      ]) || 'Success';
+      ]) || 'Thành công';
 
     return next.handle().pipe(
       map((data) => ({

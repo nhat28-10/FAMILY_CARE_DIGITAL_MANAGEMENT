@@ -76,7 +76,7 @@ export class FamiliesService {
       include: memberInclude,
     });
     if (!family) {
-      throw new NotFoundException('Family not found');
+      throw new NotFoundException('Không tìm thấy gia đình');
     }
     return family;
   }
@@ -104,10 +104,10 @@ export class FamiliesService {
       targetUserId,
     );
     if (!target) {
-      throw new NotFoundException('Member not found in this family');
+      throw new NotFoundException('Không tìm thấy thành viên trong gia đình này');
     }
     if (target.familyRole === FamilyRole.FAMILY_MANAGER) {
-      throw new BadRequestException('Cannot remove a family manager');
+      throw new BadRequestException('Không thể xóa quản lý gia đình');
     }
 
     await this.familyMembersService.remove(familyId, targetUserId);

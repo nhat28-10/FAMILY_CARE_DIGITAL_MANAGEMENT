@@ -32,7 +32,7 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Register successfully')
+  @ResponseMessage('Đăng ký thành công')
   @ApiOperation({ summary: 'Register a new account (default role: FAMILY_MANAGER)' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'Account created and tokens issued' })
@@ -43,7 +43,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Login successfully')
+  @ResponseMessage('Đăng nhập thành công')
   @ApiOperation({ summary: 'Authenticate with email & password' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login succeeded, tokens issued' })
@@ -55,7 +55,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Token refreshed successfully')
+  @ResponseMessage('Làm mới token thành công')
   @ApiOperation({ summary: 'Rotate the token pair using a valid refresh token' })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'New access & refresh tokens issued' })
@@ -68,7 +68,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Logout successfully')
+  @ResponseMessage('Đăng xuất thành công')
   @ApiOperation({
     summary:
       'Log out. Pass refreshToken to revoke only this device, omit to revoke all',
@@ -83,7 +83,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ResponseMessage('Current user fetched successfully')
+  @ResponseMessage('Lấy thông tin người dùng thành công')
   @ApiOperation({ summary: 'Get the currently authenticated user' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })

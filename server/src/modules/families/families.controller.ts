@@ -31,7 +31,7 @@ export class FamiliesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Family created successfully')
+  @ResponseMessage('Tạo gia đình thành công')
   @ApiOperation({ summary: 'Create a family (creator becomes MANAGER)' })
   @ApiResponse({ status: 201, description: 'Family created' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateFamilyDto) {
@@ -39,7 +39,7 @@ export class FamiliesController {
   }
 
   @Get('my')
-  @ResponseMessage('Fetched your families successfully')
+  @ResponseMessage('Lấy danh sách gia đình thành công')
   @ApiOperation({ summary: 'List families the current user belongs to' })
   myFamilies(@CurrentUser('id') userId: string) {
     return this.familiesService.findMyFamilies(userId);
@@ -47,7 +47,7 @@ export class FamiliesController {
 
   @Get(':familyId')
   @UseGuards(FamilyPermissionGuard)
-  @ResponseMessage('Fetched family successfully')
+  @ResponseMessage('Lấy thông tin gia đình thành công')
   @ApiOperation({ summary: 'Get a family (members only)' })
   @ApiResponse({ status: 403, description: 'Not a member of this family' })
   getOne(@Param('familyId') familyId: string) {
@@ -57,7 +57,7 @@ export class FamiliesController {
   @Patch(':familyId')
   @UseGuards(FamilyPermissionGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
-  @ResponseMessage('Family updated successfully')
+  @ResponseMessage('Cập nhật gia đình thành công')
   @ApiOperation({ summary: 'Update a family (family MANAGER only)' })
   @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
   update(@Param('familyId') familyId: string, @Body() dto: UpdateFamilyDto) {
@@ -67,7 +67,7 @@ export class FamiliesController {
   @Delete(':familyId/members/:userId')
   @UseGuards(FamilyPermissionGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
-  @ResponseMessage('Member removed successfully')
+  @ResponseMessage('Xóa thành viên thành công')
   @ApiOperation({ summary: 'Remove a member from the family (MANAGER only)' })
   @ApiResponse({ status: 400, description: 'Cannot remove a family manager' })
   @ApiResponse({ status: 404, description: 'Member not found in this family' })

@@ -35,7 +35,7 @@ export class AdminFamilyMembersController {
   constructor(private readonly admin: AdminService) {}
 
   @Get()
-  @ResponseMessage('Fetched family members successfully')
+  @ResponseMessage('Lấy danh sách thành viên gia đình thành công')
   @ApiOperation({
     summary: 'List family members (paginated, SYSTEM_ADMIN only)',
   })
@@ -45,7 +45,7 @@ export class AdminFamilyMembersController {
   }
 
   @Get(':id')
-  @ResponseMessage('Fetched family member successfully')
+  @ResponseMessage('Lấy thông tin thành viên gia đình thành công')
   @ApiOperation({ summary: 'Get a family member by id' })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   get(@Param('id') id: string) {
@@ -53,7 +53,7 @@ export class AdminFamilyMembersController {
   }
 
   @Patch(':id')
-  @ResponseMessage('Family member updated successfully')
+  @ResponseMessage('Cập nhật thành viên gia đình thành công')
   @ApiOperation({ summary: 'Update a family member (role/relationship/status)' })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateMemberDto) {
@@ -62,7 +62,7 @@ export class AdminFamilyMembersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Family member removed successfully')
+  @ResponseMessage('Xóa thành viên gia đình thành công')
   @ApiOperation({ summary: 'Remove a family member' })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   remove(@Param('id') id: string) {

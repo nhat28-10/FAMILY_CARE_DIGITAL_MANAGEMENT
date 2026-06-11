@@ -1,0 +1,105 @@
+import { BadRequestException, ValidationError } from '@nestjs/common';
+
+/** Vietnamese display labels for known DTO fields (fallback = raw name). */
+const FIELD_LABELS: Record<string, string> = {
+  email: 'Email',
+  password: 'Mật khẩu',
+  phone: 'Số điện thoại',
+  fullName: 'Họ tên',
+  name: 'Tên',
+  description: 'Mô tả',
+  avatarUrl: 'Ảnh đại diện',
+  refreshToken: 'Refresh token',
+  invitedPhone: 'Số điện thoại',
+  displayName: 'Tên hiển thị',
+  page: 'Trang',
+  limit: 'Số bản ghi mỗi trang',
+  search: 'Từ khóa',
+  familyId: 'Mã gia đình',
+  userId: 'Mã người dùng',
+  status: 'Trạng thái',
+  userType: 'Loại tài khoản',
+  accountStatus: 'Trạng thái tài khoản',
+  verificationStatus: 'Trạng thái xác minh',
+  familyRole: 'Vai trò gia đình',
+  relationship: 'Quan hệ',
+  activationStatus: 'Trạng thái kích hoạt',
+};
+
+const PASSWORD_RULE =
+  'Mật khẩu phải tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt';
+
+/** Builds a Vietnamese message for a single failed constraint. */
+function messageFor(property: string, key: string): string {
+  const label = FIELD_LABELS[property] ?? property;
+
+  // Password complexity (covers @MinLength + @Matches on the password field).
+  if (property === 'password' && (key === 'matches' || key === 'minLength')) {
+    return PASSWORD_RULE;
+  }
+
+  switch (key) {
+    case 'isEmail':
+      return 'Email không hợp lệ';
+    case 'isNotEmpty':
+      return `${label} không được để trống`;
+    case 'isString':
+      return `${label} phải là chuỗi ký tự`;
+    case 'isInt':
+    case 'isNumber':
+      return `${label} phải là số`;
+    case 'isUrl':
+      return `${label} phải là đường dẫn hợp lệ`;
+    case 'isEnum':
+      return `${label} không hợp lệ`;
+    case 'isUuid':
+      return `${label} phải là mã định danh hợp lệ`;
+    case 'isJwt':
+      return `${label} phải là JWT hợp lệ`;
+    case 'minLength':
+      return `${label} quá ngắn`;
+    case 'maxLength':
+      return `${label} quá dài`;
+    case 'min':
+      return `${label} quá nhỏ`;
+    case 'max':
+      return `${label} quá lớn`;
+    case 'matches':
+      return `${label} không đúng định dạng`;
+    case 'whitelistValidation':
+      return `Trường "${property}" không được phép`;
+    default:
+      return `${label} không hợp lệ`;
+  }
+}
+
+/**
+ * Global ValidationPipe exceptionFactory that turns class-validator failures
+ * into a single Vietnamese message. Central source of truth for validation
+ * wording — per-DTO English `message:` options are overridden here.
+ */
+export function viValidationExceptionFactory(
+  errors: ValidationError[],
+): BadRequestException {
+  // Flatten one level of nesting so nested DTOs still produce a message.
+  const flat: ValidationError[] = [];
+  const walk = (list: ValidationError[]) => {
+    for (const e of list) {
+      if (e.constraints) flat.push(e);
+      if (e.children?.length) walk(e.children);
+    }
+  };
+  walk(errors);
+
+  const first = flat[0];
+  const key = first?.constraints
+    ? Object.keys(first.constraints)[0]
+    : undefined;
+
+  const message =
+    first && key
+      ? messageFor(first.property, key)
+      : 'Dữ liệu không hợp lệ';
+
+  return new BadRequestException(message);
+}

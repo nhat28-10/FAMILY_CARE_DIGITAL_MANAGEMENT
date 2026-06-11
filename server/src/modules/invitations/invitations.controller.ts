@@ -31,7 +31,7 @@ export class InvitationsController {
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Invitation created successfully')
+  @ResponseMessage('Tạo lời mời thành công')
   @ApiOperation({ summary: 'Invite a member to a family (FAMILY_MANAGER only)' })
   @ApiResponse({ status: 201, description: 'Invitation created (token returned once)' })
   @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
@@ -44,7 +44,7 @@ export class InvitationsController {
   }
 
   @Get('invitations/:token')
-  @ResponseMessage('Fetched invitation successfully')
+  @ResponseMessage('Lấy thông tin lời mời thành công')
   @ApiOperation({ summary: 'Look up an invitation by token (public)' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   getByToken(@Param('token') token: string) {
@@ -55,7 +55,7 @@ export class InvitationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Invitation accepted successfully')
+  @ResponseMessage('Chấp nhận lời mời thành công')
   @ApiOperation({ summary: 'Accept an invitation (joins the family)' })
   @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
   @ApiResponse({ status: 403, description: 'Invitation sent to a different email' })
@@ -68,7 +68,7 @@ export class InvitationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Invitation rejected successfully')
+  @ResponseMessage('Từ chối lời mời thành công')
   @ApiOperation({ summary: 'Reject an invitation' })
   @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
   reject(@Param('token') token: string, @CurrentUser() user: SafeUser) {

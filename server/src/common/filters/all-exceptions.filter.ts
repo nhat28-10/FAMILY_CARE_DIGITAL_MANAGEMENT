@@ -30,7 +30,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message = 'Lỗi hệ thống';
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
