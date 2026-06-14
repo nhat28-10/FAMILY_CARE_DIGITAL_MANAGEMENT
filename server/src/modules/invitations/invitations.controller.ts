@@ -9,7 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FamilyRole } from '@prisma/client';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -24,7 +29,7 @@ import { InvitationsService } from './invitations.service';
 @ApiTags('Invitations')
 @Controller()
 export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) {}
+  constructor(private readonly invitationsService: InvitationsService) { }
 
   @Post('families/:familyId/invitations')
   @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
@@ -57,8 +62,14 @@ export class InvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Chấp nhận lời mời thành công')
   @ApiOperation({ summary: 'Accept an invitation (joins the family)' })
-  @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
-  @ApiResponse({ status: 403, description: 'Invitation sent to a different email' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation expired or not pending',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Invitation sent to a different email',
+  })
   @ApiResponse({ status: 409, description: 'Already a member of this family' })
   accept(@Param('token') token: string, @CurrentUser() user: SafeUser) {
     return this.invitationsService.accept(token, user);
@@ -70,7 +81,10 @@ export class InvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Từ chối lời mời thành công')
   @ApiOperation({ summary: 'Reject an invitation' })
-  @ApiResponse({ status: 400, description: 'Invitation expired or not pending' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation expired or not pending',
+  })
   reject(@Param('token') token: string, @CurrentUser() user: SafeUser) {
     return this.invitationsService.reject(token, user);
   }

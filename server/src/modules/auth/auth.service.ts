@@ -105,9 +105,12 @@ export class AuthService {
     // 1. Verify signature & expiry against the refresh secret.
     let payload: JwtPayload;
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(dto.refreshToken, {
-        secret: this.config.getOrThrow<string>('jwt.refreshSecret'),
-      });
+      payload = await this.jwtService.verifyAsync<JwtPayload>(
+        dto.refreshToken,
+        {
+          secret: this.config.getOrThrow<string>('jwt.refreshSecret'),
+        },
+      );
     } catch {
       throw new UnauthorizedException(
         'Refresh token không hợp lệ hoặc đã hết hạn',
@@ -219,7 +222,7 @@ export class AuthService {
     ]);
 
     // Persist the session using the refresh token's own expiry.
-    const decoded = this.jwtService.decode(refreshToken) as { exp: number };
+    const decoded = this.jwtService.decode(refreshToken);
     const expiresAt = new Date(decoded.exp * 1000);
     await this.refreshTokenService.store(jti, user.id, refreshToken, expiresAt);
 

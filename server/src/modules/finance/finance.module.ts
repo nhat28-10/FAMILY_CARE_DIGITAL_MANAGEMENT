@@ -1,4 +1,13 @@
 import { Module } from '@nestjs/common';
 
-@Module({})
-export class FinanceModule { }
+import { FamilyMembersModule } from '../family-members/family-members.module';
+import { FinanceController } from './controllers/finance.controller';
+import { FinanceService } from './services/finance.service';
+
+@Module({
+  imports: [FamilyMembersModule],
+  controllers: [FinanceController],
+  providers: [FinanceService],
+  exports: [FinanceService],
+})
+export class FinanceModule {}

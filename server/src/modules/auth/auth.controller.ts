@@ -28,14 +28,17 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Đăng ký thành công')
   @ApiOperation({ summary: 'Register a new account (default role: FAMILY_MANAGER)' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'Account created and tokens issued' })
+  @ApiResponse({
+    status: 201,
+    description: 'Account created and tokens issued',
+  })
   @ApiResponse({ status: 409, description: 'Email is already registered' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -58,7 +61,10 @@ export class AuthController {
   @ResponseMessage('Làm mới token thành công')
   @ApiOperation({ summary: 'Rotate the token pair using a valid refresh token' })
   @ApiBody({ type: RefreshTokenDto })
-  @ApiResponse({ status: 200, description: 'New access & refresh tokens issued' })
+  @ApiResponse({
+    status: 200,
+    description: 'New access & refresh tokens issued',
+  })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto);
