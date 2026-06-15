@@ -236,11 +236,15 @@ model Family {
   updatedAt        DateTime         @updatedAt
 
   // Relations
-  members           FamilyMember[]
-  invitations       Invitation[]
-  financeLedger     FinanceLedger?
-  financeCategories FinanceCategory[]
-  financeModels     FinanceModel[]
+  members                 FamilyMember[]
+  invitations             Invitation[]
+  financeLedger           FinanceLedger?
+  financeCategories       FinanceCategory[]
+  financeModels           FinanceModel[]
+  budgetPlans             BudgetPlan[]
+  financialGoals          FinancialGoal[]
+  budgetAlerts            BudgetAlert[]
+  spendingSupportRequests SpendingSupportRequest[]
 
   @@map("families")
 }
@@ -265,9 +269,14 @@ model FamilyMember {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Invitations created by this member (ERD: created_by_member_id).
-  createdInvitations   Invitation[]           @relation("CreatedByMember")
-  monthlyFinances      MemberMonthlyFinance[]
-  createdLedgerEntries LedgerEntry[]          @relation("CreatedLedgerEntries")
+  createdInvitations               Invitation[]             @relation("CreatedByMember")
+  monthlyFinances                  MemberMonthlyFinance[]
+  createdLedgerEntries             LedgerEntry[]            @relation("CreatedLedgerEntries")
+  createdBudgetPlans               BudgetPlan[]             @relation("CreatedBudgetPlans")
+  createdFinancialGoals            FinancialGoal[]          @relation("CreatedFinancialGoals")
+  goalAllocations                  GoalAllocation[]         @relation("GoalAllocations")
+  requestedSpendingSupportRequests SpendingSupportRequest[] @relation("RequestedSpendingSupportRequests")
+  reviewedSpendingSupportRequests  SpendingSupportRequest[] @relation("ReviewedSpendingSupportRequests")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -336,8 +345,10 @@ model FinanceLedger {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
-  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  entries LedgerEntry[]
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries      LedgerEntry[]
+  budgetLines  BudgetLine[]
+  budgetAlerts BudgetAlert[]
 
   @@map("finance_ledgers")
 }
@@ -353,8 +364,11 @@ model FinanceCategory {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
-  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  entries LedgerEntry[]
+  family                  Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries                 LedgerEntry[]
+  budgetLines             BudgetLine[]
+  budgetAlerts            BudgetAlert[]
+  spendingSupportRequests SpendingSupportRequest[]
 
   @@unique([familyId, name, categoryType])
   @@index([familyId, categoryType, status])
@@ -392,7 +406,10 @@ model FinanceJar {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  financeModel FinanceModel @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  financeModel   FinanceModel    @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  budgetLines    BudgetLine[]
+  financialGoals FinancialGoal[]
+  budgetAlerts   BudgetAlert[]
 
   @@unique([financeModelId, jarCode])
   @@index([financeModelId, isActive])
@@ -420,6 +437,7 @@ model LedgerEntry {
   ledger          FinanceLedger    @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
   category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdByMember FamilyMember     @relation("CreatedLedgerEntries", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  goalAllocations GoalAllocation[]
 
   @@index([ledgerId, entryDate])
   @@index([ledgerId, entryType, status])

@@ -1,9 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  AccountStatus,
-  UserType,
-  VerificationStatus,
-} from '@prisma/client';
+import { AccountStatus, UserType, VerificationStatus } from '@prisma/client';
 import {
   IsEnum,
   IsOptional,

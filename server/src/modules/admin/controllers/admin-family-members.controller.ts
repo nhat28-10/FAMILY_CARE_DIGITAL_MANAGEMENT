@@ -32,7 +32,7 @@ import { AdminUpdateMemberDto } from '../dto/update-member.dto';
 @Roles(UserType.SYSTEM_ADMIN)
 @Controller('admin/family-members')
 export class AdminFamilyMembersController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(private readonly admin: AdminService) { }
 
   @Get()
   @ResponseMessage('Lấy danh sách thành viên gia đình thành công')
