@@ -39,4 +39,4 @@ COPY --from=build /app/package.json ./package.json
 EXPOSE 3000
 
 # Apply pending migrations, then start the server.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
