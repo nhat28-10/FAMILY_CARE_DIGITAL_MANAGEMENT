@@ -168,6 +168,7 @@ describe('FinanceService budget planning', () => {
           thresholdPercent: null,
           essentialType: null,
           note: null,
+          financeLedgerId: null,
           category: {
             id: 'income-category',
             familyId,
@@ -190,6 +191,7 @@ describe('FinanceService budget planning', () => {
           thresholdPercent: new Prisma.Decimal(10),
           essentialType: null,
           note: null,
+          financeLedgerId: null,
           category: {
             id: 'expense-category',
             familyId,
@@ -212,6 +214,7 @@ describe('FinanceService budget planning', () => {
           thresholdPercent: null,
           essentialType: null,
           note: null,
+          financeLedgerId: null,
           category: null,
           jar: {
             id: 'jar-id',
