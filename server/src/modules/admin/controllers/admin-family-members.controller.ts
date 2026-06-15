@@ -54,7 +54,9 @@ export class AdminFamilyMembersController {
 
   @Patch(':id')
   @ResponseMessage('Family member updated successfully')
-  @ApiOperation({ summary: 'Update a family member (role/relationship/status)' })
+  @ApiOperation({
+    summary: 'Update a family member (role/relationship/status)',
+  })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateMemberDto) {
     return this.admin.updateMember(id, dto);
