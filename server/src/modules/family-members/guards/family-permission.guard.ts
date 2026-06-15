@@ -39,12 +39,12 @@ export class FamilyPermissionGuard implements CanActivate {
 
     const user = request.user;
     if (!user) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Bạn cần đăng nhập');
     }
 
     const familyId = request.params?.familyId;
     if (!familyId) {
-      throw new BadRequestException('familyId route parameter is required');
+      throw new BadRequestException('Thiếu tham số familyId trên đường dẫn');
     }
 
     const membership = await this.familyMembersService.findByFamilyAndUser(
@@ -52,7 +52,7 @@ export class FamilyPermissionGuard implements CanActivate {
       user.id,
     );
     if (!membership) {
-      throw new ForbiddenException('You are not a member of this family');
+      throw new ForbiddenException('Bạn không phải thành viên của gia đình này');
     }
 
     const requiredRoles = this.reflector.getAllAndOverride<FamilyRole[]>(
@@ -65,7 +65,7 @@ export class FamilyPermissionGuard implements CanActivate {
       !requiredRoles.includes(membership.familyRole)
     ) {
       throw new ForbiddenException(
-        `Requires family role: ${requiredRoles.join(' or ')}`,
+        `Yêu cầu vai trò gia đình: ${requiredRoles.join(' hoặc ')}`,
       );
     }
 

@@ -35,7 +35,7 @@ export class AdminFamiliesController {
   constructor(private readonly admin: AdminService) {}
 
   @Get()
-  @ResponseMessage('Fetched families successfully')
+  @ResponseMessage('Lấy danh sách gia đình thành công')
   @ApiOperation({ summary: 'List families (paginated, SYSTEM_ADMIN only)' })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListFamiliesQueryDto) {
@@ -43,7 +43,7 @@ export class AdminFamiliesController {
   }
 
   @Get(':id')
-  @ResponseMessage('Fetched family successfully')
+  @ResponseMessage('Lấy thông tin gia đình thành công')
   @ApiOperation({ summary: 'Get a family by id (with members)' })
   @ApiResponse({ status: 404, description: 'Family not found' })
   get(@Param('id') id: string) {
@@ -51,7 +51,7 @@ export class AdminFamiliesController {
   }
 
   @Patch(':id')
-  @ResponseMessage('Family updated successfully')
+  @ResponseMessage('Cập nhật gia đình thành công')
   @ApiOperation({ summary: 'Update a family' })
   @ApiResponse({ status: 404, description: 'Family not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateFamilyDto) {
@@ -60,7 +60,7 @@ export class AdminFamiliesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Family deleted successfully')
+  @ResponseMessage('Xóa gia đình thành công')
   @ApiOperation({ summary: 'Delete a family (cascades members + invitations)' })
   @ApiResponse({ status: 404, description: 'Family not found' })
   remove(@Param('id') id: string) {

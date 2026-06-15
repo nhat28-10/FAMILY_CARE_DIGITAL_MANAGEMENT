@@ -66,7 +66,7 @@ export class AdminService {
 
   async getUser(id: string): Promise<SafeUser> {
     const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     return sanitizeUser(user);
   }
 
@@ -110,7 +110,7 @@ export class AdminService {
       where: { id },
       include: familyMemberInclude,
     });
-    if (!family) throw new NotFoundException('Family not found');
+    if (!family) throw new NotFoundException('Không tìm thấy gia đình');
     return family;
   }
 
@@ -157,7 +157,7 @@ export class AdminService {
       where: { id },
       omit: { tokenHash: true },
     });
-    if (!invitation) throw new NotFoundException('Invitation not found');
+    if (!invitation) throw new NotFoundException('Không tìm thấy lời mời');
     return invitation;
   }
 
@@ -212,7 +212,7 @@ export class AdminService {
         family: { select: { id: true, name: true } },
       },
     });
-    if (!member) throw new NotFoundException('Family member not found');
+    if (!member) throw new NotFoundException('Không tìm thấy thành viên gia đình');
     return member;
   }
 

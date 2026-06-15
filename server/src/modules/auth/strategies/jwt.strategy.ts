@@ -29,10 +29,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const user = await this.usersService.findById(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException('Token không hợp lệ');
     }
     if (user.accountStatus !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Account is locked');
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
     }
 
     return sanitizeUser(user);

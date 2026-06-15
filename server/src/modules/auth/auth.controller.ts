@@ -28,14 +28,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Register successfully')
-  @ApiOperation({
-    summary: 'Register a new account (default role: FAMILY_MANAGER)',
-  })
+  @ResponseMessage('Đăng ký thành công')
+  @ApiOperation({ summary: 'Register a new account (default role: FAMILY_MANAGER)' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
     status: 201,
@@ -48,7 +46,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Login successfully')
+  @ResponseMessage('Đăng nhập thành công')
   @ApiOperation({ summary: 'Authenticate with email & password' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login succeeded, tokens issued' })
@@ -60,10 +58,8 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Token refreshed successfully')
-  @ApiOperation({
-    summary: 'Rotate the token pair using a valid refresh token',
-  })
+  @ResponseMessage('Làm mới token thành công')
+  @ApiOperation({ summary: 'Rotate the token pair using a valid refresh token' })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({
     status: 200,
@@ -78,7 +74,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Logout successfully')
+  @ResponseMessage('Đăng xuất thành công')
   @ApiOperation({
     summary:
       'Log out. Pass refreshToken to revoke only this device, omit to revoke all',
@@ -93,7 +89,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ResponseMessage('Current user fetched successfully')
+  @ResponseMessage('Lấy thông tin người dùng thành công')
   @ApiOperation({ summary: 'Get the currently authenticated user' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })

@@ -45,10 +45,10 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<AuthResult> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
-      throw new ConflictException('Email is already registered');
+      throw new ConflictException('Email đã được sử dụng');
     }
     if (dto.phone && (await this.usersService.findByPhone(dto.phone))) {
-      throw new ConflictException('Phone number is already registered');
+      throw new ConflictException('Số điện thoại đã được sử dụng');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, this.saltRounds);
@@ -74,8 +74,8 @@ export class AuthService {
         const field = Array.isArray(target) ? target.join(',') : String(target);
         throw new ConflictException(
           field.includes('phone')
-            ? 'Phone number is already registered'
-            : 'Email is already registered',
+            ? 'Số điện thoại đã được sử dụng'
+            : 'Email đã được sử dụng',
         );
       }
       throw err;
@@ -89,11 +89,11 @@ export class AuthService {
 
     // Verify credentials. Use a generic message to avoid user enumeration.
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
     if (user.accountStatus !== AccountStatus.ACTIVE) {
-      throw new ForbiddenException('Account is locked');
+      throw new ForbiddenException('Tài khoản đã bị khóa');
     }
 
     // Stamp last login, then issue tokens with the updated record.
@@ -112,7 +112,9 @@ export class AuthService {
         },
       );
     } catch {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     // 2. The token must correspond to a live session in refresh_tokens.
@@ -124,15 +126,19 @@ export class AuthService {
         dto.refreshToken,
       ))
     ) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
     if (user.accountStatus !== AccountStatus.ACTIVE) {
-      throw new ForbiddenException('Account is locked');
+      throw new ForbiddenException('Tài khoản đã bị khóa');
     }
 
     // 3. Rotate: revoke the used session and issue a fresh pair.
@@ -167,7 +173,7 @@ export class AuthService {
   async getProfile(userId: string): Promise<SafeUser> {
     const user = await this.usersService.findById(userId);
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('Không tìm thấy người dùng');
     }
     return sanitizeUser(user);
   }

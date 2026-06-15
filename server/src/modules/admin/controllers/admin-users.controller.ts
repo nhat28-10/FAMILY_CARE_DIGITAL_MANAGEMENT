@@ -35,7 +35,7 @@ export class AdminUsersController {
   constructor(private readonly admin: AdminService) {}
 
   @Get()
-  @ResponseMessage('Fetched users successfully')
+  @ResponseMessage('Lấy danh sách người dùng thành công')
   @ApiOperation({ summary: 'List users (paginated, SYSTEM_ADMIN only)' })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListUsersQueryDto) {
@@ -43,7 +43,7 @@ export class AdminUsersController {
   }
 
   @Get(':id')
-  @ResponseMessage('Fetched user successfully')
+  @ResponseMessage('Lấy thông tin người dùng thành công')
   @ApiOperation({ summary: 'Get a user by id' })
   @ApiResponse({ status: 404, description: 'User not found' })
   get(@Param('id') id: string) {
@@ -51,7 +51,7 @@ export class AdminUsersController {
   }
 
   @Patch(':id')
-  @ResponseMessage('User updated successfully')
+  @ResponseMessage('Cập nhật người dùng thành công')
   @ApiOperation({ summary: 'Update a user (status/type/profile)' })
   @ApiResponse({ status: 404, description: 'User not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
@@ -60,7 +60,7 @@ export class AdminUsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('User deleted successfully')
+  @ResponseMessage('Xóa người dùng thành công')
   @ApiOperation({ summary: 'Delete a user' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id') id: string) {

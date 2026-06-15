@@ -146,49 +146,11 @@ enum FinanceModelStatus {
   INACTIVE
 }
 
-enum BudgetPeriodType {
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
-
-enum BudgetPlanStatus {
-  DRAFT
-  ACTIVE
-  CLOSED
-  CANCELED
-}
-
-enum FinancialGoalStatus {
-  ACTIVE
-  ACHIEVED
-  CANCELED
-  AT_RISK
-}
-
-enum BudgetAlertType {
-  OVER_BUDGET
-  GOAL_AT_RISK
-  NON_ESSENTIAL_TOO_HIGH
-}
-
-enum BudgetAlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum BudgetAlertStatus {
-  NEW
-  ACKNOWLEDGED
-  RESOLVED
-}
-
-enum SpendingSupportRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELED
+/// Subscription plan tier offered to family workspaces (ERD: plan_code).
+enum SubscriptionPlanCode {
+  FREE
+  PLUS
+  PREMIUM
 }
 
 // ===========================================================================
@@ -485,163 +447,23 @@ model LedgerEntry {
   @@map("ledger_entries")
 }
 
-model SpendingSupportRequest {
-  id                 String                       @id @default(uuid())
-  familyId           String
-  requesterMemberId  String
-  amount             Decimal                      @db.Decimal(18, 2)
-  categoryId         String?
-  purpose            String
-  status             SpendingSupportRequestStatus @default(PENDING)
-  reviewedByMemberId String?
-  reviewedAt         DateTime?
-  decisionNote       String?
-  createdAt          DateTime                     @default(now())
-  updatedAt          DateTime                     @updatedAt
+/// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only;
+/// admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.
+model SubscriptionPlan {
+  id            String               @id @default(uuid())
+  planCode      SubscriptionPlanCode @unique
+  name          String
+  /// ERD: annual_price — paid plans are billed yearly.
+  annualPrice   Decimal              @db.Decimal(18, 2)
+  /// ERD: max_members — member cap enforced per workspace subscription.
+  maxMembers    Int
+  /// ERD: storage_limit — storage allowance in megabytes.
+  storageLimit  Int
+  /// ERD: feature_access — feature flags/limits map for the tier.
+  featureAccess Json?
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
-  family           Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  requesterMember  FamilyMember     @relation("RequestedSpendingSupportRequests", fields: [requesterMemberId], references: [id], onDelete: Restrict)
-  reviewedByMember FamilyMember?    @relation("ReviewedSpendingSupportRequests", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
-  category         FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@index([familyId])
-  @@index([requesterMemberId])
-  @@index([reviewedByMemberId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("spending_support_requests")
-}
-
-/// Family-level budget plan for an internal planning period.
-model BudgetPlan {
-  id                    String           @id @default(uuid())
-  familyId              String
-  planName              String
-  periodType            BudgetPeriodType
-  periodStart           DateTime         @db.Date
-  periodEnd             DateTime         @db.Date
-  expectedSharedIncome  Decimal?         @db.Decimal(18, 2)
-  expectedSharedExpense Decimal?         @db.Decimal(18, 2)
-  status                BudgetPlanStatus @default(DRAFT)
-  createdByMemberId     String
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-
-  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  createdByMember FamilyMember  @relation("CreatedBudgetPlans", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  lines           BudgetLine[]
-  budgetAlerts    BudgetAlert[]
-
-  @@index([familyId])
-  @@index([periodStart, periodEnd])
-  @@index([status])
-  @@map("budget_plans")
-}
-
-/// Planned amount assigned to a family category, finance jar, or both.
-model BudgetLine {
-  id               String         @id @default(uuid())
-  budgetPlanId     String
-  categoryId       String?
-  jarId            String?
-  plannedAmount    Decimal        @db.Decimal(18, 2)
-  thresholdAmount  Decimal?       @db.Decimal(18, 2)
-  thresholdPercent Decimal?       @db.Decimal(5, 2)
-  essentialType    EssentialType?
-  note             String?
-
-  budgetPlan      BudgetPlan       @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
-  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  jar             FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
-  financeLedger   FinanceLedger?   @relation(fields: [financeLedgerId], references: [id])
-  financeLedgerId String?
-
-  @@index([budgetPlanId])
-  @@index([categoryId])
-  @@index([jarId])
-  @@map("budget_lines")
-}
-
-model FinancialGoal {
-  id                        String              @id @default(uuid())
-  familyId                  String
-  goalName                  String
-  targetAmount              Decimal             @db.Decimal(18, 2)
-  deadline                  DateTime?           @db.Date
-  monthlyContributionTarget Decimal?            @db.Decimal(18, 2)
-  relatedJarId              String?
-  status                    FinancialGoalStatus @default(ACTIVE)
-  createdByMemberId         String
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-
-  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  relatedJar      FinanceJar?      @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
-  createdByMember FamilyMember     @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  allocations     GoalAllocation[]
-  budgetAlerts    BudgetAlert[]
-
-  @@index([familyId])
-  @@index([relatedJarId])
-  @@index([status])
-  @@index([deadline])
-  @@map("financial_goals")
-}
-
-model GoalAllocation {
-  id                  String   @id @default(uuid())
-  goalId              String
-  ledgerEntryId       String
-  amount              Decimal  @db.Decimal(18, 2)
-  allocatedByMemberId String
-  allocatedAt         DateTime @default(now())
-
-  goal              FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  ledgerEntry       LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
-  allocatedByMember FamilyMember  @relation("GoalAllocations", fields: [allocatedByMemberId], references: [id], onDelete: Restrict)
-
-  @@index([goalId])
-  @@index([ledgerEntryId])
-  @@index([allocatedByMemberId])
-  @@map("goal_allocations")
-}
-
-model BudgetAlert {
-  id             String              @id @default(uuid())
-  familyId       String
-  sourceKey      String
-  budgetPlanId   String?
-  goalId         String?
-  jarId          String?
-  categoryId     String?
-  alertType      BudgetAlertType
-  severity       BudgetAlertSeverity
-  thresholdValue Decimal?            @db.Decimal(18, 2)
-  actualValue    Decimal?            @db.Decimal(18, 2)
-  message        String?
-  resolutionNote String?
-  status         BudgetAlertStatus   @default(NEW)
-  createdAt      DateTime            @default(now())
-  resolvedAt     DateTime?
-
-  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  budgetPlan      BudgetPlan?      @relation(fields: [budgetPlanId], references: [id], onDelete: SetNull)
-  goal            FinancialGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  jar             FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
-  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  financeLedger   FinanceLedger?   @relation(fields: [financeLedgerId], references: [id])
-  financeLedgerId String?
-
-  @@index([familyId])
-  @@index([sourceKey])
-  @@index([budgetPlanId])
-  @@index([goalId])
-  @@index([jarId])
-  @@index([categoryId])
-  @@index([alertType])
-  @@index([severity])
-  @@index([status])
-  @@index([createdAt])
-  @@map("budget_alerts")
+  @@map("subscription_plans")
 }
