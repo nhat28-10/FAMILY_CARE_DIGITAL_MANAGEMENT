@@ -146,6 +146,13 @@ enum FinanceModelStatus {
   INACTIVE
 }
 
+/// Subscription plan tier offered to family workspaces (ERD: plan_code).
+enum SubscriptionPlanCode {
+  FREE
+  PLUS
+  PREMIUM
+}
+
 // ===========================================================================
 // Models
 // ===========================================================================
@@ -420,4 +427,25 @@ model LedgerEntry {
   @@index([createdByMemberId])
   @@index([sourceType, sourceId])
   @@map("ledger_entries")
+}
+
+/// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only;
+/// admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.
+model SubscriptionPlan {
+  id            String               @id @default(uuid())
+  planCode      SubscriptionPlanCode @unique
+  name          String
+  /// ERD: annual_price — paid plans are billed yearly.
+  annualPrice   Decimal              @db.Decimal(18, 2)
+  /// ERD: max_members — member cap enforced per workspace subscription.
+  maxMembers    Int
+  /// ERD: storage_limit — storage allowance in megabytes.
+  storageLimit  Int
+  /// ERD: feature_access — feature flags/limits map for the tier.
+  featureAccess Json?
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@map("subscription_plans")
 }
