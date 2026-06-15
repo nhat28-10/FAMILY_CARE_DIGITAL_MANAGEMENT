@@ -27,7 +27,7 @@ services:
     container_name: familycare_api
     env_file: .env.production
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     depends_on:
       db:
         condition: service_healthy
