@@ -12,6 +12,8 @@ services:
     image: postgres:16-alpine
     container_name: familycare_db
     env_file: .env.production
+    ports:
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +22,7 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    # DB port is NOT published — only the api service (same network) can reach it.
+    # DB port is published only on VPS localhost for SSH tunnel, not public internet.
 
   api:
     build: .
