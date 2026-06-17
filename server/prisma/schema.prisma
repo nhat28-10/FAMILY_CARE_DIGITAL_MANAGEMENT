@@ -191,6 +191,29 @@ enum SpendingSupportRequestStatus {
   CANCELED
 }
 
+enum TaskCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskType {
+  AD_HOC
+  RECURRING
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
 /// Subscription plan tier offered to family workspaces (ERD: plan_code).
 enum SubscriptionPlanCode {
   FREE
@@ -290,6 +313,8 @@ model Family {
   financialGoals          FinancialGoal[]
   budgetAlerts            BudgetAlert[]
   spendingSupportRequests SpendingSupportRequest[]
+  taskCategories          TaskCategory[]
+  tasks                   Task[]
 
   @@map("families")
 }
@@ -322,6 +347,7 @@ model FamilyMember {
   goalAllocations                  GoalAllocation[]         @relation("GoalAllocations")
   requestedSpendingSupportRequests SpendingSupportRequest[] @relation("RequestedSpendingSupportRequests")
   reviewedSpendingSupportRequests  SpendingSupportRequest[] @relation("ReviewedSpendingSupportRequests")
+  createdTasks                     Task[]                   @relation("CreatedTasks")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -645,6 +671,49 @@ model BudgetAlert {
   @@index([status])
   @@index([createdAt])
   @@map("budget_alerts")
+}
+
+model TaskCategory {
+  id          String             @id @default(uuid())
+  familyId    String
+  name        String
+  description String?
+  status      TaskCategoryStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@unique([familyId, name])
+  @@index([familyId, status])
+  @@map("task_categories")
+}
+
+model Task {
+  id                String       @id @default(uuid())
+  familyId          String
+  taskCategoryId    String?
+  title             String
+  description       String?
+  taskType          TaskType     @default(AD_HOC)
+  priority          TaskPriority @default(MEDIUM)
+  status            TaskStatus   @default(ACTIVE)
+  createdByMemberId String
+  dueAt             DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category        TaskCategory? @relation(fields: [taskCategoryId], references: [id], onDelete: SetNull)
+  createdByMember FamilyMember  @relation("CreatedTasks", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([familyId])
+  @@index([taskCategoryId])
+  @@index([createdByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("tasks")
 }
 
 /// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only;

@@ -24,6 +24,12 @@ const FIELD_LABELS: Record<string, string> = {
   familyRole: 'Vai trò gia đình',
   relationship: 'Quan hệ',
   activationStatus: 'Trạng thái kích hoạt',
+  title: 'Tên công việc',
+  taskCategoryId: 'Danh mục công việc',
+  taskType: 'Loại công việc',
+  priority: 'Mức độ ưu tiên',
+  dueAt: 'Hạn hoàn thành',
+  categoryId: 'Danh mục công việc',
 };
 
 const PASSWORD_RULE =
@@ -97,9 +103,7 @@ export function viValidationExceptionFactory(
     : undefined;
 
   const message =
-    first && key
-      ? messageFor(first.property, key)
-      : 'Dữ liệu không hợp lệ';
+    first && key ? messageFor(first.property, key) : 'Dữ liệu không hợp lệ';
 
   return new BadRequestException(message);
 }
