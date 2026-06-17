@@ -30,6 +30,24 @@ const FIELD_LABELS: Record<string, string> = {
   priority: 'Mức độ ưu tiên',
   dueAt: 'Hạn hoàn thành',
   categoryId: 'Danh mục công việc',
+  assignedToMemberId: 'Thành viên được giao',
+  assignedByMemberId: 'Thành viên giao việc',
+  assignmentId: 'Phân công công việc',
+  startAt: 'Thời gian bắt đầu',
+  startFrom: 'Thời gian bắt đầu từ',
+  startTo: 'Thời gian bắt đầu đến',
+  dueFrom: 'Thời gian kết thúc từ',
+  dueTo: 'Thời gian kết thúc đến',
+  proofs: 'Danh sách minh chứng',
+  proofType: 'Loại minh chứng',
+  fileUrl: 'Đường dẫn file minh chứng',
+  thumbnailUrl: 'Đường dẫn ảnh đại diện minh chứng',
+  note: 'Ghi chú minh chứng',
+  submissionNote: 'Ghi chú nộp minh chứng',
+  decision: 'Quyết định duyệt',
+  reviewNote: 'Ghi chú đánh giá',
+  submissionId: 'Minh chứng hoàn thành công việc',
+  proofId: 'Minh chứng',
 };
 
 const PASSWORD_RULE =
@@ -45,6 +63,13 @@ function messageFor(property: string, key: string): string {
   }
 
   switch (key) {
+    case 'arrayMinSize':
+      if (property === 'proofs') {
+        return 'Danh sách minh chứng không được để trống';
+      }
+      return `${label} không được để trống`;
+    case 'isArray':
+      return `${label} phải là mảng`;
     case 'isEmail':
       return 'Email không hợp lệ';
     case 'isNotEmpty':

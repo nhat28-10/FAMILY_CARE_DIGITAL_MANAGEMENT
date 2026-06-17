@@ -214,6 +214,28 @@ enum TaskStatus {
   CANCELED
 }
 
+enum TaskAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum TaskSubmissionStatus {
+  WAITING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TaskProofType {
+  IMAGE
+  VIDEO
+  NOTE
+  FILE
+}
+
 /// Subscription plan tier offered to family workspaces (ERD: plan_code).
 enum SubscriptionPlanCode {
   FREE
@@ -348,6 +370,10 @@ model FamilyMember {
   requestedSpendingSupportRequests SpendingSupportRequest[] @relation("RequestedSpendingSupportRequests")
   reviewedSpendingSupportRequests  SpendingSupportRequest[] @relation("ReviewedSpendingSupportRequests")
   createdTasks                     Task[]                   @relation("CreatedTasks")
+  assignedTasks                    TaskAssignment[]         @relation("TaskAssignedTo")
+  givenTaskAssignments             TaskAssignment[]         @relation("TaskAssignedBy")
+  submittedTaskSubmissions         TaskSubmission[]         @relation("TaskSubmissionSubmittedBy")
+  reviewedTaskSubmissions          TaskSubmission[]         @relation("TaskSubmissionReviewedBy")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -704,9 +730,10 @@ model Task {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  category        TaskCategory? @relation(fields: [taskCategoryId], references: [id], onDelete: SetNull)
-  createdByMember FamilyMember  @relation("CreatedTasks", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category        TaskCategory?    @relation(fields: [taskCategoryId], references: [id], onDelete: SetNull)
+  createdByMember FamilyMember     @relation("CreatedTasks", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  assignments     TaskAssignment[]
 
   @@index([familyId])
   @@index([taskCategoryId])
@@ -714,6 +741,74 @@ model Task {
   @@index([status])
   @@index([dueAt])
   @@map("tasks")
+}
+
+model TaskAssignment {
+  id                 String               @id @default(uuid())
+  taskId             String
+  assignedToMemberId String
+  assignedByMemberId String
+  status             TaskAssignmentStatus @default(ASSIGNED)
+  assignedAt         DateTime             @default(now())
+  startAt            DateTime?
+  dueAt              DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  task             Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedToMember FamilyMember     @relation("TaskAssignedTo", fields: [assignedToMemberId], references: [id], onDelete: Restrict)
+  assignedByMember FamilyMember     @relation("TaskAssignedBy", fields: [assignedByMemberId], references: [id], onDelete: Restrict)
+  submissions      TaskSubmission[]
+
+  @@index([taskId])
+  @@index([assignedToMemberId])
+  @@index([assignedByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("task_assignments")
+}
+
+model TaskSubmission {
+  id                  String               @id @default(uuid())
+  assignmentId        String
+  submittedByMemberId String
+  submissionNote      String?
+  status              TaskSubmissionStatus @default(WAITING_REVIEW)
+  reviewedByMemberId  String?
+  reviewNote          String?
+  submittedAt         DateTime             @default(now())
+  reviewedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  assignment        TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submittedByMember FamilyMember   @relation("TaskSubmissionSubmittedBy", fields: [submittedByMemberId], references: [id], onDelete: Restrict)
+  reviewedByMember  FamilyMember?  @relation("TaskSubmissionReviewedBy", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
+  proofs            TaskProof[]
+
+  @@index([assignmentId])
+  @@index([submittedByMemberId])
+  @@index([reviewedByMemberId])
+  @@index([status])
+  @@map("task_submissions")
+}
+
+model TaskProof {
+  id           String        @id @default(uuid())
+  submissionId String
+  proofType    TaskProofType
+  fileUrl      String?
+  thumbnailUrl String?
+  note         String?
+  uploadedAt   DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  submission TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([proofType])
+  @@map("task_proofs")
 }
 
 /// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only;
