@@ -101,68 +101,214 @@ export interface UploadedTaskProofFile {
   buffer: Buffer;
 }
 
-const familyMemberSelect = {
+const memberSummarySelect = {
   id: true,
-  familyId: true,
-  displayName: true,
+  userId: true,
   familyRole: true,
-  relationship: true,
   status: true,
   user: {
     select: {
       id: true,
-      email: true,
       fullName: true,
       avatarUrl: true,
     },
   },
 } satisfies Prisma.FamilyMemberSelect;
 
-const taskInclude = {
-  category: true,
-  createdByMember: {
-    select: familyMemberSelect,
-  },
-} satisfies Prisma.TaskInclude;
-
-const assignmentInclude = {
-  task: {
-    include: {
-      category: true,
-      createdByMember: {
-        select: familyMemberSelect,
-      },
+const memberCompactSummarySelect = {
+  id: true,
+  userId: true,
+  user: {
+    select: {
+      id: true,
+      fullName: true,
+      avatarUrl: true,
     },
   },
+} satisfies Prisma.FamilyMemberSelect;
+
+const categoryResponseSelect = {
+  id: true,
+  familyId: true,
+  name: true,
+  description: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.TaskCategorySelect;
+
+const categorySummarySelect = {
+  id: true,
+  name: true,
+  status: true,
+} satisfies Prisma.TaskCategorySelect;
+
+const taskResponseSelect = {
+  id: true,
+  familyId: true,
+  taskCategoryId: true,
+  title: true,
+  description: true,
+  taskType: true,
+  priority: true,
+  status: true,
+  createdByMemberId: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
+  category: {
+    select: categoryResponseSelect,
+  },
+  createdByMember: {
+    select: memberSummarySelect,
+  },
+} satisfies Prisma.TaskSelect;
+
+const taskListItemSelect = {
+  id: true,
+  familyId: true,
+  taskCategoryId: true,
+  title: true,
+  description: true,
+  taskType: true,
+  priority: true,
+  status: true,
+  createdByMemberId: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
+  category: {
+    select: categorySummarySelect,
+  },
+  createdByMember: {
+    select: memberCompactSummarySelect,
+  },
+} satisfies Prisma.TaskSelect;
+
+const taskSummarySelect = {
+  id: true,
+  familyId: true,
+  taskCategoryId: true,
+  title: true,
+  taskType: true,
+  priority: true,
+  status: true,
+  dueAt: true,
+  category: {
+    select: categorySummarySelect,
+  },
+} satisfies Prisma.TaskSelect;
+
+const assignmentResponseSelect = {
+  id: true,
+  taskId: true,
+  assignedToMemberId: true,
+  assignedByMemberId: true,
+  status: true,
+  assignedAt: true,
+  startAt: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
   assignedToMember: {
-    select: familyMemberSelect,
+    select: memberSummarySelect,
   },
   assignedByMember: {
-    select: familyMemberSelect,
+    select: memberSummarySelect,
   },
-} satisfies Prisma.TaskAssignmentInclude;
+} satisfies Prisma.TaskAssignmentSelect;
 
-const submissionInclude = {
+const assignmentWithTaskResponseSelect = {
+  ...assignmentResponseSelect,
+  task: {
+    select: taskSummarySelect,
+  },
+} satisfies Prisma.TaskAssignmentSelect;
+
+const proofResponseSelect = {
+  id: true,
+  submissionId: true,
+  proofType: true,
+  fileUrl: true,
+  thumbnailUrl: true,
+  note: true,
+  uploadedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.TaskProofSelect;
+
+const submissionResponseSelect = {
+  id: true,
+  assignmentId: true,
+  submittedByMemberId: true,
+  submissionNote: true,
+  status: true,
+  reviewedByMemberId: true,
+  reviewNote: true,
+  submittedAt: true,
+  reviewedAt: true,
+  createdAt: true,
+  updatedAt: true,
   assignment: {
-    include: assignmentInclude,
+    select: {
+      assignedToMemberId: true,
+      dueAt: true,
+    },
   },
   submittedByMember: {
-    select: familyMemberSelect,
+    select: memberSummarySelect,
   },
   reviewedByMember: {
-    select: familyMemberSelect,
+    select: memberSummarySelect,
   },
   proofs: {
+    select: proofResponseSelect,
     orderBy: { uploadedAt: 'asc' },
   },
-} satisfies Prisma.TaskSubmissionInclude;
+} satisfies Prisma.TaskSubmissionSelect;
 
-type AssignmentWithRelations = Prisma.TaskAssignmentGetPayload<{
-  include: typeof assignmentInclude;
+type MemberSummaryPayload = Prisma.FamilyMemberGetPayload<{
+  select: typeof memberSummarySelect;
 }>;
 
-type SubmissionWithRelations = Prisma.TaskSubmissionGetPayload<{
-  include: typeof submissionInclude;
+type MemberCompactSummaryPayload = Prisma.FamilyMemberGetPayload<{
+  select: typeof memberCompactSummarySelect;
+}>;
+
+type CategoryResponsePayload = Prisma.TaskCategoryGetPayload<{
+  select: typeof categoryResponseSelect;
+}>;
+
+type CategorySummaryPayload = Prisma.TaskCategoryGetPayload<{
+  select: typeof categorySummarySelect;
+}>;
+
+type TaskResponsePayload = Prisma.TaskGetPayload<{
+  select: typeof taskResponseSelect;
+}>;
+
+type TaskListItemPayload = Prisma.TaskGetPayload<{
+  select: typeof taskListItemSelect;
+}>;
+
+type TaskSummaryPayload = Prisma.TaskGetPayload<{
+  select: typeof taskSummarySelect;
+}>;
+
+type AssignmentResponsePayload = Prisma.TaskAssignmentGetPayload<{
+  select: typeof assignmentResponseSelect;
+}>;
+
+type AssignmentWithTaskResponsePayload = Prisma.TaskAssignmentGetPayload<{
+  select: typeof assignmentWithTaskResponseSelect;
+}>;
+
+type SubmissionResponsePayload = Prisma.TaskSubmissionGetPayload<{
+  select: typeof submissionResponseSelect;
+}>;
+
+type ProofResponsePayload = Prisma.TaskProofGetPayload<{
+  select: typeof proofResponseSelect;
 }>;
 
 @Injectable()
@@ -223,27 +369,31 @@ export class TasksService {
     };
   }
 
-  listTaskCategories(familyId: string, query: TaskCategoryQueryDto) {
-    return this.prisma.taskCategory.findMany({
+  async listTaskCategories(familyId: string, query: TaskCategoryQueryDto) {
+    const categories = await this.prisma.taskCategory.findMany({
       where: {
         familyId,
         status: query.status,
       },
+      select: categoryResponseSelect,
       orderBy: [{ status: 'asc' }, { name: 'asc' }],
     });
+    return categories.map((category) => this.mapCategoryResponse(category));
   }
 
   async createTaskCategory(familyId: string, dto: CreateTaskCategoryDto) {
     await this.assertTaskCategoryNameAvailable(familyId, dto.name);
 
     try {
-      return await this.prisma.taskCategory.create({
+      const category = await this.prisma.taskCategory.create({
         data: {
           familyId,
           name: dto.name,
           description: dto.description,
         },
+        select: categoryResponseSelect,
       });
+      return this.mapCategoryResponse(category);
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw new ConflictException(
@@ -274,18 +424,20 @@ export class TasksService {
       );
     }
 
-    return this.prisma.taskCategory.update({
+    const updatedCategory = await this.prisma.taskCategory.update({
       where: { id: categoryId },
       data: {
         name: dto.name,
         description: dto.description,
         status: dto.status,
       },
+      select: categoryResponseSelect,
     });
+    return this.mapCategoryResponse(updatedCategory);
   }
 
-  listTasks(familyId: string, query: TaskQueryDto) {
-    return this.prisma.task.findMany({
+  async listTasks(familyId: string, query: TaskQueryDto) {
+    const tasks = await this.prisma.task.findMany({
       where: {
         familyId,
         status: query.status,
@@ -293,20 +445,21 @@ export class TasksService {
         priority: query.priority,
         taskType: query.taskType,
       },
-      include: taskInclude,
+      select: taskListItemSelect,
       orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
     });
+    return tasks.map((task) => this.mapTaskListItem(task));
   }
 
   async getTask(familyId: string, taskId: string) {
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, familyId },
-      include: taskInclude,
+      select: taskResponseSelect,
     });
     if (!task) {
       throw new NotFoundException('Không tìm thấy công việc');
     }
-    return task;
+    return this.mapTaskResponse(task);
   }
 
   async createTask(
@@ -334,10 +487,11 @@ export class TasksService {
       },
     });
 
-    return this.prisma.task.findUniqueOrThrow({
+    const createdTask = await this.prisma.task.findUniqueOrThrow({
       where: { id: task.id },
-      include: taskInclude,
+      select: taskResponseSelect,
     });
+    return this.mapTaskResponse(createdTask);
   }
 
   async updateTask(familyId: string, taskId: string, dto: UpdateTaskDto) {
@@ -356,7 +510,7 @@ export class TasksService {
 
     const taskCategoryIdProvided = Object.hasOwn(dto, 'taskCategoryId');
 
-    return this.prisma.task.update({
+    const updatedTask = await this.prisma.task.update({
       where: { id: taskId },
       data: {
         title: dto.title,
@@ -373,8 +527,9 @@ export class TasksService {
               ? new Date(dto.dueAt)
               : null,
       },
-      include: taskInclude,
+      select: taskResponseSelect,
     });
+    return this.mapTaskResponse(updatedTask);
   }
 
   async cancelTask(familyId: string, taskId: string) {
@@ -385,11 +540,12 @@ export class TasksService {
       throw new NotFoundException('Không tìm thấy công việc');
     }
 
-    return this.prisma.task.update({
+    const updatedTask = await this.prisma.task.update({
       where: { id: taskId },
       data: { status: TaskStatus.CANCELED },
-      include: taskInclude,
+      select: taskResponseSelect,
     });
+    return this.mapTaskResponse(updatedTask);
   }
 
   async createTaskAssignment(
@@ -418,7 +574,7 @@ export class TasksService {
     const createdAssignment =
       await this.prisma.taskAssignment.findUniqueOrThrow({
         where: { id: assignment.id },
-        include: assignmentInclude,
+        select: assignmentResponseSelect,
       });
     return this.mapAssignmentResponse(createdAssignment);
   }
@@ -440,7 +596,7 @@ export class TasksService {
           ? undefined
           : currentMemberId,
       },
-      include: assignmentInclude,
+      select: assignmentResponseSelect,
       orderBy: [{ dueAt: 'asc' }, { assignedAt: 'desc' }],
     });
     return assignments.map((assignment) =>
@@ -464,11 +620,11 @@ export class TasksService {
           priority: query.priority,
         },
       },
-      include: assignmentInclude,
+      select: assignmentWithTaskResponseSelect,
       orderBy: [{ dueAt: 'asc' }, { startAt: 'asc' }, { assignedAt: 'desc' }],
     });
     return assignments.map((assignment) =>
-      this.mapAssignmentResponse(assignment),
+      this.mapAssignmentResponse(assignment, { includeTask: true }),
     );
   }
 
@@ -486,7 +642,7 @@ export class TasksService {
       throw new NotFoundException('Không tìm thấy phân công công việc');
     }
     this.assertCanViewAssignment(assignment, currentMemberId, familyRole);
-    return this.mapAssignmentResponse(assignment);
+    return this.mapAssignmentResponse(assignment, { includeTask: true });
   }
 
   async startTaskAssignment(
@@ -515,7 +671,7 @@ export class TasksService {
     const updatedAssignment = await this.prisma.taskAssignment.update({
       where: { id: assignmentId },
       data: { status: TaskAssignmentStatus.IN_PROGRESS },
-      include: assignmentInclude,
+      select: assignmentResponseSelect,
     });
     return this.mapAssignmentResponse(updatedAssignment);
   }
@@ -537,7 +693,7 @@ export class TasksService {
     const updatedAssignment = await this.prisma.taskAssignment.update({
       where: { id: assignmentId },
       data: { status: TaskAssignmentStatus.CANCELED },
-      include: assignmentInclude,
+      select: assignmentResponseSelect,
     });
     return this.mapAssignmentResponse(updatedAssignment);
   }
@@ -580,7 +736,7 @@ export class TasksService {
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
         status: TaskAssignmentStatus.ASSIGNED,
       },
-      include: assignmentInclude,
+      select: assignmentResponseSelect,
     });
     return this.mapAssignmentResponse(updatedAssignment);
   }
@@ -596,7 +752,10 @@ export class TasksService {
     const submission = await this.prisma.$transaction(async (tx) => {
       const assignment = await tx.taskAssignment.findFirst({
         where: { id: assignmentId, task: { familyId } },
-        include: { task: true },
+        select: {
+          assignedToMemberId: true,
+          status: true,
+        },
       });
       if (!assignment) {
         throw new NotFoundException('Không tìm thấy phân công công việc');
@@ -635,7 +794,7 @@ export class TasksService {
 
       return tx.taskSubmission.findUniqueOrThrow({
         where: { id: createdSubmission.id },
-        include: submissionInclude,
+        select: submissionResponseSelect,
       });
     });
 
@@ -669,7 +828,7 @@ export class TasksService {
       note: dto.note ?? proof.note,
     });
 
-    return this.prisma.taskProof.update({
+    const updatedProof = await this.prisma.taskProof.update({
       where: { id: proofId },
       data: {
         proofType: dto.proofType,
@@ -677,7 +836,9 @@ export class TasksService {
         thumbnailUrl: dto.thumbnailUrl,
         note: dto.note,
       },
+      select: proofResponseSelect,
     });
+    return this.mapProofResponse(updatedProof);
   }
 
   async deleteTaskProof(familyId: string, proofId: string, memberId: string) {
@@ -697,7 +858,11 @@ export class TasksService {
       );
     }
 
-    return this.prisma.taskProof.delete({ where: { id: proofId } });
+    const deletedProof = await this.prisma.taskProof.delete({
+      where: { id: proofId },
+      select: proofResponseSelect,
+    });
+    return this.mapProofResponse(deletedProof);
   }
 
   async listTaskSubmissions(
@@ -721,7 +886,7 @@ export class TasksService {
         assignmentId,
         status: query.status,
       },
-      include: submissionInclude,
+      select: submissionResponseSelect,
       orderBy: { submittedAt: 'desc' },
     });
 
@@ -761,9 +926,14 @@ export class TasksService {
           id: submissionId,
           assignment: { task: { familyId } },
         },
-        include: {
+        select: {
+          id: true,
+          assignmentId: true,
+          status: true,
           assignment: {
-            include: { task: true },
+            select: {
+              taskId: true,
+            },
           },
         },
       });
@@ -835,7 +1005,7 @@ export class TasksService {
 
       return tx.taskSubmission.findUniqueOrThrow({
         where: { id: reviewedSubmission.id },
-        include: submissionInclude,
+        select: submissionResponseSelect,
       });
     });
 
@@ -906,7 +1076,7 @@ export class TasksService {
         id: assignmentId,
         task: { familyId },
       },
-      include: assignmentInclude,
+      select: assignmentWithTaskResponseSelect,
     });
   }
 
@@ -916,7 +1086,7 @@ export class TasksService {
         id: submissionId,
         assignment: { task: { familyId } },
       },
-      include: submissionInclude,
+      select: submissionResponseSelect,
     });
   }
 
@@ -928,12 +1098,15 @@ export class TasksService {
           assignment: { task: { familyId } },
         },
       },
-      include: {
+      select: {
+        id: true,
+        proofType: true,
+        fileUrl: true,
+        note: true,
         submission: {
-          include: {
-            assignment: {
-              include: { task: true },
-            },
+          select: {
+            submittedByMemberId: true,
+            status: true,
             _count: {
               select: { proofs: true },
             },
@@ -1082,22 +1255,181 @@ export class TasksService {
     }
   }
 
-  private mapAssignmentResponse<T extends AssignmentWithRelations>(
-    assignment: T,
-  ) {
+  private mapMemberSummary(member: MemberSummaryPayload | null) {
+    if (!member) {
+      return null;
+    }
+
     return {
-      ...assignment,
-      isOverdue: this.isAssignmentOverdue(assignment),
+      id: member.id,
+      userId: member.userId,
+      familyRole: member.familyRole,
+      status: member.status,
+      user: {
+        id: member.user.id,
+        fullName: member.user.fullName,
+        avatarUrl: member.user.avatarUrl,
+      },
     };
   }
 
-  private mapSubmissionResponse<T extends SubmissionWithRelations>(
-    submission: T,
-  ) {
+  private mapMemberCompactSummary(member: MemberCompactSummaryPayload | null) {
+    if (!member) {
+      return null;
+    }
+
     return {
-      ...submission,
-      assignment: this.mapAssignmentResponse(submission.assignment),
+      id: member.id,
+      userId: member.userId,
+      user: {
+        id: member.user.id,
+        fullName: member.user.fullName,
+        avatarUrl: member.user.avatarUrl,
+      },
+    };
+  }
+
+  private mapCategoryResponse(category: CategoryResponsePayload | null) {
+    if (!category) {
+      return null;
+    }
+
+    return {
+      id: category.id,
+      familyId: category.familyId,
+      name: category.name,
+      description: category.description,
+      status: category.status,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
+    };
+  }
+
+  private mapCategorySummary(category: CategorySummaryPayload | null) {
+    if (!category) {
+      return null;
+    }
+
+    return {
+      id: category.id,
+      name: category.name,
+      status: category.status,
+    };
+  }
+
+  private mapTaskListItem(task: TaskListItemPayload) {
+    return {
+      id: task.id,
+      familyId: task.familyId,
+      taskCategoryId: task.taskCategoryId,
+      title: task.title,
+      description: task.description,
+      taskType: task.taskType,
+      priority: task.priority,
+      status: task.status,
+      createdByMemberId: task.createdByMemberId,
+      dueAt: task.dueAt,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      category: this.mapCategorySummary(task.category),
+      createdByMember: this.mapMemberCompactSummary(task.createdByMember),
+    };
+  }
+
+  private mapTaskResponse(task: TaskResponsePayload) {
+    return {
+      id: task.id,
+      familyId: task.familyId,
+      taskCategoryId: task.taskCategoryId,
+      title: task.title,
+      description: task.description,
+      taskType: task.taskType,
+      priority: task.priority,
+      status: task.status,
+      createdByMemberId: task.createdByMemberId,
+      dueAt: task.dueAt,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      category: this.mapCategoryResponse(task.category),
+      createdByMember: this.mapMemberSummary(task.createdByMember),
+    };
+  }
+
+  private mapTaskSummary(task: TaskSummaryPayload) {
+    return {
+      id: task.id,
+      familyId: task.familyId,
+      taskCategoryId: task.taskCategoryId,
+      title: task.title,
+      taskType: task.taskType,
+      priority: task.priority,
+      status: task.status,
+      dueAt: task.dueAt,
+      category: this.mapCategorySummary(task.category),
+    };
+  }
+
+  private mapAssignmentResponse(
+    assignment: AssignmentResponsePayload | AssignmentWithTaskResponsePayload,
+    options: { includeTask?: boolean } = {},
+  ) {
+    const response = {
+      id: assignment.id,
+      taskId: assignment.taskId,
+      assignedToMemberId: assignment.assignedToMemberId,
+      assignedByMemberId: assignment.assignedByMemberId,
+      status: assignment.status,
+      assignedAt: assignment.assignedAt,
+      startAt: assignment.startAt,
+      dueAt: assignment.dueAt,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt,
+      isOverdue: this.isAssignmentOverdue(assignment),
+      assignedToMember: this.mapMemberSummary(assignment.assignedToMember),
+      assignedByMember: this.mapMemberSummary(assignment.assignedByMember),
+    };
+
+    if (options.includeTask && 'task' in assignment) {
+      return {
+        ...response,
+        task: this.mapTaskSummary(assignment.task),
+      };
+    }
+
+    return response;
+  }
+
+  private mapSubmissionResponse(submission: SubmissionResponsePayload) {
+    return {
+      id: submission.id,
+      assignmentId: submission.assignmentId,
+      submittedByMemberId: submission.submittedByMemberId,
+      submissionNote: submission.submissionNote,
+      status: submission.status,
+      reviewedByMemberId: submission.reviewedByMemberId,
+      reviewNote: submission.reviewNote,
+      submittedAt: submission.submittedAt,
+      reviewedAt: submission.reviewedAt,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
       isLate: this.isSubmissionLate(submission),
+      proofs: submission.proofs.map((proof) => this.mapProofResponse(proof)),
+      submittedByMember: this.mapMemberSummary(submission.submittedByMember),
+      reviewedByMember: this.mapMemberSummary(submission.reviewedByMember),
+    };
+  }
+
+  private mapProofResponse(proof: ProofResponsePayload) {
+    return {
+      id: proof.id,
+      submissionId: proof.submissionId,
+      proofType: proof.proofType,
+      fileUrl: proof.fileUrl,
+      thumbnailUrl: proof.thumbnailUrl,
+      note: proof.note,
+      uploadedAt: proof.uploadedAt,
+      createdAt: proof.createdAt,
+      updatedAt: proof.updatedAt,
     };
   }
 
