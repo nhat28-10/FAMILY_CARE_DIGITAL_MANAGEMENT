@@ -7,6 +7,7 @@ import { FamilyRole, Relationship } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
+import { SosGateway } from '../sos/sos.gateway';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 
@@ -32,6 +33,7 @@ export class FamiliesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly familyMembersService: FamilyMembersService,
+    private readonly sosGateway: SosGateway,
   ) {}
 
   /**
@@ -104,13 +106,17 @@ export class FamiliesService {
       targetUserId,
     );
     if (!target) {
-      throw new NotFoundException('Không tìm thấy thành viên trong gia đình này');
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
     }
     if (target.familyRole === FamilyRole.FAMILY_MANAGER) {
       throw new BadRequestException('Không thể xóa quản lý gia đình');
     }
 
     await this.familyMembersService.remove(familyId, targetUserId);
+    // Evict the removed member from the workspace's realtime SOS room.
+    this.sosGateway.kickMemberFromWorkspace(targetUserId, familyId);
     return null;
   }
 }

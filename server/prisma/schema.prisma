@@ -198,51 +198,6 @@ enum SubscriptionPlanCode {
   PREMIUM
 }
 
-enum BudgetPeriodType {
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
-
-enum BudgetPlanStatus {
-  DRAFT
-  ACTIVE
-  CLOSED
-  CANCELED
-}
-
-enum FinancialGoalStatus {
-  ACTIVE
-  ACHIEVED
-  CANCELED
-  AT_RISK
-}
-
-enum BudgetAlertType {
-  OVER_BUDGET
-  GOAL_AT_RISK
-  NON_ESSENTIAL_TOO_HIGH
-}
-
-enum BudgetAlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum BudgetAlertStatus {
-  NEW
-  ACKNOWLEDGED
-  RESOLVED
-}
-
-enum SpendingSupportRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELED
-}
-
 // ===========================================================================
 // Models
 // ===========================================================================
@@ -335,6 +290,11 @@ model Family {
   financialGoals          FinancialGoal[]
   budgetAlerts            BudgetAlert[]
   spendingSupportRequests SpendingSupportRequest[]
+  sosSetting              SosSetting?
+  wearableDevices         WearableDevice[]
+  sosAlerts               SosAlert[]
+  memberLocationPoints    MemberLocationPoint[]
+  notifications           Notification[]
 
   @@map("families")
 }
@@ -367,6 +327,13 @@ model FamilyMember {
   goalAllocations                  GoalAllocation[]         @relation("GoalAllocations")
   requestedSpendingSupportRequests SpendingSupportRequest[] @relation("RequestedSpendingSupportRequests")
   reviewedSpendingSupportRequests  SpendingSupportRequest[] @relation("ReviewedSpendingSupportRequests")
+  createdSosSettings               SosSetting[]             @relation("CreatedSosSettings")
+  ownedWearableDevices             WearableDevice[]         @relation("OwnedWearableDevices")
+  triggeredSosAlerts               SosAlert[]               @relation("TriggeredSosAlerts")
+  resolvedSosAlerts                SosAlert[]               @relation("ResolvedSosAlerts")
+  sosResponses                     SosResponse[]            @relation("SosResponses")
+  memberLocationPoints             MemberLocationPoint[]    @relation("MemberLocationPoints")
+  notifications                    Notification[]           @relation("MemberNotifications")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -435,8 +402,10 @@ model FinanceLedger {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
-  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  entries LedgerEntry[]
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries      LedgerEntry[]
+  budgetLines  BudgetLine[]
+  budgetAlerts BudgetAlert[]
 
   @@map("finance_ledgers")
 }
@@ -533,163 +502,6 @@ model LedgerEntry {
   @@index([createdByMemberId])
   @@index([sourceType, sourceId])
   @@map("ledger_entries")
-}
-
-model SpendingSupportRequest {
-  id                 String                       @id @default(uuid())
-  familyId           String
-  requesterMemberId  String
-  amount             Decimal                      @db.Decimal(18, 2)
-  categoryId         String?
-  purpose            String
-  status             SpendingSupportRequestStatus @default(PENDING)
-  reviewedByMemberId String?
-  reviewedAt         DateTime?
-  decisionNote       String?
-  createdAt          DateTime                     @default(now())
-  updatedAt          DateTime                     @updatedAt
-
-  family           Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  requesterMember  FamilyMember     @relation("RequestedSpendingSupportRequests", fields: [requesterMemberId], references: [id], onDelete: Restrict)
-  reviewedByMember FamilyMember?    @relation("ReviewedSpendingSupportRequests", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
-  category         FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@index([familyId])
-  @@index([requesterMemberId])
-  @@index([reviewedByMemberId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("spending_support_requests")
-}
-
-/// Family-level budget plan for an internal planning period.
-model BudgetPlan {
-  id                    String           @id @default(uuid())
-  familyId              String
-  planName              String
-  periodType            BudgetPeriodType
-  periodStart           DateTime         @db.Date
-  periodEnd             DateTime         @db.Date
-  expectedSharedIncome  Decimal?         @db.Decimal(18, 2)
-  expectedSharedExpense Decimal?         @db.Decimal(18, 2)
-  status                BudgetPlanStatus @default(DRAFT)
-  createdByMemberId     String
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-
-  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  createdByMember FamilyMember  @relation("CreatedBudgetPlans", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  lines           BudgetLine[]
-  budgetAlerts    BudgetAlert[]
-
-  @@index([familyId])
-  @@index([periodStart, periodEnd])
-  @@index([status])
-  @@map("budget_plans")
-}
-
-/// Planned amount assigned to a family category, finance jar, or both.
-model BudgetLine {
-  id               String         @id @default(uuid())
-  budgetPlanId     String
-  categoryId       String?
-  jarId            String?
-  plannedAmount    Decimal        @db.Decimal(18, 2)
-  thresholdAmount  Decimal?       @db.Decimal(18, 2)
-  thresholdPercent Decimal?       @db.Decimal(5, 2)
-  essentialType    EssentialType?
-  note             String?
-
-  budgetPlan BudgetPlan       @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
-  category   FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  jar        FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
-
-  @@index([budgetPlanId])
-  @@index([categoryId])
-  @@index([jarId])
-  @@map("budget_lines")
-}
-
-model FinancialGoal {
-  id                        String              @id @default(uuid())
-  familyId                  String
-  goalName                  String
-  targetAmount              Decimal             @db.Decimal(18, 2)
-  deadline                  DateTime?           @db.Date
-  monthlyContributionTarget Decimal?            @db.Decimal(18, 2)
-  relatedJarId              String?
-  status                    FinancialGoalStatus @default(ACTIVE)
-  createdByMemberId         String
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-
-  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  relatedJar      FinanceJar?      @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
-  createdByMember FamilyMember     @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  allocations     GoalAllocation[]
-  budgetAlerts    BudgetAlert[]
-
-  @@index([familyId])
-  @@index([relatedJarId])
-  @@index([status])
-  @@index([deadline])
-  @@map("financial_goals")
-}
-
-model GoalAllocation {
-  id                  String   @id @default(uuid())
-  goalId              String
-  ledgerEntryId       String
-  amount              Decimal  @db.Decimal(18, 2)
-  allocatedByMemberId String
-  allocatedAt         DateTime @default(now())
-
-  goal              FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  ledgerEntry       LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
-  allocatedByMember FamilyMember  @relation("GoalAllocations", fields: [allocatedByMemberId], references: [id], onDelete: Restrict)
-
-  @@index([goalId])
-  @@index([ledgerEntryId])
-  @@index([allocatedByMemberId])
-  @@map("goal_allocations")
-}
-
-model BudgetAlert {
-  id             String              @id @default(uuid())
-  familyId       String
-  sourceKey      String
-  budgetPlanId   String?
-  goalId         String?
-  jarId          String?
-  categoryId     String?
-  alertType      BudgetAlertType
-  severity       BudgetAlertSeverity
-  thresholdValue Decimal?            @db.Decimal(18, 2)
-  actualValue    Decimal?            @db.Decimal(18, 2)
-  message        String?
-  resolutionNote String?
-  status         BudgetAlertStatus   @default(NEW)
-  createdAt      DateTime            @default(now())
-  resolvedAt     DateTime?
-
-  family     Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  budgetPlan BudgetPlan?      @relation(fields: [budgetPlanId], references: [id], onDelete: SetNull)
-  goal       FinancialGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  jar        FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
-  category   FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@index([familyId])
-  @@index([sourceKey])
-  @@index([budgetPlanId])
-  @@index([goalId])
-  @@index([jarId])
-  @@index([categoryId])
-  @@index([alertType])
-  @@index([severity])
-  @@index([status])
-  @@index([createdAt])
-  @@map("budget_alerts")
 }
 
 /// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only;
@@ -872,4 +684,292 @@ model BudgetAlert {
   @@index([status])
   @@index([createdAt])
   @@map("budget_alerts")
+}
+
+// ===========================================================================
+// SOS / Safety Response + Notifications
+// ===========================================================================
+
+/// How a SOS alert was triggered (mobile app, wearable, simulated device demo).
+enum SosSourceType {
+  MOBILE_APP
+  WEARABLE
+  SIMULATED_DEVICE
+}
+
+/// Lifecycle of a SOS alert.
+enum SosAlertStatus {
+  ACTIVE
+  RESOLVED
+  CANCELED
+  FALSE_ALARM
+}
+
+/// Severity classification shared by alerts and sensor events.
+enum SosSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Type of member response to a SOS alert.
+enum SosResponseType {
+  VIEWED
+  CONFIRM_SAFE
+  NEED_HELP
+  RESOLVED
+  CANCELED
+}
+
+enum WearableDeviceType {
+  SMARTWATCH
+  GPS_TRACKER
+  BLE_DEVICE
+  SIMULATED_DEVICE
+}
+
+enum DevicePairingStatus {
+  PAIRED
+  UNPAIRED
+  LOST
+}
+
+/// Origin of a GPS location point (shared by SOS routes and daily tracking).
+enum GpsSourceType {
+  MOBILE_GPS
+  WEARABLE_GPS
+  SIMULATED_GPS
+}
+
+enum SensorEventType {
+  SOS_BUTTON_PRESSED
+  FALL_DETECTED
+  HARD_IMPACT
+  ABNORMAL_MOVEMENT
+}
+
+enum NotificationType {
+  SOS
+  GENERAL
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+/// Per-workspace SOS configuration (1-1 with a family workspace).
+model SosSetting {
+  sosSettingId            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sos_setting_id")
+  workspaceId             String   @unique @map("workspace_id")
+  isEnabled               Boolean  @default(true) @map("is_enabled")
+  notifyAllMembers        Boolean  @default(true) @map("notify_all_members")
+  autoCreateAlertFromFall Boolean  @default(false) @map("auto_create_alert_from_fall")
+  locationRequired        Boolean  @default(true) @map("location_required")
+  createdByMemberId       String?  @map("created_by_member_id")
+  createdAt               DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt               DateTime @updatedAt @db.Timestamptz @map("updated_at")
+
+  workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember   FamilyMember?      @relation("CreatedSosSettings", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  emergencyContacts EmergencyContact[]
+
+  @@index([createdByMemberId])
+  @@map("sos_settings")
+}
+
+/// Emergency contacts attached to a workspace's SOS settings.
+model EmergencyContact {
+  contactId        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("contact_id")
+  sosSettingId     String   @db.Uuid @map("sos_setting_id")
+  contactName      String   @map("contact_name")
+  phoneNumber      String   @map("phone_number")
+  relationshipNote String?  @map("relationship_note")
+  priorityOrder    Int      @map("priority_order")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt        DateTime @updatedAt @db.Timestamptz @map("updated_at")
+
+  sosSetting SosSetting @relation(fields: [sosSettingId], references: [sosSettingId], onDelete: Cascade)
+
+  @@index([sosSettingId])
+  @@map("emergency_contacts")
+}
+
+/// Wearable / tracking devices paired to a member within a workspace.
+model WearableDevice {
+  deviceId         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("device_id")
+  workspaceId      String              @map("workspace_id")
+  ownerMemberId    String              @map("owner_member_id")
+  deviceName       String              @map("device_name")
+  deviceType       WearableDeviceType  @map("device_type")
+  deviceIdentifier String              @map("device_identifier")
+  pairingStatus    DevicePairingStatus @map("pairing_status")
+  gpsEnabled       Boolean             @map("gps_enabled")
+  sosEnabled       Boolean             @map("sos_enabled")
+  lastSeenAt       DateTime?           @db.Timestamptz @map("last_seen_at")
+  createdAt        DateTime            @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt        DateTime            @updatedAt @db.Timestamptz @map("updated_at")
+
+  workspace   Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerMember FamilyMember @relation("OwnedWearableDevices", fields: [ownerMemberId], references: [id], onDelete: Cascade)
+
+  sosAlerts            SosAlert[]
+  sosLocationPoints    SosLocationPoint[]
+  sensorEvents         SensorEvent[]
+  memberLocationPoints MemberLocationPoint[]
+
+  // Plus a partial unique index (one active SOS device per owner) added via raw
+  // SQL in the migration: UNIQUE(owner_member_id) WHERE pairing_status='PAIRED'
+  // AND sos_enabled=true.
+  @@unique([workspaceId, deviceIdentifier])
+  @@index([workspaceId])
+  @@index([ownerMemberId])
+  @@map("wearable_devices")
+}
+
+/// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
+model SosAlert {
+  sosAlertId          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sos_alert_id")
+  workspaceId         String         @map("workspace_id")
+  triggeredByMemberId String         @map("triggered_by_member_id")
+  deviceId            String?        @db.Uuid @map("device_id")
+  sourceType          SosSourceType  @map("source_type")
+  status              SosAlertStatus @default(ACTIVE) @map("status")
+  severity            SosSeverity?   @map("severity")
+  initialLatitude     Decimal?       @db.Decimal(10, 7) @map("initial_latitude")
+  initialLongitude    Decimal?       @db.Decimal(10, 7) @map("initial_longitude")
+  message             String?        @map("message")
+  triggeredAt         DateTime       @default(now()) @db.Timestamptz @map("triggered_at")
+  resolvedByMemberId  String?        @map("resolved_by_member_id")
+  resolvedAt          DateTime?      @db.Timestamptz @map("resolved_at")
+  resolutionNote      String?        @map("resolution_note")
+  createdAt           DateTime       @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt           DateTime       @updatedAt @db.Timestamptz @map("updated_at")
+
+  workspace         Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggeredByMember FamilyMember    @relation("TriggeredSosAlerts", fields: [triggeredByMemberId], references: [id], onDelete: Cascade)
+  device            WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+  resolvedByMember  FamilyMember?   @relation("ResolvedSosAlerts", fields: [resolvedByMemberId], references: [id], onDelete: SetNull)
+
+  locationPoints SosLocationPoint[]
+  responses      SosResponse[]
+  sensorEvents   SensorEvent[]      @relation("CreatedSosAlertSensorEvents")
+
+  @@index([workspaceId])
+  @@index([triggeredByMemberId])
+  @@index([deviceId])
+  @@index([status])
+  @@index([triggeredAt])
+  @@map("sos_alerts")
+}
+
+/// GPS route points captured during a single SOS event.
+model SosLocationPoint {
+  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("location_point_id")
+  sosAlertId      String        @db.Uuid @map("sos_alert_id")
+  deviceId        String?       @db.Uuid @map("device_id")
+  latitude        Decimal       @db.Decimal(10, 7) @map("latitude")
+  longitude       Decimal       @db.Decimal(10, 7) @map("longitude")
+  accuracy        Decimal?      @db.Decimal(10, 2) @map("accuracy")
+  sourceType      GpsSourceType @map("source_type")
+  recordedAt      DateTime      @db.Timestamptz @map("recorded_at")
+  createdAt       DateTime      @default(now()) @db.Timestamptz @map("created_at")
+
+  sosAlert SosAlert        @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
+  device   WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+
+  @@index([sosAlertId])
+  @@index([deviceId])
+  @@index([recordedAt])
+  @@map("sos_location_points")
+}
+
+/// Member responses to a SOS alert (viewed / safe / need help / resolved / canceled).
+model SosResponse {
+  responseId        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("response_id")
+  sosAlertId        String          @db.Uuid @map("sos_alert_id")
+  responderMemberId String          @map("responder_member_id")
+  responseType      SosResponseType @map("response_type")
+  message           String?         @map("message")
+  respondedAt       DateTime        @default(now()) @db.Timestamptz @map("responded_at")
+
+  sosAlert        SosAlert     @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
+  responderMember FamilyMember @relation("SosResponses", fields: [responderMemberId], references: [id], onDelete: Cascade)
+
+  @@index([sosAlertId])
+  @@index([responderMemberId])
+  @@map("sos_responses")
+}
+
+/// Raw sensor events emitted by wearable / simulated devices.
+model SensorEvent {
+  sensorEventId     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sensor_event_id")
+  deviceId          String          @db.Uuid @map("device_id")
+  eventType         SensorEventType @map("event_type")
+  rawValue          Json?           @db.JsonB @map("raw_value")
+  severity          SosSeverity?    @map("severity")
+  detectedAt        DateTime        @db.Timestamptz @map("detected_at")
+  createdSosAlertId String?         @db.Uuid @map("created_sos_alert_id")
+  createdAt         DateTime        @default(now()) @db.Timestamptz @map("created_at")
+
+  device          WearableDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+  createdSosAlert SosAlert?      @relation("CreatedSosAlertSensorEvents", fields: [createdSosAlertId], references: [sosAlertId], onDelete: SetNull)
+
+  @@index([deviceId])
+  @@index([createdSosAlertId])
+  @@index([detectedAt])
+  @@map("sensor_events")
+}
+
+/// Everyday member location tracking — separate from SOS-event route points.
+model MemberLocationPoint {
+  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("location_point_id")
+  workspaceId     String        @map("workspace_id")
+  memberId        String        @map("member_id")
+  deviceId        String?       @db.Uuid @map("device_id")
+  latitude        Decimal       @db.Decimal(10, 7) @map("latitude")
+  longitude       Decimal       @db.Decimal(10, 7) @map("longitude")
+  accuracy        Decimal?      @db.Decimal(10, 2) @map("accuracy")
+  sourceType      GpsSourceType @map("source_type")
+  recordedAt      DateTime      @db.Timestamptz @map("recorded_at")
+  createdAt       DateTime      @default(now()) @db.Timestamptz @map("created_at")
+
+  workspace Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member    FamilyMember    @relation("MemberLocationPoints", fields: [memberId], references: [id], onDelete: Cascade)
+  device    WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+
+  // Plus CHECK constraints added via raw SQL in the migration:
+  // latitude BETWEEN -90 AND 90, longitude BETWEEN -180 AND 180.
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([deviceId])
+  @@index([recordedAt])
+  @@map("member_location_points")
+}
+
+/// Shared in-app notifications (reused across modules; SOS uses type=SOS).
+model Notification {
+  notificationId    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("notification_id")
+  familyId          String               @map("family_id")
+  recipientMemberId String               @map("recipient_member_id")
+  type              NotificationType     @map("type")
+  priority          NotificationPriority @default(NORMAL) @map("priority")
+  title             String               @map("title")
+  body              String               @map("body")
+  referenceType     String?              @map("reference_type")
+  referenceId       String?              @map("reference_id")
+  isRead            Boolean              @default(false) @map("is_read")
+  readAt            DateTime?            @db.Timestamptz @map("read_at")
+  createdAt         DateTime             @default(now()) @db.Timestamptz @map("created_at")
+
+  family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  recipientMember FamilyMember @relation("MemberNotifications", fields: [recipientMemberId], references: [id], onDelete: Cascade)
+
+  @@index([recipientMemberId, isRead])
+  @@index([familyId])
+  @@map("notifications")
 }
