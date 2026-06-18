@@ -65,7 +65,6 @@ const FIELD_LABELS: Record<string, string> = {
   deviceId: 'Mã thiết bị',
   alertId: 'Mã cảnh báo',
   unreadOnly: 'Chỉ chưa đọc',
->>>>>>> 4727bc87c3c3b3852b073391bcc1034bc12d83fa
 };
 
 const PASSWORD_RULE =
