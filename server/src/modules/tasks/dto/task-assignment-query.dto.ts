@@ -2,7 +2,9 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskAssignmentStatus } from '@prisma/client';
 import { IsEnum, IsOptional } from 'class-validator';
 
-export class TaskAssignmentQueryDto {
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+
+export class TaskAssignmentQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     enum: TaskAssignmentStatus,
     description: 'Lọc phân công công việc theo trạng thái',

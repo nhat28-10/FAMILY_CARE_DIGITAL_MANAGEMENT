@@ -50,7 +50,8 @@ export class UpdateTaskDto {
 
   @ApiPropertyOptional({
     enum: TaskType,
-    description: 'Loại công việc; Phase 1 không hỗ trợ chuyển sang RECURRING',
+    description:
+      'Loại công việc; API cập nhật công việc thường không hỗ trợ chuyển sang RECURRING',
   })
   @IsOptional()
   @IsEnum(TaskType, { message: 'Loại công việc không hợp lệ' })

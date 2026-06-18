@@ -1,35 +1,40 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TaskPriority, TaskStatus, TaskType } from '@prisma/client';
-import { Transform, TransformFnParams } from 'class-transformer';
+import { TaskPriority, TaskStatus } from '@prisma/client';
+import { Transform, TransformFnParams, Type } from 'class-transformer';
 import {
-  IsDateString,
   IsEnum,
+  IsDefined,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+
+import { TaskScheduleDto } from './task-schedule.dto';
 
 const trimString = ({ value }: TransformFnParams): unknown => {
   const candidate: unknown = value;
   return typeof candidate === 'string' ? candidate.trim() : candidate;
 };
 
-export class CreateTaskDto {
+export class CreateRecurringTaskDto {
   @ApiProperty({
-    example: 'Rửa chén',
-    description: 'Tiêu đề công việc cần tạo',
+    example: 'Dọn phòng khách',
+    description: 'Tiêu đề công việc lặp lại cần tạo',
   })
   @Transform(trimString)
   @IsString({ message: 'Tên công việc phải là chuỗi' })
   @IsNotEmpty({ message: 'Tên công việc không được để trống' })
-  @MaxLength(150, { message: 'Tên công việc không được vượt quá 150 ký tự' })
+  @MaxLength(150, {
+    message: 'Tên công việc không được vượt quá 150 ký tự',
+  })
   title!: string;
 
   @ApiPropertyOptional({
-    example: 'Rửa chén sau bữa tối',
-    description: 'Mô tả chi tiết công việc',
+    example: 'Dọn phòng khách mỗi tuần',
+    description: 'Mô tả chi tiết công việc lặp lại',
   })
   @Transform(trimString)
   @IsOptional()
@@ -46,15 +51,6 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID('4', { message: 'Danh mục công việc không hợp lệ' })
   taskCategoryId?: string;
-
-  @ApiPropertyOptional({
-    enum: TaskType,
-    default: TaskType.AD_HOC,
-    description: 'Loại công việc; API tạo công việc thường chỉ hỗ trợ AD_HOC',
-  })
-  @IsOptional()
-  @IsEnum(TaskType, { message: 'Loại công việc không hợp lệ' })
-  taskType?: TaskType;
 
   @ApiPropertyOptional({
     enum: TaskPriority,
@@ -74,11 +70,12 @@ export class CreateTaskDto {
   @IsEnum(TaskStatus, { message: 'Trạng thái công việc không hợp lệ' })
   status?: TaskStatus;
 
-  @ApiPropertyOptional({
-    example: '2026-06-30T12:00:00.000Z',
-    description: 'Hạn hoàn thành công việc',
+  @ApiProperty({
+    type: TaskScheduleDto,
+    description: 'Lịch lặp của công việc',
   })
-  @IsOptional()
-  @IsDateString({}, { message: 'Hạn hoàn thành phải là ngày hợp lệ' })
-  dueAt?: string;
+  @IsDefined({ message: 'Lịch lặp công việc không được để trống' })
+  @ValidateNested()
+  @Type(() => TaskScheduleDto)
+  schedule!: TaskScheduleDto;
 }

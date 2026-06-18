@@ -88,11 +88,11 @@ export class TasksController {
   @ApiOperation({
     summary: 'Tạo công việc cơ bản cho gia đình',
     description:
-      'Phase 1 chỉ tạo công việc AD_HOC, không tạo phân công hoặc thiết lập thưởng.',
+      'API này chỉ tạo công việc AD_HOC, không tạo phân công hoặc thiết lập thưởng. Công việc lặp lại dùng API lịch lặp riêng.',
   })
   @ApiResponse({
     status: 400,
-    description: 'Công việc lặp lại sẽ được triển khai ở Phase 4',
+    description: 'Vui lòng tạo công việc lặp lại bằng API lịch lặp',
   })
   createTask(
     @Param('familyId') familyId: string,
@@ -129,7 +129,8 @@ export class TasksController {
   @ResponseMessage('Cập nhật công việc thành công')
   @ApiOperation({
     summary: 'Cập nhật công việc cơ bản của gia đình',
-    description: 'Phase 1 không hỗ trợ chuyển công việc sang RECURRING.',
+    description:
+      'API này không chuyển công việc thường sang RECURRING. Công việc lặp lại dùng API lịch lặp riêng.',
   })
   @ApiParam({
     name: 'taskId',
