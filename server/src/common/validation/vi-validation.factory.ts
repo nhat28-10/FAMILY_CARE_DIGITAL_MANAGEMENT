@@ -24,6 +24,7 @@ const FIELD_LABELS: Record<string, string> = {
   familyRole: 'Vai trò gia đình',
   relationship: 'Quan hệ',
   activationStatus: 'Trạng thái kích hoạt',
+
   title: 'Tên công việc',
   taskCategoryId: 'Danh mục công việc',
   taskType: 'Loại công việc',
@@ -48,6 +49,23 @@ const FIELD_LABELS: Record<string, string> = {
   reviewNote: 'Ghi chú đánh giá',
   submissionId: 'Minh chứng hoàn thành công việc',
   proofId: 'Minh chứng',
+
+  // SOS / Safety
+  sourceType: 'Nguồn',
+  severity: 'Mức độ',
+  responseType: 'Loại phản hồi',
+  message: 'Nội dung',
+  resolutionNote: 'Ghi chú xử lý',
+  initialLatitude: 'Vĩ độ',
+  initialLongitude: 'Kinh độ',
+  latitude: 'Vĩ độ',
+  longitude: 'Kinh độ',
+  accuracy: 'Độ chính xác',
+  recordedAt: 'Thời điểm ghi nhận',
+  deviceId: 'Mã thiết bị',
+  alertId: 'Mã cảnh báo',
+  unreadOnly: 'Chỉ chưa đọc',
+>>>>>>> 4727bc87c3c3b3852b073391bcc1034bc12d83fa
 };
 
 const PASSWORD_RULE =
