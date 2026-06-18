@@ -24,6 +24,21 @@ const FIELD_LABELS: Record<string, string> = {
   familyRole: 'Vai trò gia đình',
   relationship: 'Quan hệ',
   activationStatus: 'Trạng thái kích hoạt',
+  // SOS / Safety
+  sourceType: 'Nguồn',
+  severity: 'Mức độ',
+  responseType: 'Loại phản hồi',
+  message: 'Nội dung',
+  resolutionNote: 'Ghi chú xử lý',
+  initialLatitude: 'Vĩ độ',
+  initialLongitude: 'Kinh độ',
+  latitude: 'Vĩ độ',
+  longitude: 'Kinh độ',
+  accuracy: 'Độ chính xác',
+  recordedAt: 'Thời điểm ghi nhận',
+  deviceId: 'Mã thiết bị',
+  alertId: 'Mã cảnh báo',
+  unreadOnly: 'Chỉ chưa đọc',
 };
 
 const PASSWORD_RULE =
@@ -97,9 +112,7 @@ export function viValidationExceptionFactory(
     : undefined;
 
   const message =
-    first && key
-      ? messageFor(first.property, key)
-      : 'Dữ liệu không hợp lệ';
+    first && key ? messageFor(first.property, key) : 'Dữ liệu không hợp lệ';
 
   return new BadRequestException(message);
 }
