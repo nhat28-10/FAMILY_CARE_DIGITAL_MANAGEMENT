@@ -33,7 +33,7 @@ const TASK_MANAGER_ROLES = [
   FamilyRole.DEPUTY_MEMBER,
 ] as const;
 
-@ApiTags('Tasks - Lịch lặp')
+@ApiTags('Tasks - Công việc lặp lại thường xuyên')
 @ApiBearerAuth()
 @ApiParam({
   name: 'familyId',
@@ -43,7 +43,7 @@ const TASK_MANAGER_ROLES = [
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/tasks')
 export class TaskSchedulesController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(private readonly tasksService: TasksService) { }
 
   @Post('recurring')
   @FamilyRoles(...TASK_MANAGER_ROLES)
