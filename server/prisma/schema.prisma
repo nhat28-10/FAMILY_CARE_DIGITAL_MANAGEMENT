@@ -191,6 +191,95 @@ enum SpendingSupportRequestStatus {
   CANCELED
 }
 
+enum TaskCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskType {
+  AD_HOC
+  RECURRING
+}
+
+enum TaskRepeatType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum TaskScheduleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+enum TaskAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum TaskSubmissionStatus {
+  WAITING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TaskUnavailabilityStatus {
+  REPORTED
+  HANDLED
+  CANCELED
+}
+
+enum RewardType {
+  MONEY_RECORD
+  POINT
+  OTHER
+}
+
+enum RewardSettlementStatus {
+  PENDING_SETTLEMENT
+  WAITING_CONFIRMATION
+  SETTLED
+  DISPUTED
+  CANCELED
+}
+
+enum RewardDisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+enum RewardExternalMethod {
+  CASH
+  BANK_TRANSFER
+  THIRD_PARTY_WALLET
+  OTHER
+}
+
+enum TaskProofType {
+  IMAGE
+  VIDEO
+  NOTE
+  FILE
+}
+
 /// Subscription plan tier offered to family workspaces (ERD: plan_code).
 enum SubscriptionPlanCode {
   FREE
@@ -290,6 +379,8 @@ model Family {
   financialGoals          FinancialGoal[]
   budgetAlerts            BudgetAlert[]
   spendingSupportRequests SpendingSupportRequest[]
+  taskCategories          TaskCategory[]
+  tasks                   Task[]
   sosSetting              SosSetting?
   wearableDevices         WearableDevice[]
   sosAlerts               SosAlert[]
@@ -327,6 +418,18 @@ model FamilyMember {
   goalAllocations                  GoalAllocation[]         @relation("GoalAllocations")
   requestedSpendingSupportRequests SpendingSupportRequest[] @relation("RequestedSpendingSupportRequests")
   reviewedSpendingSupportRequests  SpendingSupportRequest[] @relation("ReviewedSpendingSupportRequests")
+  createdTasks                     Task[]                   @relation("CreatedTasks")
+  assignedTasks                    TaskAssignment[]         @relation("TaskAssignedTo")
+  givenTaskAssignments             TaskAssignment[]         @relation("TaskAssignedBy")
+  submittedTaskSubmissions         TaskSubmission[]         @relation("TaskSubmissionSubmittedBy")
+  reviewedTaskSubmissions          TaskSubmission[]         @relation("TaskSubmissionReviewedBy")
+  reportedTaskUnavailabilities     TaskUnavailability[]     @relation("TaskUnavailabilityReportedBy")
+  handledTaskUnavailabilities      TaskUnavailability[]     @relation("TaskUnavailabilityHandledBy")
+  receivedRewardSettlements        RewardSettlement[]       @relation("RewardSettlementReceiver")
+  settledRewardSettlements         RewardSettlement[]       @relation("RewardSettlementSettledBy")
+  rewardAllocations                RewardAllocation[]       @relation("RewardAllocationAllocatedBy")
+  reportedRewardDisputes           RewardDispute[]          @relation("RewardDisputeReportedBy")
+  resolvedRewardDisputes           RewardDispute[]          @relation("RewardDisputeResolvedBy")
   createdSosSettings               SosSetting[]             @relation("CreatedSosSettings")
   ownedWearableDevices             WearableDevice[]         @relation("OwnedWearableDevices")
   triggeredSosAlerts               SosAlert[]               @relation("TriggeredSosAlerts")
@@ -463,10 +566,11 @@ model FinanceJar {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  financeModel   FinanceModel    @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
-  budgetLines    BudgetLine[]
-  financialGoals FinancialGoal[]
-  budgetAlerts   BudgetAlert[]
+  financeModel      FinanceModel       @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  budgetLines       BudgetLine[]
+  financialGoals    FinancialGoal[]
+  budgetAlerts      BudgetAlert[]
+  rewardAllocations RewardAllocation[]
 
   @@unique([financeModelId, jarCode])
   @@index([financeModelId, isActive])
@@ -491,10 +595,11 @@ model LedgerEntry {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  ledger          FinanceLedger    @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
-  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdByMember FamilyMember     @relation("CreatedLedgerEntries", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  goalAllocations GoalAllocation[]
+  ledger            FinanceLedger      @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  category          FinanceCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdByMember   FamilyMember       @relation("CreatedLedgerEntries", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  goalAllocations   GoalAllocation[]
+  rewardAllocations RewardAllocation[]
 
   @@index([ledgerId, entryDate])
   @@index([ledgerId, entryType, status])
@@ -616,11 +721,12 @@ model FinancialGoal {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
 
-  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  relatedJar      FinanceJar?      @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
-  createdByMember FamilyMember     @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  allocations     GoalAllocation[]
-  budgetAlerts    BudgetAlert[]
+  family            Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  relatedJar        FinanceJar?        @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
+  createdByMember   FamilyMember       @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  allocations       GoalAllocation[]
+  budgetAlerts      BudgetAlert[]
+  rewardAllocations RewardAllocation[]
 
   @@index([familyId])
   @@index([relatedJarId])
@@ -684,6 +790,255 @@ model BudgetAlert {
   @@index([status])
   @@index([createdAt])
   @@map("budget_alerts")
+}
+
+model TaskCategory {
+  id          String             @id @default(uuid())
+  familyId    String
+  name        String
+  description String?
+  status      TaskCategoryStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@unique([familyId, name])
+  @@index([familyId, status])
+  @@map("task_categories")
+}
+
+model Task {
+  id                String       @id @default(uuid())
+  familyId          String
+  taskCategoryId    String?
+  title             String
+  description       String?
+  taskType          TaskType     @default(AD_HOC)
+  priority          TaskPriority @default(MEDIUM)
+  status            TaskStatus   @default(ACTIVE)
+  createdByMemberId String
+  dueAt             DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category        TaskCategory?    @relation(fields: [taskCategoryId], references: [id], onDelete: SetNull)
+  createdByMember FamilyMember     @relation("CreatedTasks", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  assignments     TaskAssignment[]
+  schedule        TaskSchedule?
+  rewardSetting   RewardSetting?
+
+  @@index([familyId])
+  @@index([taskCategoryId])
+  @@index([createdByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("tasks")
+}
+
+model TaskSchedule {
+  id             String             @id @default(uuid())
+  taskId         String             @unique
+  repeatType     TaskRepeatType
+  repeatInterval Int
+  startDate      DateTime           @db.Date
+  endDate        DateTime?          @db.Date
+  dayOfWeek      Int?
+  status         TaskScheduleStatus @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([status])
+  @@index([startDate])
+  @@map("task_schedules")
+}
+
+model TaskAssignment {
+  id                 String               @id @default(uuid())
+  taskId             String
+  assignedToMemberId String
+  assignedByMemberId String
+  status             TaskAssignmentStatus @default(ASSIGNED)
+  assignedAt         DateTime             @default(now())
+  startAt            DateTime?
+  dueAt              DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  task             Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedToMember FamilyMember         @relation("TaskAssignedTo", fields: [assignedToMemberId], references: [id], onDelete: Restrict)
+  assignedByMember FamilyMember         @relation("TaskAssignedBy", fields: [assignedByMemberId], references: [id], onDelete: Restrict)
+  submissions      TaskSubmission[]
+  unavailabilities TaskUnavailability[]
+
+  @@index([taskId])
+  @@index([assignedToMemberId])
+  @@index([assignedByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("task_assignments")
+}
+
+model TaskSubmission {
+  id                  String               @id @default(uuid())
+  assignmentId        String
+  submittedByMemberId String
+  submissionNote      String?
+  status              TaskSubmissionStatus @default(WAITING_REVIEW)
+  reviewedByMemberId  String?
+  reviewNote          String?
+  submittedAt         DateTime             @default(now())
+  reviewedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  assignment        TaskAssignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submittedByMember FamilyMember      @relation("TaskSubmissionSubmittedBy", fields: [submittedByMemberId], references: [id], onDelete: Restrict)
+  reviewedByMember  FamilyMember?     @relation("TaskSubmissionReviewedBy", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
+  proofs            TaskProof[]
+  rewardSettlement  RewardSettlement?
+
+  @@index([assignmentId])
+  @@index([submittedByMemberId])
+  @@index([reviewedByMemberId])
+  @@index([status])
+  @@map("task_submissions")
+}
+
+model RewardSetting {
+  id                   String     @id @default(uuid())
+  taskId               String     @unique
+  rewardType           RewardType
+  rewardAmount         Decimal?   @db.Decimal(14, 2)
+  rewardDescription    String?
+  autoCreateSettlement Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  task        Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  settlements RewardSettlement[]
+
+  @@index([taskId])
+  @@map("reward_settings")
+}
+
+model RewardSettlement {
+  id                String                 @id @default(uuid())
+  taskSubmissionId  String                 @unique
+  rewardSettingId   String
+  receiverMemberId  String
+  settledByMemberId String?
+  amount            Decimal                @db.Decimal(14, 2)
+  status            RewardSettlementStatus @default(PENDING_SETTLEMENT)
+  externalMethod    RewardExternalMethod?
+  externalNote      String?
+  settledAt         DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  taskSubmission  TaskSubmission     @relation(fields: [taskSubmissionId], references: [id], onDelete: Cascade)
+  rewardSetting   RewardSetting      @relation(fields: [rewardSettingId], references: [id], onDelete: Restrict)
+  receiverMember  FamilyMember       @relation("RewardSettlementReceiver", fields: [receiverMemberId], references: [id], onDelete: Restrict)
+  settledByMember FamilyMember?      @relation("RewardSettlementSettledBy", fields: [settledByMemberId], references: [id], onDelete: Restrict)
+  allocations     RewardAllocation[]
+  disputes        RewardDispute[]
+
+  @@index([rewardSettingId])
+  @@index([receiverMemberId])
+  @@index([settledByMemberId])
+  @@index([status])
+  @@map("reward_settlements")
+}
+
+model RewardAllocation {
+  id                  String   @id @default(uuid())
+  rewardSettlementId  String
+  jarId               String?
+  goalId              String?
+  ledgerEntryId       String?
+  amount              Decimal  @db.Decimal(14, 2)
+  allocatedByMemberId String
+  allocatedAt         DateTime @default(now())
+
+  rewardSettlement  RewardSettlement @relation(fields: [rewardSettlementId], references: [id], onDelete: Cascade)
+  jar               FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
+  goal              FinancialGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  ledgerEntry       LedgerEntry?     @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+  allocatedByMember FamilyMember     @relation("RewardAllocationAllocatedBy", fields: [allocatedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([rewardSettlementId])
+  @@index([jarId])
+  @@index([goalId])
+  @@index([ledgerEntryId])
+  @@index([allocatedByMemberId])
+  @@map("reward_allocations")
+}
+
+model RewardDispute {
+  id                 String              @id @default(uuid())
+  rewardSettlementId String
+  reportedByMemberId String
+  reason             String
+  status             RewardDisputeStatus @default(OPEN)
+  resolvedByMemberId String?
+  createdAt          DateTime            @default(now())
+  resolvedAt         DateTime?
+
+  rewardSettlement RewardSettlement @relation(fields: [rewardSettlementId], references: [id], onDelete: Cascade)
+  reportedByMember FamilyMember     @relation("RewardDisputeReportedBy", fields: [reportedByMemberId], references: [id], onDelete: Restrict)
+  resolvedByMember FamilyMember?    @relation("RewardDisputeResolvedBy", fields: [resolvedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([rewardSettlementId])
+  @@index([reportedByMemberId])
+  @@index([resolvedByMemberId])
+  @@index([status])
+  @@map("reward_disputes")
+}
+
+model TaskUnavailability {
+  id                 String                   @id @default(uuid())
+  assignmentId       String
+  reportedByMemberId String
+  reason             String
+  status             TaskUnavailabilityStatus @default(REPORTED)
+  reportedAt         DateTime                 @default(now())
+  handledByMemberId  String?
+  handledAt          DateTime?
+
+  assignment       TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  reportedByMember FamilyMember   @relation("TaskUnavailabilityReportedBy", fields: [reportedByMemberId], references: [id], onDelete: Restrict)
+  handledByMember  FamilyMember?  @relation("TaskUnavailabilityHandledBy", fields: [handledByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([reportedByMemberId])
+  @@index([handledByMemberId])
+  @@index([status])
+  @@index([reportedAt])
+  @@map("task_unavailabilities")
+}
+
+model TaskProof {
+  id           String        @id @default(uuid())
+  submissionId String
+  proofType    TaskProofType
+  fileUrl      String?
+  thumbnailUrl String?
+  note         String?
+  uploadedAt   DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  submission TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([proofType])
+  @@map("task_proofs")
 }
 
 // ===========================================================================
@@ -763,15 +1118,15 @@ enum NotificationPriority {
 
 /// Per-workspace SOS configuration (1-1 with a family workspace).
 model SosSetting {
-  sosSettingId            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sos_setting_id")
+  sosSettingId            String   @id @default(dbgenerated("gen_random_uuid()")) @map("sos_setting_id") @db.Uuid
   workspaceId             String   @unique @map("workspace_id")
   isEnabled               Boolean  @default(true) @map("is_enabled")
   notifyAllMembers        Boolean  @default(true) @map("notify_all_members")
   autoCreateAlertFromFall Boolean  @default(false) @map("auto_create_alert_from_fall")
   locationRequired        Boolean  @default(true) @map("location_required")
   createdByMemberId       String?  @map("created_by_member_id")
-  createdAt               DateTime @default(now()) @db.Timestamptz @map("created_at")
-  updatedAt               DateTime @updatedAt @db.Timestamptz @map("updated_at")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdByMember   FamilyMember?      @relation("CreatedSosSettings", fields: [createdByMemberId], references: [id], onDelete: SetNull)
@@ -783,15 +1138,15 @@ model SosSetting {
 
 /// Emergency contacts attached to a workspace's SOS settings.
 model EmergencyContact {
-  contactId        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("contact_id")
-  sosSettingId     String   @db.Uuid @map("sos_setting_id")
+  contactId        String   @id @default(dbgenerated("gen_random_uuid()")) @map("contact_id") @db.Uuid
+  sosSettingId     String   @map("sos_setting_id") @db.Uuid
   contactName      String   @map("contact_name")
   phoneNumber      String   @map("phone_number")
   relationshipNote String?  @map("relationship_note")
   priorityOrder    Int      @map("priority_order")
   isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @db.Timestamptz @map("created_at")
-  updatedAt        DateTime @updatedAt @db.Timestamptz @map("updated_at")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   sosSetting SosSetting @relation(fields: [sosSettingId], references: [sosSettingId], onDelete: Cascade)
 
@@ -801,7 +1156,7 @@ model EmergencyContact {
 
 /// Wearable / tracking devices paired to a member within a workspace.
 model WearableDevice {
-  deviceId         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("device_id")
+  deviceId         String              @id @default(dbgenerated("gen_random_uuid()")) @map("device_id") @db.Uuid
   workspaceId      String              @map("workspace_id")
   ownerMemberId    String              @map("owner_member_id")
   deviceName       String              @map("device_name")
@@ -810,9 +1165,9 @@ model WearableDevice {
   pairingStatus    DevicePairingStatus @map("pairing_status")
   gpsEnabled       Boolean             @map("gps_enabled")
   sosEnabled       Boolean             @map("sos_enabled")
-  lastSeenAt       DateTime?           @db.Timestamptz @map("last_seen_at")
-  createdAt        DateTime            @default(now()) @db.Timestamptz @map("created_at")
-  updatedAt        DateTime            @updatedAt @db.Timestamptz @map("updated_at")
+  lastSeenAt       DateTime?           @map("last_seen_at") @db.Timestamptz
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace   Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   ownerMember FamilyMember @relation("OwnedWearableDevices", fields: [ownerMemberId], references: [id], onDelete: Cascade)
@@ -833,22 +1188,22 @@ model WearableDevice {
 
 /// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
 model SosAlert {
-  sosAlertId          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sos_alert_id")
+  sosAlertId          String         @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
   workspaceId         String         @map("workspace_id")
   triggeredByMemberId String         @map("triggered_by_member_id")
-  deviceId            String?        @db.Uuid @map("device_id")
+  deviceId            String?        @map("device_id") @db.Uuid
   sourceType          SosSourceType  @map("source_type")
   status              SosAlertStatus @default(ACTIVE) @map("status")
   severity            SosSeverity?   @map("severity")
-  initialLatitude     Decimal?       @db.Decimal(10, 7) @map("initial_latitude")
-  initialLongitude    Decimal?       @db.Decimal(10, 7) @map("initial_longitude")
+  initialLatitude     Decimal?       @map("initial_latitude") @db.Decimal(10, 7)
+  initialLongitude    Decimal?       @map("initial_longitude") @db.Decimal(10, 7)
   message             String?        @map("message")
-  triggeredAt         DateTime       @default(now()) @db.Timestamptz @map("triggered_at")
+  triggeredAt         DateTime       @default(now()) @map("triggered_at") @db.Timestamptz
   resolvedByMemberId  String?        @map("resolved_by_member_id")
-  resolvedAt          DateTime?      @db.Timestamptz @map("resolved_at")
+  resolvedAt          DateTime?      @map("resolved_at") @db.Timestamptz
   resolutionNote      String?        @map("resolution_note")
-  createdAt           DateTime       @default(now()) @db.Timestamptz @map("created_at")
-  updatedAt           DateTime       @updatedAt @db.Timestamptz @map("updated_at")
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace         Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   triggeredByMember FamilyMember    @relation("TriggeredSosAlerts", fields: [triggeredByMemberId], references: [id], onDelete: Cascade)
@@ -869,15 +1224,15 @@ model SosAlert {
 
 /// GPS route points captured during a single SOS event.
 model SosLocationPoint {
-  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("location_point_id")
-  sosAlertId      String        @db.Uuid @map("sos_alert_id")
-  deviceId        String?       @db.Uuid @map("device_id")
-  latitude        Decimal       @db.Decimal(10, 7) @map("latitude")
-  longitude       Decimal       @db.Decimal(10, 7) @map("longitude")
-  accuracy        Decimal?      @db.Decimal(10, 2) @map("accuracy")
+  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
+  sosAlertId      String        @map("sos_alert_id") @db.Uuid
+  deviceId        String?       @map("device_id") @db.Uuid
+  latitude        Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude       Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy        Decimal?      @map("accuracy") @db.Decimal(10, 2)
   sourceType      GpsSourceType @map("source_type")
-  recordedAt      DateTime      @db.Timestamptz @map("recorded_at")
-  createdAt       DateTime      @default(now()) @db.Timestamptz @map("created_at")
+  recordedAt      DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   sosAlert SosAlert        @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
   device   WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
@@ -890,12 +1245,12 @@ model SosLocationPoint {
 
 /// Member responses to a SOS alert (viewed / safe / need help / resolved / canceled).
 model SosResponse {
-  responseId        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("response_id")
-  sosAlertId        String          @db.Uuid @map("sos_alert_id")
+  responseId        String          @id @default(dbgenerated("gen_random_uuid()")) @map("response_id") @db.Uuid
+  sosAlertId        String          @map("sos_alert_id") @db.Uuid
   responderMemberId String          @map("responder_member_id")
   responseType      SosResponseType @map("response_type")
   message           String?         @map("message")
-  respondedAt       DateTime        @default(now()) @db.Timestamptz @map("responded_at")
+  respondedAt       DateTime        @default(now()) @map("responded_at") @db.Timestamptz
 
   sosAlert        SosAlert     @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
   responderMember FamilyMember @relation("SosResponses", fields: [responderMemberId], references: [id], onDelete: Cascade)
@@ -907,14 +1262,14 @@ model SosResponse {
 
 /// Raw sensor events emitted by wearable / simulated devices.
 model SensorEvent {
-  sensorEventId     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("sensor_event_id")
-  deviceId          String          @db.Uuid @map("device_id")
+  sensorEventId     String          @id @default(dbgenerated("gen_random_uuid()")) @map("sensor_event_id") @db.Uuid
+  deviceId          String          @map("device_id") @db.Uuid
   eventType         SensorEventType @map("event_type")
-  rawValue          Json?           @db.JsonB @map("raw_value")
+  rawValue          Json?           @map("raw_value") @db.JsonB
   severity          SosSeverity?    @map("severity")
-  detectedAt        DateTime        @db.Timestamptz @map("detected_at")
-  createdSosAlertId String?         @db.Uuid @map("created_sos_alert_id")
-  createdAt         DateTime        @default(now()) @db.Timestamptz @map("created_at")
+  detectedAt        DateTime        @map("detected_at") @db.Timestamptz
+  createdSosAlertId String?         @map("created_sos_alert_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
   device          WearableDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
   createdSosAlert SosAlert?      @relation("CreatedSosAlertSensorEvents", fields: [createdSosAlertId], references: [sosAlertId], onDelete: SetNull)
@@ -927,16 +1282,16 @@ model SensorEvent {
 
 /// Everyday member location tracking — separate from SOS-event route points.
 model MemberLocationPoint {
-  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("location_point_id")
+  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
   workspaceId     String        @map("workspace_id")
   memberId        String        @map("member_id")
-  deviceId        String?       @db.Uuid @map("device_id")
-  latitude        Decimal       @db.Decimal(10, 7) @map("latitude")
-  longitude       Decimal       @db.Decimal(10, 7) @map("longitude")
-  accuracy        Decimal?      @db.Decimal(10, 2) @map("accuracy")
+  deviceId        String?       @map("device_id") @db.Uuid
+  latitude        Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude       Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy        Decimal?      @map("accuracy") @db.Decimal(10, 2)
   sourceType      GpsSourceType @map("source_type")
-  recordedAt      DateTime      @db.Timestamptz @map("recorded_at")
-  createdAt       DateTime      @default(now()) @db.Timestamptz @map("created_at")
+  recordedAt      DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   workspace Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   member    FamilyMember    @relation("MemberLocationPoints", fields: [memberId], references: [id], onDelete: Cascade)
@@ -953,7 +1308,7 @@ model MemberLocationPoint {
 
 /// Shared in-app notifications (reused across modules; SOS uses type=SOS).
 model Notification {
-  notificationId    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("notification_id")
+  notificationId    String               @id @default(dbgenerated("gen_random_uuid()")) @map("notification_id") @db.Uuid
   familyId          String               @map("family_id")
   recipientMemberId String               @map("recipient_member_id")
   type              NotificationType     @map("type")
@@ -963,8 +1318,8 @@ model Notification {
   referenceType     String?              @map("reference_type")
   referenceId       String?              @map("reference_id")
   isRead            Boolean              @default(false) @map("is_read")
-  readAt            DateTime?            @db.Timestamptz @map("read_at")
-  createdAt         DateTime             @default(now()) @db.Timestamptz @map("created_at")
+  readAt            DateTime?            @map("read_at") @db.Timestamptz
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz
 
   family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
   recipientMember FamilyMember @relation("MemberNotifications", fields: [recipientMemberId], references: [id], onDelete: Cascade)

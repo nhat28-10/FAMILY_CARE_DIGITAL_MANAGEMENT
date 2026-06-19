@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { FamilyMember, FamilyRole } from '@prisma/client';
+import { FamilyMember, FamilyRole, MemberStatus } from '@prisma/client';
 
 import { SafeUser } from '../../users/users.types';
 import { FAMILY_ROLES_KEY } from '../decorators/family-roles.decorator';
@@ -52,7 +52,14 @@ export class FamilyPermissionGuard implements CanActivate {
       user.id,
     );
     if (!membership) {
-      throw new ForbiddenException('Bạn không phải thành viên của gia đình này');
+      throw new ForbiddenException(
+        'Bạn không phải thành viên của gia đình này',
+      );
+    }
+    if (membership.status !== MemberStatus.ACTIVE) {
+      throw new ForbiddenException(
+        'Tư cách thành viên gia đình không còn hoạt động',
+      );
     }
 
     const requiredRoles = this.reflector.getAllAndOverride<FamilyRole[]>(

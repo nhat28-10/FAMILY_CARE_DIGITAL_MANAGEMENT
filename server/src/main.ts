@@ -1,7 +1,9 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -9,13 +11,16 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { viValidationExceptionFactory } from './common/validation/vi-validation.factory';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
   const prefix = configService.get<string>('app.prefix') || 'api/v1';
 
   app.setGlobalPrefix(prefix);
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
 
   app.enableCors({
     origin: true,
