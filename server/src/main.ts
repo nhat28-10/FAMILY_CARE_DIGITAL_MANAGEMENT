@@ -1,6 +1,9 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -9,13 +12,20 @@ import { viValidationExceptionFactory } from './common/validation/vi-validation.
 import { setupSwagger } from './config/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` keeps the unparsed request Buffer on `req.rawBody` (alongside
+  // the normal JSON body) so the Stripe webhook can verify its signature.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
   const prefix = configService.get<string>('app.prefix') || 'api/v1';
 
   app.setGlobalPrefix(prefix);
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
 
   app.enableCors({
     origin: true,

@@ -31,4 +31,16 @@ export default () => ({
   invitation: {
     expiresInDays: parseInt(process.env.INVITATION_EXPIRES_IN_DAYS || '7', 10),
   },
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    // Stripe Checkout redirect targets. `{CHECKOUT_SESSION_ID}` is substituted
+    // by Stripe; the frontend confirms status via webhook, not these URLs.
+    checkoutSuccessUrl:
+      process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
+      'http://localhost:5173/subscription/success',
+    checkoutCancelUrl:
+      process.env.STRIPE_CHECKOUT_CANCEL_URL ||
+      'http://localhost:5173/subscription/cancel',
+  },
 });

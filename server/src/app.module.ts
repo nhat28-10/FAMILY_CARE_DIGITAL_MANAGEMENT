@@ -13,6 +13,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
 import { RolesPermissionsModule } from './modules/roles-permissions/roles-permissions.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { BillingsModule } from './modules/billing/billings.module';
 
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
@@ -45,6 +46,7 @@ import { AdminModule } from './modules/admin/admin.module';
     RolesPermissionsModule,
     SubscriptionPlansModule,
     SubscriptionsModule,
+    BillingsModule,
     TasksModule,
     RewardsModule,
     ChatsModule,

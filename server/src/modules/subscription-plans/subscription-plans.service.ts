@@ -42,6 +42,7 @@ export class SubscriptionPlansService {
         storageLimit: dto.storageLimit,
         featureAccess:
           (dto.featureAccess as Prisma.InputJsonValue | undefined) ?? undefined,
+        stripePriceId: dto.stripePriceId ?? null,
         isActive: dto.isActive ?? true,
       },
     });

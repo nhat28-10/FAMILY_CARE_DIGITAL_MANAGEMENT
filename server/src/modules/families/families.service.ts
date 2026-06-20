@@ -8,6 +8,7 @@ import { FamilyRole, Relationship } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
 import { SosGateway } from '../sos/sos.gateway';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 
@@ -34,6 +35,7 @@ export class FamiliesService {
     private readonly prisma: PrismaService,
     private readonly familyMembersService: FamilyMembersService,
     private readonly sosGateway: SosGateway,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   /**
@@ -42,8 +44,8 @@ export class FamiliesService {
    * Both steps run in a single transaction.
    */
   async create(userId: string, dto: CreateFamilyDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const family = await tx.family.create({
+    const family = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.family.create({
         data: {
           name: dto.name,
           description: dto.description ?? null,
@@ -54,7 +56,7 @@ export class FamiliesService {
 
       await tx.familyMember.create({
         data: {
-          familyId: family.id,
+          familyId: created.id,
           userId,
           familyRole: FamilyRole.FAMILY_MANAGER,
           relationship: dto.relationship ?? Relationship.OTHER,
@@ -62,10 +64,15 @@ export class FamiliesService {
       });
 
       return tx.family.findUniqueOrThrow({
-        where: { id: family.id },
+        where: { id: created.id },
         include: memberInclude,
       });
     });
+
+    // Seed the default FREE subscription (no-op if FREE plan isn't configured).
+    await this.subscriptionsService.ensureFreeSubscription(family.id);
+
+    return family;
   }
 
   findMyFamilies(userId: string) {
