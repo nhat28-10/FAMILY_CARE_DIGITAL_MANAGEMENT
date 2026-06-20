@@ -48,6 +48,15 @@ export class CreateSubscriptionPlanDto {
   @IsObject()
   featureAccess?: Record<string, unknown>;
 
+  @ApiPropertyOptional({
+    description: 'Stripe recurring Price id (bắt buộc cho gói trả phí PLUS/PREMIUM)',
+    example: 'price_1Xxxx',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  stripePriceId?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

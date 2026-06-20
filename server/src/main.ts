@@ -9,9 +9,14 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { viValidationExceptionFactory } from './common/validation/vi-validation.factory';
+import { setupSwagger } from './config/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // `rawBody: true` keeps the unparsed request Buffer on `req.rawBody` (alongside
+  // the normal JSON body) so the Stripe webhook can verify its signature.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
@@ -40,17 +45,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Family Care API')
-    .setDescription(
-      'Backend API for Family Care Digital Family Management Solution',
-    )
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  setupSwagger(app);
 
   await app.listen(port);
 }

@@ -386,6 +386,8 @@ model Family {
   sosAlerts               SosAlert[]
   memberLocationPoints    MemberLocationPoint[]
   notifications           Notification[]
+  subscription            FamilySubscription?
+  paymentTransactions     PaymentTransaction[]
 
   @@map("families")
 }
@@ -623,11 +625,63 @@ model SubscriptionPlan {
   storageLimit  Int
   /// ERD: feature_access — feature flags/limits map for the tier.
   featureAccess Json?
+  /// Stripe recurring (annual) Price id — required for paid tiers (PLUS/PREMIUM).
+  stripePriceId String?              @unique
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
+  familySubscriptions FamilySubscription[]
+
   @@map("subscription_plans")
+}
+
+/// Lifecycle state of a family's subscription (mirrors Stripe subscription status).
+enum FamilySubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+/// One row per family (always present). New families start on FREE with no
+/// expiry; buying a paid plan moves the row to PLUS/PREMIUM and fills the Stripe
+/// ids. Webhooks are the source of truth for status/period changes.
+model FamilySubscription {
+  id                   String                   @id @default(uuid())
+  familyId             String                   @unique
+  planId               String
+  status               FamilySubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?                  @unique
+  /// null for FREE (no expiry); set from Stripe current_period_end for paid plans.
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean                  @default(false)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  family Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("family_subscriptions")
+}
+
+/// Payment/webhook history. `stripeEventId` is unique so replayed Stripe webhook
+/// events are idempotent (duplicate inserts fail and are skipped).
+model PaymentTransaction {
+  id            String   @id @default(uuid())
+  familyId      String
+  stripeEventId String   @unique
+  type          String
+  amount        Decimal? @db.Decimal(18, 2)
+  currency      String?
+  status        String
+  rawPayload    Json
+  createdAt     DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@map("payment_transactions")
 }
 
 model SpendingSupportRequest {

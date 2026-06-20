@@ -86,6 +86,9 @@ export class InvitationsService {
       throw new ConflictException('Bạn đã là thành viên của gia đình này');
     }
 
+    // Enforce the family's plan member cap before adding a new member.
+    await this.familyMembersService.assertCanAddMember(invitation.familyId);
+
     const [member] = await this.prisma.$transaction([
       this.prisma.familyMember.create({
         data: {
@@ -163,9 +166,7 @@ export class InvitationsService {
 
   private assertEmailMatches(invitation: Invitation, user: SafeUser): void {
     if (invitation.email.toLowerCase() !== user.email.toLowerCase()) {
-      throw new ForbiddenException(
-        'Lời mời được gửi tới một email khác',
-      );
+      throw new ForbiddenException('Lời mời được gửi tới một email khác');
     }
   }
 
