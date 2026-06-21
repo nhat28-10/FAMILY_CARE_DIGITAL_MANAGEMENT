@@ -80,9 +80,28 @@ async function main() {
   await backfillFreeSubscriptions();
 }
 
-/** Upsert the base plans by planCode (preserves any stripePriceId already set). */
+/**
+ * Stripe recurring Price id for a paid plan, read from env. Lets teammates
+ * sharing one Stripe test account configure plans via `.env` + `npm run seed`
+ * instead of PATCHing each DB by hand:
+ *   STRIPE_PRICE_PLUS, STRIPE_PRICE_PREMIUM
+ */
+function stripePriceIdFor(planCode: SubscriptionPlanCode): string | undefined {
+  if (planCode === SubscriptionPlanCode.PLUS) return process.env.STRIPE_PRICE_PLUS;
+  if (planCode === SubscriptionPlanCode.PREMIUM) {
+    return process.env.STRIPE_PRICE_PREMIUM;
+  }
+  return undefined;
+}
+
+/**
+ * Upsert the base plans by planCode. `stripePriceId` is set from env when
+ * provided; when the env var is absent the existing value is left untouched
+ * (so re-running seed without the vars won't wipe an already-configured price).
+ */
 async function seedPlans() {
   for (const plan of BASE_PLANS) {
+    const stripePriceId = stripePriceIdFor(plan.planCode);
     await prisma.subscriptionPlan.upsert({
       where: { planCode: plan.planCode },
       update: {
@@ -91,11 +110,17 @@ async function seedPlans() {
         maxMembers: plan.maxMembers,
         storageLimit: plan.storageLimit,
         isActive: true,
+        ...(stripePriceId ? { stripePriceId } : {}),
       },
-      create: { ...plan, isActive: true },
+      create: { ...plan, isActive: true, stripePriceId: stripePriceId ?? null },
     });
   }
-  console.log(`✔ Seeded ${BASE_PLANS.length} subscription plans (FREE/PLUS/PREMIUM)`);
+
+  const configured = BASE_PLANS.filter((p) => stripePriceIdFor(p.planCode)).length;
+  console.log(
+    `✔ Seeded ${BASE_PLANS.length} subscription plans ` +
+      `(${configured} paid plan(s) linked to Stripe price)`,
+  );
 }
 
 /** Give every family without a subscription a FREE one (status ACTIVE). */
