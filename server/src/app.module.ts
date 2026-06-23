@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './modules/mail/mail.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -36,6 +37,7 @@ import { AdminModule } from './modules/admin/admin.module';
     }),
 
     PrismaModule,
+    MailModule,
 
     AuthModule,
     UsersModule,

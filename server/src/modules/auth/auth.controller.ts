@@ -23,6 +23,7 @@ import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -95,5 +96,35 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
   me(@CurrentUser() user: SafeUser) {
     return this.authService.getProfile(user.id);
+  }
+
+  @Post('verify-email')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Xác thực tài khoản thành công')
+  @ApiOperation({ summary: 'Verify the account email with the 6-digit OTP' })
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiResponse({ status: 200, description: 'Account verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  verifyEmail(@CurrentUser('id') userId: string, @Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(userId, dto.code);
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đã gửi lại mã xác thực')
+  @ApiOperation({ summary: 'Resend the email verification OTP (rate-limited)' })
+  @ApiResponse({ status: 200, description: 'Verification OTP resent' })
+  @ApiResponse({
+    status: 400,
+    description: 'Already verified or resend on cooldown',
+  })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  resendVerification(@CurrentUser() user: SafeUser) {
+    return this.authService.resendVerification(user);
   }
 }

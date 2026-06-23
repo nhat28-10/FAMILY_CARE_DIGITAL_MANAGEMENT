@@ -1,14 +1,22 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { AccountStatus, Prisma, User, UserType } from '@prisma/client';
+import {
+  AccountStatus,
+  Prisma,
+  User,
+  UserType,
+  VerificationStatus,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
@@ -17,6 +25,7 @@ import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { EmailVerificationService } from './email-verification.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtPayload } from './types/jwt-payload.type';
 
@@ -31,9 +40,12 @@ export interface AuthResult extends AuthTokens {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly emailVerificationService: EmailVerificationService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -79,6 +91,18 @@ export class AuthService {
         );
       }
       throw err;
+    }
+
+    // Gửi OTP xác thực email (best-effort): lỗi mail không làm hỏng đăng ký vì
+    // tài khoản UNVERIFIED vẫn được phép đăng nhập.
+    try {
+      await this.emailVerificationService.generateAndSend(user.id, user.email, {
+        enforceCooldown: false,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Gửi OTP xác thực khi đăng ký thất bại (user ${user.id}): ${(err as Error).message}`,
+      );
     }
 
     return this.buildAuthResult(user);
@@ -176,6 +200,23 @@ export class AuthService {
       throw new UnauthorizedException('Không tìm thấy người dùng');
     }
     return sanitizeUser(user);
+  }
+
+  /** Xác thực email bằng mã OTP; trả về user đã được cập nhật trạng thái. */
+  async verifyEmail(userId: string, code: string): Promise<SafeUser> {
+    await this.emailVerificationService.verify(userId, code);
+    return this.getProfile(userId);
+  }
+
+  /** Gửi lại mã OTP xác thực (có cooldown). */
+  async resendVerification(user: SafeUser): Promise<null> {
+    if (user.verificationStatus === VerificationStatus.VERIFIED) {
+      throw new BadRequestException('Tài khoản đã được xác thực');
+    }
+    await this.emailVerificationService.generateAndSend(user.id, user.email, {
+      enforceCooldown: true,
+    });
+    return null;
   }
 
   // ---------------------------------------------------------------------------
