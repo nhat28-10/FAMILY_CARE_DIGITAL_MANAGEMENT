@@ -68,7 +68,7 @@ export class FamilyMembersService {
 
   listByFamily(familyId: string) {
     return this.prisma.familyMember.findMany({
-      where: { familyId },
+      where: { familyId, status: MemberStatus.ACTIVE },
       include: { user: { select: memberUserSelect } },
       orderBy: { joinedAt: 'asc' },
     });
@@ -89,9 +89,17 @@ export class FamilyMembersService {
     });
   }
 
+  /**
+   * Soft-removes a member: marks the membership REMOVED and stamps `leftAt`
+   * instead of hard-deleting the row. A hard delete would hit the many
+   * `onDelete: Restrict` foreign keys pointing at FamilyMember (ledger
+   * entries, tasks, budgets, goals…) and fail once the member has any
+   * history. Keeping the row preserves that history.
+   */
   remove(familyId: string, userId: string): Promise<FamilyMember> {
-    return this.prisma.familyMember.delete({
+    return this.prisma.familyMember.update({
       where: { familyId_userId: { familyId, userId } },
+      data: { status: MemberStatus.REMOVED, leftAt: new Date() },
     });
   }
 }

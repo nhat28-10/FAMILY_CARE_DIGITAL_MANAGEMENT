@@ -50,6 +50,13 @@ enum Relationship {
 /// Lifecycle status of a family invitation.
 enum InvitationStatus {
   PENDING
+  /// Invitee has sent a join request (awaiting manager approval).
+  CLAIMED
+  /// Manager approved the claim → family member created.
+  APPROVED
+  /// Manager rejected the claim.
+  REJECTED
+  /// @deprecated Legacy single-step accept; kept for back-compat, no longer set.
   ACCEPTED
   EXPIRED
   CANCELED
@@ -313,12 +320,30 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  memberships         FamilyMember[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
-  acceptedInvitations Invitation[]         @relation("AcceptedBy")
+  memberships             FamilyMember[]
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  claimedInvitations      Invitation[]             @relation("ClaimedBy")
 
   @@map("users")
+}
+
+/// Mã OTP xác thực email (6 số). Chỉ lưu sha256 của mã, không lưu mã thật.
+/// `usedAt` đánh dấu đã dùng; `attempts` đếm số lần nhập sai để khóa tạm.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 /// One-time password reset tokens (ERD: PasswordResetToken). The raw token is
@@ -413,6 +438,7 @@ model FamilyMember {
 
   // Invitations created by this member (ERD: created_by_member_id).
   createdInvitations               Invitation[]             @relation("CreatedByMember")
+  approvedInvitations              Invitation[]             @relation("ApprovedByInvitations")
   monthlyFinances                  MemberMonthlyFinance[]
   createdLedgerEntries             LedgerEntry[]            @relation("CreatedLedgerEntries")
   createdBudgetPlans               BudgetPlan[]             @relation("CreatedBudgetPlans")
@@ -458,16 +484,21 @@ model Invitation {
   status            InvitationStatus @default(PENDING)
   /// ERD: created_by_member_id — the family member who issued the invite.
   createdByMemberId String
-  /// ERD: accepted_by_user_id — who accepted the invitation.
-  acceptedById      String?
+  /// ERD: claimed_by_user_id — the user who sent the join request.
+  claimedById       String?
+  /// ERD: claimed_at — when the join request was sent.
+  claimedAt         DateTime?
+  /// ERD: approved_by_member_id — the manager who approved the claim.
+  approvedByMemberId String?
+  /// ERD: approved_at — when the claim was approved.
+  approvedAt        DateTime?
   expiresAt         DateTime
   createdAt         DateTime         @default(now())
-  /// ERD: accepted_at.
-  acceptedAt        DateTime?
 
-  family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  createdByMember FamilyMember @relation("CreatedByMember", fields: [createdByMemberId], references: [id], onDelete: Cascade)
-  acceptedBy      User?        @relation("AcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember  FamilyMember  @relation("CreatedByMember", fields: [createdByMemberId], references: [id], onDelete: Cascade)
+  claimedBy        User?         @relation("ClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
+  approvedByMember FamilyMember? @relation("ApprovedByInvitations", fields: [approvedByMemberId], references: [id], onDelete: SetNull)
 
   @@index([familyId])
   @@map("invitations")

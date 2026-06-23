@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FamilyRole, Relationship } from '@prisma/client';
+import { FamilyRole, MemberStatus, Relationship } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
@@ -112,7 +112,9 @@ export class FamiliesService {
       familyId,
       targetUserId,
     );
-    if (!target) {
+    // Treat an already-removed membership as not found — only ACTIVE members
+    // can be removed (keeps the operation idempotent).
+    if (!target || target.status !== MemberStatus.ACTIVE) {
       throw new NotFoundException(
         'Không tìm thấy thành viên trong gia đình này',
       );
