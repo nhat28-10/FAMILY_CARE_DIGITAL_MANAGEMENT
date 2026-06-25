@@ -73,4 +73,9 @@ export default () => ({
       process.env.STRIPE_CHECKOUT_CANCEL_URL ||
       'http://localhost:5173/subscription/cancel',
   },
+  throttle: {
+    // TTL tính bằng GIÂY trong ENV; module sẽ nhân 1000 sang ms.
+    ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
+    limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
+  },
 });
