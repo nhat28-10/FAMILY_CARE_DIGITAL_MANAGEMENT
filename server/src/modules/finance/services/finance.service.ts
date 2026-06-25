@@ -18,6 +18,7 @@ import {
   FinanceModelType,
   FinancialGoalStatus,
   FamilyRole,
+  GoalContributionPlanStatus,
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
@@ -43,6 +44,7 @@ import { CreateGoalAllocationDto } from '../dto/create-goal-allocation.dto';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { CreateMemberMonthlyFinanceDto } from '../dto/create-member-monthly-finance.dto';
 import { CreateSpendingSupportRequestDto } from '../dto/create-spending-support-request.dto';
+import { ConfirmGoalContributionPlanDto } from '../dto/confirm-goal-contribution-plan.dto';
 import {
   OptionalFinancePeriodDto,
   RequiredFinancePeriodDto,
@@ -51,11 +53,13 @@ import { FinancialGoalQueryDto } from '../dto/financial-goal-query.dto';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
 import { RecomputeBudgetAlertsDto } from '../dto/recompute-budget-alerts.dto';
 import { ResolveBudgetAlertDto } from '../dto/resolve-budget-alert.dto';
+import { ReviewGoalContributionPlanDto } from '../dto/review-goal-contribution-plan.dto';
 import {
   ReviewSpendingSupportRequestDto,
   SpendingSupportDecision,
 } from '../dto/review-spending-support-request.dto';
 import { SpendingSupportRequestQueryDto } from '../dto/spending-support-request-query.dto';
+import { SubmitGoalContributionPlanDto } from '../dto/submit-goal-contribution-plan.dto';
 import { UpdateBudgetLineDto } from '../dto/update-budget-line.dto';
 import { UpdateBudgetPlanDto } from '../dto/update-budget-plan.dto';
 import { UpdateFinancialGoalDto } from '../dto/update-financial-goal.dto';
@@ -78,6 +82,22 @@ type AlertCandidate = {
   thresholdValue?: Prisma.Decimal;
   actualValue?: Prisma.Decimal;
   message: string;
+};
+
+type GoalContributionPlanRow = {
+  contributionPlanId: string;
+  memberId: string;
+  displayName: string;
+  plannedAmount: number;
+  pendingAmount: number | null;
+  actualAmount: number;
+  shortageAmount: number;
+  dueDate: string;
+  submittedAt: Date | null;
+  submittedNote: string | null;
+  reviewedAt: Date | null;
+  reviewNote: string | null;
+  status: GoalContributionPlanStatus;
 };
 
 const GOAL_ELIGIBLE_ENTRY_TYPES = [
@@ -413,6 +433,7 @@ export class FinanceService {
       },
       include: {
         category: true,
+        jar: true,
         createdByMember: {
           select: {
             id: true,
@@ -456,10 +477,15 @@ export class FinanceService {
         }
       }
 
+      if (dto.jarId) {
+        await this.assertJarBelongsToFamily(tx, familyId, dto.jarId);
+      }
+
       return tx.ledgerEntry.create({
         data: {
           ledgerId: ledger.id,
           categoryId: dto.categoryId,
+          jarId: dto.jarId,
           createdByMemberId: memberId,
           entryType: dto.entryType,
           amount: new Prisma.Decimal(dto.amount),
@@ -469,7 +495,7 @@ export class FinanceService {
           sourceType: dto.sourceType?.trim(),
           sourceId: dto.sourceId?.trim(),
         },
-        include: { category: true },
+        include: { category: true, jar: true },
       });
     });
   }
@@ -1043,7 +1069,12 @@ export class FinanceService {
               ],
             },
           },
-          select: { categoryId: true, entryType: true, amount: true },
+          select: {
+            categoryId: true,
+            jarId: true,
+            entryType: true,
+            amount: true,
+          },
         })
       : [];
 
@@ -1086,14 +1117,20 @@ export class FinanceService {
     }> = [];
 
     const lines = budgetPlan.lines.map((budgetLine) => {
-      // LedgerEntry has no jarId yet, so jar-only lines cannot have actuals.
       const entryTypes =
         budgetLine.category?.categoryType === FinanceCategoryType.INCOME
           ? incomeTypes
           : expenseTypes;
       const actualAmount = budgetLine.categoryId
         ? this.sumEntryAmounts(entries, entryTypes, budgetLine.categoryId)
-        : zero;
+        : budgetLine.jarId
+          ? this.sumEntryAmounts(
+              entries,
+              entryTypes,
+              undefined,
+              budgetLine.jarId,
+            )
+          : zero;
       const thresholdLimit = budgetLine.thresholdAmount
         ? budgetLine.thresholdAmount
         : budgetLine.thresholdPercent
@@ -1317,6 +1354,433 @@ export class FinanceService {
     goalId: string,
   ) {
     return this.getFinancialGoal(familyId, memberId, goalId);
+  }
+
+  async getGoalContributionSuggestions(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    period: RequiredFinancePeriodDto,
+  ) {
+    const member = await this.getMemberInFamilyOrThrow(familyId, memberId);
+    const goal = await this.requireFinancialGoal(familyId, goalId);
+    this.assertCanViewGoal(member.familyRole, goal);
+
+    const members = await this.prisma.familyMember.findMany({
+      where: { familyId, status: MemberStatus.ACTIVE },
+      select: {
+        id: true,
+        displayName: true,
+        user: { select: { fullName: true } },
+        monthlyFinances: {
+          where: {
+            periodMonth: period.month,
+            periodYear: period.year,
+          },
+          select: {
+            expectedIncome: true,
+            expectedPersonalExpense: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    const suggestionsBase = members
+      .map((familyMember) => {
+        const monthlyFinance = familyMember.monthlyFinances[0];
+        const expectedIncome =
+          monthlyFinance?.expectedIncome ?? new Prisma.Decimal(0);
+        const expectedPersonalExpense =
+          monthlyFinance?.expectedPersonalExpense ?? new Prisma.Decimal(0);
+        const availableAmount = expectedIncome.minus(expectedPersonalExpense);
+        return {
+          memberId: familyMember.id,
+          displayName: this.memberDisplayName(familyMember),
+          availableAmount,
+        };
+      })
+      .filter((item) => item.availableAmount.greaterThan(0));
+
+    const totalAvailableAmount = suggestionsBase.reduce(
+      (sum, item) => sum.plus(item.availableAmount),
+      new Prisma.Decimal(0),
+    );
+    const monthlyContributionTarget =
+      goal.monthlyContributionTarget ?? new Prisma.Decimal(0);
+
+    return {
+      goalId,
+      periodMonth: period.month,
+      periodYear: period.year,
+      monthlyContributionTarget: this.decimalToNumber(
+        monthlyContributionTarget,
+      ),
+      totalAvailableAmount: this.decimalToNumber(totalAvailableAmount),
+      suggestions: suggestionsBase.map((item) => ({
+        memberId: item.memberId,
+        displayName: item.displayName,
+        availableAmount: this.decimalToNumber(item.availableAmount),
+        suggestedContribution: totalAvailableAmount.equals(0)
+          ? 0
+          : this.decimalToNumber(
+              monthlyContributionTarget
+                .times(item.availableAmount)
+                .dividedBy(totalAvailableAmount)
+                .toDecimalPlaces(0),
+            ),
+      })),
+    };
+  }
+
+  confirmGoalContributionPlans(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    dto: ConfirmGoalContributionPlanDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const member = await this.getMemberInFamilyOrThrow(
+        familyId,
+        memberId,
+        tx,
+      );
+      this.assertCanManageGoal(member.familyRole);
+      const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+      if (goal.status === FinancialGoalStatus.CANCELED) {
+        throw new BadRequestException(
+          'KhÃ´ng thá»ƒ xÃ¡c nháº­n káº¿ hoáº¡ch Ä‘Ã³ng gÃ³p cho má»¥c tiÃªu Ä‘Ã£ bá»‹ há»§y',
+        );
+      }
+
+      const requestedMemberIds = dto.members.map((item) => item.memberId);
+      if (new Set(requestedMemberIds).size !== requestedMemberIds.length) {
+        throw new BadRequestException(
+          'Danh sÃ¡ch thÃ nh viÃªn Ä‘Ã³ng gÃ³p khÃ´ng Ä‘Æ°á»£c trá»«ng láº·p',
+        );
+      }
+
+      const activeMembers = await tx.familyMember.findMany({
+        where: {
+          id: { in: requestedMemberIds },
+          familyId,
+          status: MemberStatus.ACTIVE,
+        },
+        select: { id: true },
+      });
+      const activeMemberIds = new Set(activeMembers.map((item) => item.id));
+      const invalidMemberIds = requestedMemberIds.filter(
+        (id) => !activeMemberIds.has(id),
+      );
+      if (invalidMemberIds.length > 0) {
+        throw new NotFoundException(
+          'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+        );
+      }
+
+      const dueDate = this.toDateOnly(dto.dueDate);
+      const actualAmounts = await this.calculateGoalContributionActualAmounts(
+        tx,
+        familyId,
+        goalId,
+        dto.periodMonth,
+        dto.periodYear,
+        requestedMemberIds,
+      );
+
+      for (const planMember of dto.members) {
+        const plannedAmount = new Prisma.Decimal(planMember.plannedAmount);
+        const actualAmount =
+          actualAmounts.get(planMember.memberId) ?? new Prisma.Decimal(0);
+        const status = this.computeContributionPlanStatus(
+          plannedAmount,
+          actualAmount,
+          dueDate,
+        );
+        await tx.goalContributionPlan.upsert({
+          where: {
+            goalId_memberId_periodMonth_periodYear: {
+              goalId,
+              memberId: planMember.memberId,
+              periodMonth: dto.periodMonth,
+              periodYear: dto.periodYear,
+            },
+          },
+          create: {
+            familyId,
+            goalId,
+            memberId: planMember.memberId,
+            periodMonth: dto.periodMonth,
+            periodYear: dto.periodYear,
+            plannedAmount,
+            dueDate,
+            status,
+          },
+          update: {
+            plannedAmount,
+            dueDate,
+            status,
+          },
+        });
+      }
+
+      return this.buildGoalContributionPlanView(
+        tx,
+        familyId,
+        goal,
+        dto.periodMonth,
+        dto.periodYear,
+      );
+    });
+  }
+
+  submitGoalContributionPlan(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    planId: string,
+    dto: SubmitGoalContributionPlanDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.getMemberInFamilyOrThrow(familyId, memberId, tx);
+      const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+      const plan = await this.requireGoalContributionPlan(
+        tx,
+        familyId,
+        goalId,
+        planId,
+      );
+      if (plan.memberId !== memberId) {
+        throw new ForbiddenException(
+          'Khong co quyen submit ke hoach dong gop cua thanh vien khac',
+        );
+      }
+      if (plan.status === GoalContributionPlanStatus.PAID) {
+        throw new BadRequestException(
+          'Ke hoach dong gop da duoc thanh toan du',
+        );
+      }
+      if (plan.status === GoalContributionPlanStatus.PENDING_CONFIRMATION) {
+        throw new ConflictException('Ke hoach dong gop dang cho xac nhan');
+      }
+
+      await tx.goalContributionPlan.update({
+        where: { id: plan.id },
+        data: {
+          pendingAmount: new Prisma.Decimal(dto.amount),
+          submittedAt: new Date(),
+          submittedNote: dto.note?.trim(),
+          reviewedByMemberId: null,
+          reviewedAt: null,
+          reviewNote: null,
+          status: GoalContributionPlanStatus.PENDING_CONFIRMATION,
+        },
+      });
+
+      return this.buildGoalContributionPlanView(
+        tx,
+        familyId,
+        goal,
+        plan.periodMonth,
+        plan.periodYear,
+      );
+    });
+  }
+
+  approveGoalContributionPlan(
+    familyId: string,
+    reviewerMemberId: string,
+    goalId: string,
+    planId: string,
+    dto: ReviewGoalContributionPlanDto,
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const reviewer = await this.getMemberInFamilyOrThrow(
+          familyId,
+          reviewerMemberId,
+          tx,
+        );
+        this.assertCanManageGoal(reviewer.familyRole);
+        const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+        const plan = await this.requireGoalContributionPlan(
+          tx,
+          familyId,
+          goalId,
+          planId,
+        );
+        if (plan.status !== GoalContributionPlanStatus.PENDING_CONFIRMATION) {
+          throw new BadRequestException(
+            'Chi co the approve ke hoach dang cho xac nhan',
+          );
+        }
+        if (!plan.pendingAmount || plan.pendingAmount.lessThanOrEqualTo(0)) {
+          throw new BadRequestException('Khong co so tien dang cho xac nhan');
+        }
+
+        const ledger = await tx.financeLedger.upsert({
+          where: { familyId },
+          create: {
+            familyId,
+            ledgerName: 'Shared Family Ledger',
+            status: FinanceLedgerStatus.ACTIVE,
+          },
+          update: {},
+        });
+        const ledgerEntry = await tx.ledgerEntry.create({
+          data: {
+            ledgerId: ledger.id,
+            jarId: goal.relatedJarId,
+            createdByMemberId: plan.memberId,
+            entryType: LedgerEntryType.CONTRIBUTION,
+            amount: plan.pendingAmount,
+            description: `Goal contribution: ${goal.goalName}`,
+            note: plan.submittedNote,
+            entryDate: this.resolveContributionEntryDate(plan),
+            sourceType: 'MANUAL',
+            sourceId: plan.id,
+            status: LedgerEntryStatus.ACTIVE,
+          },
+        });
+        await tx.goalAllocation.create({
+          data: {
+            goalId: goal.id,
+            ledgerEntryId: ledgerEntry.id,
+            amount: plan.pendingAmount,
+            allocatedByMemberId: reviewerMemberId,
+          },
+        });
+
+        const actualAmounts = await this.calculateGoalContributionActualAmounts(
+          tx,
+          familyId,
+          goal.id,
+          plan.periodMonth,
+          plan.periodYear,
+          [plan.memberId],
+        );
+        const actualAmount =
+          actualAmounts.get(plan.memberId) ?? new Prisma.Decimal(0);
+        const status = this.computeContributionPlanStatus(
+          plan.plannedAmount,
+          actualAmount,
+          plan.dueDate,
+        );
+        await tx.goalContributionPlan.update({
+          where: { id: plan.id },
+          data: {
+            pendingAmount: null,
+            reviewedByMemberId: reviewerMemberId,
+            reviewedAt: new Date(),
+            reviewNote: dto.note?.trim(),
+            status,
+          },
+        });
+
+        return this.buildGoalContributionPlanView(
+          tx,
+          familyId,
+          goal,
+          plan.periodMonth,
+          plan.periodYear,
+        );
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  rejectGoalContributionPlan(
+    familyId: string,
+    reviewerMemberId: string,
+    goalId: string,
+    planId: string,
+    dto: ReviewGoalContributionPlanDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const reviewer = await this.getMemberInFamilyOrThrow(
+        familyId,
+        reviewerMemberId,
+        tx,
+      );
+      this.assertCanManageGoal(reviewer.familyRole);
+      const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+      const plan = await this.requireGoalContributionPlan(
+        tx,
+        familyId,
+        goalId,
+        planId,
+      );
+      if (plan.status !== GoalContributionPlanStatus.PENDING_CONFIRMATION) {
+        throw new BadRequestException(
+          'Chi co the reject ke hoach dang cho xac nhan',
+        );
+      }
+      await tx.goalContributionPlan.update({
+        where: { id: plan.id },
+        data: {
+          reviewedByMemberId: reviewerMemberId,
+          reviewedAt: new Date(),
+          reviewNote: dto.note?.trim(),
+          status: GoalContributionPlanStatus.REJECTED,
+        },
+      });
+
+      return this.buildGoalContributionPlanView(
+        tx,
+        familyId,
+        goal,
+        plan.periodMonth,
+        plan.periodYear,
+      );
+    });
+  }
+
+  listGoalContributionPlans(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    period: RequiredFinancePeriodDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const member = await this.getMemberInFamilyOrThrow(
+        familyId,
+        memberId,
+        tx,
+      );
+      const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+      this.assertCanViewGoal(member.familyRole, goal);
+      return this.buildGoalContributionPlanView(
+        tx,
+        familyId,
+        goal,
+        period.month,
+        period.year,
+      );
+    });
+  }
+
+  async getGoalContributionShortage(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    period: RequiredFinancePeriodDto,
+  ) {
+    const view = await this.listGoalContributionPlans(
+      familyId,
+      memberId,
+      goalId,
+      period,
+    );
+    return {
+      goalId: view.goalId,
+      periodMonth: view.periodMonth,
+      periodYear: view.periodYear,
+      totalPlannedAmount: view.totalPlannedAmount,
+      totalActualAmount: view.totalActualAmount,
+      totalShortageAmount: view.totalShortageAmount,
+      memberShortages: view.members.filter((item) => item.shortageAmount > 0),
+    };
   }
 
   async listGoalAllocations(
@@ -1936,21 +2400,27 @@ export class FinanceService {
                 lt: this.nextUtcDay(plan.periodEnd),
               },
             },
-            select: { categoryId: true, entryType: true, amount: true },
+            select: {
+              categoryId: true,
+              jarId: true,
+              entryType: true,
+              amount: true,
+            },
           })
         : [];
       for (const line of plan.lines) {
         if (
-          !line.categoryId ||
-          line.category?.categoryType !== FinanceCategoryType.EXPENSE
+          (line.categoryId &&
+            line.category?.categoryType !== FinanceCategoryType.EXPENSE) ||
+          (!line.categoryId && !line.jarId)
         ) {
-          // LedgerEntry has no jarId, so jar-only budget alerts are skipped.
           continue;
         }
         const actual = this.sumEntryAmounts(
           entries,
           [LedgerEntryType.EXPENSE, LedgerEntryType.SUPPORT],
-          line.categoryId,
+          line.categoryId ?? undefined,
+          line.jarId ?? undefined,
         );
         const threshold = this.thresholdForBudgetLine(line);
         if (actual.greaterThan(threshold)) {
@@ -1965,10 +2435,10 @@ export class FinanceService {
             severity: this.calculateAlertSeverity(threshold, actual),
             budgetPlanId: plan.id,
             jarId: line.jarId ?? undefined,
-            categoryId: line.categoryId,
+            categoryId: line.categoryId ?? undefined,
             thresholdValue: threshold,
             actualValue: actual,
-            message: `Chi tiêu danh mục ${line.category.name} đã vượt ngân sách ${percent.toString()}% trong kỳ này.`,
+            message: `Chi tieu ${line.category?.name ?? line.jar?.name ?? line.id} da vuot ngan sach ${percent.toString()}% trong ky nay.`,
           });
         }
       }
@@ -2507,6 +2977,17 @@ export class FinanceService {
     return date.toISOString().slice(0, 10);
   }
 
+  private decimalToNumber(value: Prisma.Decimal) {
+    return value.toNumber();
+  }
+
+  private memberDisplayName(member: {
+    displayName: string | null;
+    user?: { fullName: string | null } | null;
+  }) {
+    return member.displayName ?? member.user?.fullName ?? 'Member';
+  }
+
   private async getMemberInFamilyOrThrow(
     familyId: string,
     memberId: string,
@@ -2764,6 +3245,286 @@ export class FinanceService {
       );
     }
     return allocation;
+  }
+
+  private async requireGoalContributionPlan(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    goalId: string,
+    planId: string,
+  ) {
+    const plan = await tx.goalContributionPlan.findFirst({
+      where: { id: planId, familyId, goalId },
+    });
+    if (!plan) {
+      throw new NotFoundException(
+        'Khong tim thay ke hoach dong gop muc tieu trong gia dinh nay',
+      );
+    }
+    return plan;
+  }
+
+  private async buildGoalContributionPlanView(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    goal: FinancialGoalWithJar,
+    periodMonth: number,
+    periodYear: number,
+  ) {
+    const plans = await tx.goalContributionPlan.findMany({
+      where: {
+        familyId,
+        goalId: goal.id,
+        periodMonth,
+        periodYear,
+      },
+      include: {
+        member: {
+          select: {
+            id: true,
+            displayName: true,
+            user: { select: { fullName: true } },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    const actualAmounts = await this.calculateGoalContributionActualAmounts(
+      tx,
+      familyId,
+      goal.id,
+      periodMonth,
+      periodYear,
+      plans.map((plan) => plan.memberId),
+    );
+
+    const rows: GoalContributionPlanRow[] = [];
+    for (const plan of plans) {
+      const actualAmount =
+        actualAmounts.get(plan.memberId) ?? new Prisma.Decimal(0);
+      const status = this.computeContributionPlanStatus(
+        plan.plannedAmount,
+        actualAmount,
+        plan.dueDate,
+        plan.status,
+      );
+      if (status !== plan.status) {
+        await tx.goalContributionPlan.update({
+          where: { id: plan.id },
+          data: { status },
+        });
+      }
+      const shortageAmount = Prisma.Decimal.max(
+        plan.plannedAmount.minus(actualAmount),
+        new Prisma.Decimal(0),
+      );
+      rows.push({
+        contributionPlanId: plan.id,
+        memberId: plan.memberId,
+        displayName: this.memberDisplayName(plan.member),
+        plannedAmount: this.decimalToNumber(plan.plannedAmount),
+        pendingAmount: plan.pendingAmount
+          ? this.decimalToNumber(plan.pendingAmount)
+          : null,
+        actualAmount: this.decimalToNumber(actualAmount),
+        shortageAmount: this.decimalToNumber(shortageAmount),
+        dueDate: this.dateKey(plan.dueDate),
+        submittedAt: plan.submittedAt,
+        submittedNote: plan.submittedNote,
+        reviewedAt: plan.reviewedAt,
+        reviewNote: plan.reviewNote,
+        status,
+      });
+    }
+
+    await this.syncGoalContributionShortageAlerts(
+      tx,
+      familyId,
+      goal,
+      periodMonth,
+      periodYear,
+      rows,
+    );
+
+    const totalPlannedAmount = rows.reduce(
+      (sum, item) => sum + item.plannedAmount,
+      0,
+    );
+    const totalActualAmount = rows.reduce(
+      (sum, item) => sum + item.actualAmount,
+      0,
+    );
+    const totalShortageAmount = rows.reduce(
+      (sum, item) => sum + item.shortageAmount,
+      0,
+    );
+    return {
+      goalId: goal.id,
+      periodMonth,
+      periodYear,
+      totalPlannedAmount,
+      totalActualAmount,
+      totalShortageAmount,
+      members: rows,
+    };
+  }
+
+  private async calculateGoalContributionActualAmounts(
+    client: Prisma.TransactionClient | PrismaService,
+    familyId: string,
+    goalId: string,
+    periodMonth: number,
+    periodYear: number,
+    memberIds?: string[],
+  ) {
+    if (memberIds && memberIds.length === 0) {
+      return new Map<string, Prisma.Decimal>();
+    }
+    const { start, end } = this.periodRange(periodMonth, periodYear);
+    const allocations = await client.goalAllocation.findMany({
+      where: {
+        goalId,
+        ledgerEntry: {
+          ledger: { familyId },
+          entryType: LedgerEntryType.CONTRIBUTION,
+          status: LedgerEntryStatus.ACTIVE,
+          createdByMemberId: memberIds ? { in: memberIds } : undefined,
+          entryDate: { gte: start, lt: end },
+        },
+      },
+      select: {
+        amount: true,
+        ledgerEntry: { select: { createdByMemberId: true } },
+      },
+    });
+    const actualAmounts = new Map<string, Prisma.Decimal>();
+    for (const allocation of allocations) {
+      const contributorId = allocation.ledgerEntry.createdByMemberId;
+      actualAmounts.set(
+        contributorId,
+        (actualAmounts.get(contributorId) ?? new Prisma.Decimal(0)).plus(
+          allocation.amount,
+        ),
+      );
+    }
+    return actualAmounts;
+  }
+
+  private computeContributionPlanStatus(
+    plannedAmount: Prisma.Decimal,
+    actualAmount: Prisma.Decimal,
+    dueDate: Date,
+    currentStatus?: GoalContributionPlanStatus,
+  ) {
+    if (
+      currentStatus === GoalContributionPlanStatus.PENDING_CONFIRMATION ||
+      currentStatus === GoalContributionPlanStatus.REJECTED
+    ) {
+      return currentStatus;
+    }
+    if (actualAmount.greaterThanOrEqualTo(plannedAmount)) {
+      return GoalContributionPlanStatus.PAID;
+    }
+    const today = this.toDateOnly(new Date().toISOString());
+    if (dueDate.getTime() < today.getTime()) {
+      return GoalContributionPlanStatus.MISSED;
+    }
+    if (actualAmount.greaterThan(0)) {
+      return GoalContributionPlanStatus.PARTIAL;
+    }
+    return GoalContributionPlanStatus.PLANNED;
+  }
+
+  private resolveContributionEntryDate(plan: {
+    periodMonth: number;
+    periodYear: number;
+    submittedAt: Date | null;
+    dueDate: Date;
+  }) {
+    const { start, end } = this.periodRange(plan.periodMonth, plan.periodYear);
+    if (
+      plan.submittedAt &&
+      plan.submittedAt.getTime() >= start.getTime() &&
+      plan.submittedAt.getTime() < end.getTime()
+    ) {
+      return plan.submittedAt;
+    }
+    return plan.dueDate;
+  }
+
+  private async syncGoalContributionShortageAlerts(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    goal: FinancialGoalWithJar,
+    periodMonth: number,
+    periodYear: number,
+    rows: GoalContributionPlanRow[],
+  ) {
+    const prefix = `CONTRIBUTION_SHORTAGE:${goal.id}:${periodMonth}:${periodYear}:`;
+    const activeRows = rows.filter(
+      (row) =>
+        row.shortageAmount > 0 &&
+        row.status === GoalContributionPlanStatus.MISSED,
+    );
+    const activeKeys = activeRows.map((row) => `${prefix}${row.memberId}`);
+    for (const row of activeRows) {
+      const sourceKey = `${prefix}${row.memberId}`;
+      const data = {
+        severity: this.contributionShortageSeverity(
+          new Prisma.Decimal(row.plannedAmount),
+          new Prisma.Decimal(row.shortageAmount),
+        ),
+        thresholdValue: new Prisma.Decimal(row.plannedAmount),
+        actualValue: new Prisma.Decimal(row.actualAmount),
+        goalId: goal.id,
+        jarId: goal.relatedJarId ?? undefined,
+        message: `Goal ${goal.goalName} contribution is short by ${row.shortageAmount} for ${row.displayName}.`,
+      };
+      const existing = await tx.budgetAlert.findFirst({
+        where: {
+          familyId,
+          sourceKey,
+          status: {
+            in: [BudgetAlertStatus.NEW, BudgetAlertStatus.ACKNOWLEDGED],
+          },
+        },
+      });
+      if (existing) {
+        await tx.budgetAlert.update({ where: { id: existing.id }, data });
+      } else {
+        await tx.budgetAlert.create({
+          data: {
+            familyId,
+            sourceKey,
+            alertType: BudgetAlertType.GOAL_AT_RISK,
+            ...data,
+          },
+        });
+      }
+    }
+    await tx.budgetAlert.updateMany({
+      where: {
+        familyId,
+        alertType: BudgetAlertType.GOAL_AT_RISK,
+        sourceKey: activeKeys.length
+          ? { startsWith: prefix, notIn: activeKeys }
+          : { startsWith: prefix },
+        status: { in: [BudgetAlertStatus.NEW, BudgetAlertStatus.ACKNOWLEDGED] },
+      },
+      data: { status: BudgetAlertStatus.RESOLVED, resolvedAt: new Date() },
+    });
+  }
+
+  private contributionShortageSeverity(
+    plannedAmount: Prisma.Decimal,
+    shortageAmount: Prisma.Decimal,
+  ) {
+    if (plannedAmount.equals(0)) return BudgetAlertSeverity.LOW;
+    const percent = shortageAmount.dividedBy(plannedAmount).times(100);
+    if (percent.lessThanOrEqualTo(10)) return BudgetAlertSeverity.LOW;
+    if (percent.lessThanOrEqualTo(25)) return BudgetAlertSeverity.MEDIUM;
+    return BudgetAlertSeverity.HIGH;
   }
 
   private async calculateGoalAllocatedAmount(
@@ -3131,16 +3892,19 @@ export class FinanceService {
   private sumEntryAmounts(
     entries: Array<{
       categoryId: string | null;
+      jarId?: string | null;
       entryType: LedgerEntryType;
       amount: Prisma.Decimal;
     }>,
     entryTypes: LedgerEntryType[],
     categoryId?: string,
+    jarId?: string,
   ) {
     return entries.reduce(
       (sum, entry) =>
         entryTypes.includes(entry.entryType) &&
-        (categoryId === undefined || entry.categoryId === categoryId)
+        (categoryId === undefined || entry.categoryId === categoryId) &&
+        (jarId === undefined || entry.jarId === jarId)
           ? sum.plus(entry.amount)
           : sum,
       new Prisma.Decimal(0),
