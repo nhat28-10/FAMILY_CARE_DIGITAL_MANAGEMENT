@@ -56,6 +56,24 @@ export class MailService {
 
     this.provider = this.resolveProvider();
 
+    // Cảnh báo cấu hình: provider ép nhưng thiếu credential.
+    if (this.provider === 'resend' && !this.cfg.resendApiKey) {
+      this.logger.warn(
+        'MAIL_PROVIDER=resend nhưng thiếu RESEND_API_KEY — gửi mail sẽ thất bại (bị nuốt lỗi).',
+      );
+    }
+    if (this.provider === 'brevo' && !this.cfg.brevoApiKey) {
+      this.logger.warn(
+        'MAIL_PROVIDER=brevo nhưng thiếu BREVO_API_KEY — gửi mail sẽ thất bại (bị nuốt lỗi).',
+      );
+    }
+    // Cảnh báo dùng sender mặc định resend.dev — chỉ gửi được tới email chủ tài khoản Resend.
+    if (this.provider === 'resend' && this.cfg.from.includes('onboarding@resend.dev')) {
+      this.logger.warn(
+        'Đang dùng sender mặc định onboarding@resend.dev — Resend chỉ gửi tới email chủ tài khoản. Đặt MAIL_FROM bằng domain đã verify cho production.',
+      );
+    }
+
     if (this.provider === 'smtp') {
       this.transporter = nodemailer.createTransport({
         host: this.cfg.host,

@@ -22,6 +22,9 @@ async function bootstrap() {
   const port = configService.get<number>('app.port') || 3000;
   const prefix = configService.get<string>('app.prefix') || 'api/v1';
 
+  // Sau reverse proxy (AZDIGI/Docker) — để req.ip lấy đúng client IP cho throttler.
+  app.set('trust proxy', 1);
+
   app.setGlobalPrefix(prefix);
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
