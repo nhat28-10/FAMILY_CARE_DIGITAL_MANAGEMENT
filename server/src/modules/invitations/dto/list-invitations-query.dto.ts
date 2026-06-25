@@ -6,7 +6,8 @@ import { IsEnum, IsOptional } from 'class-validator';
 export class ListInvitationsQueryDto {
   @ApiPropertyOptional({
     enum: InvitationStatus,
-    description: 'Lọc theo trạng thái lời mời (vd CLAIMED để xem yêu cầu chờ duyệt)',
+    description:
+      'Lọc theo trạng thái lời mời (vd CLAIMED để xem yêu cầu chờ duyệt)',
   })
   @IsOptional()
   @IsEnum(InvitationStatus)

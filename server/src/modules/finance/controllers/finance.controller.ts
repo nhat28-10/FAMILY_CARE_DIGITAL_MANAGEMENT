@@ -32,6 +32,7 @@ import { BudgetAlertQueryDto } from '../dto/budget-alert-query.dto';
 import { CreateFinancialGoalDto } from '../dto/create-financial-goal.dto';
 import { CreateGoalAllocationDto } from '../dto/create-goal-allocation.dto';
 import { BudgetPlanQueryDto } from '../dto/budget-plan-query.dto';
+import { ConfirmGoalContributionPlanDto } from '../dto/confirm-goal-contribution-plan.dto';
 import { CreateBudgetLineDto } from '../dto/create-budget-line.dto';
 import { CreateBudgetPlanDto } from '../dto/create-budget-plan.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
@@ -47,8 +48,10 @@ import { FinancialGoalQueryDto } from '../dto/financial-goal-query.dto';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
 import { RecomputeBudgetAlertsDto } from '../dto/recompute-budget-alerts.dto';
 import { ResolveBudgetAlertDto } from '../dto/resolve-budget-alert.dto';
+import { ReviewGoalContributionPlanDto } from '../dto/review-goal-contribution-plan.dto';
 import { ReviewSpendingSupportRequestDto } from '../dto/review-spending-support-request.dto';
 import { SpendingSupportRequestQueryDto } from '../dto/spending-support-request-query.dto';
+import { SubmitGoalContributionPlanDto } from '../dto/submit-goal-contribution-plan.dto';
 import { UpdateFinancialGoalDto } from '../dto/update-financial-goal.dto';
 import { UpdateGoalAllocationDto } from '../dto/update-goal-allocation.dto';
 import { UpdateMemberMonthlyFinanceDto } from '../dto/update-member-monthly-finance.dto';
@@ -605,6 +608,179 @@ export class FinanceController {
       familyId,
       memberId,
       goalId,
+    );
+  }
+
+  @Get('financial-goals/:goalId/contribution-suggestions')
+  @ResponseMessage('Lay goi y dong gop muc tieu thanh cong')
+  @ApiOperation({
+    summary:
+      'Tính gợi ý đóng góp hằng tháng của mỗi thành viên cho mục tiêu tài chính',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Gợi ý đóng góp theo từng thành viên',
+  })
+  getGoalContributionSuggestions(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Query() period: RequiredFinancePeriodDto,
+  ) {
+    return this.financeService.getGoalContributionSuggestions(
+      familyId,
+      memberId,
+      goalId,
+      period,
+    );
+  }
+
+  @Post('financial-goals/:goalId/contribution-plans/confirm')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage(
+    'Xác nhận hoặc cập nhật kế hoạch đóng góp mục tiêu theo tháng thành công',
+  )
+  @ApiOperation({
+    summary: 'Xác nhận hoặc cập nhật kế hoạch đóng góp mục tiêu theo tháng',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Kế hoạch đóng góp đã được lưu' })
+  confirmGoalContributionPlans(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Body() dto: ConfirmGoalContributionPlanDto,
+  ) {
+    return this.financeService.confirmGoalContributionPlans(
+      familyId,
+      memberId,
+      goalId,
+      dto,
+    );
+  }
+
+  @Post('financial-goals/:goalId/contribution-plans/:planId/submit')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Xác nhận khoản đóng góp thành công')
+  @ApiOperation({
+    summary: 'Thành viên xác nhận đã đóng góp vào kế hoạch mục tiêu',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiParam({ name: 'planId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Khoản đóng góp đang chờ xác nhận' })
+  submitGoalContributionPlan(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Param('planId') planId: string,
+    @Body() dto: SubmitGoalContributionPlanDto,
+  ) {
+    return this.financeService.submitGoalContributionPlan(
+      familyId,
+      memberId,
+      goalId,
+      planId,
+      dto,
+    );
+  }
+
+  @Post('financial-goals/:goalId/contribution-plans/:planId/approve')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Phê duyệt khoản đóng góp mục tiêu thành công')
+  @ApiOperation({
+    summary:
+      'Manager/deputy phê duyệt khoản đóng góp và ghi vào sổ sách tài chính',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiParam({ name: 'planId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Khoản đóng góp đã được phê duyệt' })
+  approveGoalContributionPlan(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Param('planId') planId: string,
+    @Body() dto: ReviewGoalContributionPlanDto,
+  ) {
+    return this.financeService.approveGoalContributionPlan(
+      familyId,
+      memberId,
+      goalId,
+      planId,
+      dto,
+    );
+  }
+
+  @Post('financial-goals/:goalId/contribution-plans/:planId/reject')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Từ chối khoản đóng góp mục tiêu thành công')
+  @ApiOperation({
+    summary: 'Manager/deputy từ chối khoản đóng góp đang chờ xác nhận',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiParam({ name: 'planId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Khoản đóng góp đã bị từ chối' })
+  rejectGoalContributionPlan(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Param('planId') planId: string,
+    @Body() dto: ReviewGoalContributionPlanDto,
+  ) {
+    return this.financeService.rejectGoalContributionPlan(
+      familyId,
+      memberId,
+      goalId,
+      planId,
+      dto,
+    );
+  }
+
+  @Get('financial-goals/:goalId/contribution-plans')
+  @ResponseMessage('Lấy kế hoạch và thực tế đóng góp mục tiêu thành công')
+  @ApiOperation({
+    summary: 'Lấy kế hoạch và thực tế đóng góp mục tiêu thành công',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Planned vs actual theo thành viên',
+  })
+  listGoalContributionPlans(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Query() period: RequiredFinancePeriodDto,
+  ) {
+    return this.financeService.listGoalContributionPlans(
+      familyId,
+      memberId,
+      goalId,
+      period,
+    );
+  }
+
+  @Get('financial-goals/:goalId/contribution-shortage')
+  @ResponseMessage('Lấy tổng thiếu hụt đóng góp mục tiêu theo tháng thành công')
+  @ApiOperation({
+    summary: 'Lấy tổng thiếu hụt đóng góp mục tiêu theo tháng',
+  })
+  @ApiParam({ name: 'goalId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Tổng thiếu hụt đóng góp mục tiêu' })
+  getGoalContributionShortage(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Query() period: RequiredFinancePeriodDto,
+  ) {
+    return this.financeService.getGoalContributionShortage(
+      familyId,
+      memberId,
+      goalId,
+      period,
     );
   }
 

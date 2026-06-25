@@ -44,6 +44,10 @@ describe('InvitationsService claim/approve/reject flow', () => {
     createdAt: new Date(),
   };
 
+  type InvitationUpdateMockArgs = {
+    data: Partial<typeof baseInvitation>;
+  };
+
   let prisma: {
     invitation: Record<string, jest.Mock>;
     familyMember: Record<string, jest.Mock>;
@@ -60,7 +64,12 @@ describe('InvitationsService claim/approve/reject flow', () => {
       invitation: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
-        update: jest.fn((args) => ({ ...baseInvitation, ...args.data })),
+        update: jest.fn(
+          (args: InvitationUpdateMockArgs): typeof baseInvitation => ({
+            ...baseInvitation,
+            ...args.data,
+          }),
+        ),
         updateMany: jest.fn(),
       },
       familyMember: {

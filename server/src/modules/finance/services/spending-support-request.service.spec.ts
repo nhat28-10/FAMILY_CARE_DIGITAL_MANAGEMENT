@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { SpendingSupportDecision } from '../dto/review-spending-support-request.dto';
 import { FinanceService } from './finance.service';
 
@@ -23,6 +24,7 @@ describe('FinanceService spending support requests', () => {
   const requestId = 'request-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { createForMembers: jest.Mock };
   let service: FinanceService;
 
   const activeMember = {
@@ -75,7 +77,13 @@ describe('FinanceService spending support requests', () => {
       financeLedger: { findUnique: jest.fn() },
       memberMonthlyFinance: { findUnique: jest.fn() },
     };
-    service = new FinanceService(prisma as unknown as PrismaService);
+    notifications = {
+      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    service = new FinanceService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
   });
 
   it('creates a pending request for an active member', async () => {

@@ -49,7 +49,8 @@ export class CreateSubscriptionPlanDto {
   featureAccess?: Record<string, unknown>;
 
   @ApiPropertyOptional({
-    description: 'Stripe recurring Price id (bắt buộc cho gói trả phí PLUS/PREMIUM)',
+    description:
+      'Stripe recurring Price id (bắt buộc cho gói trả phí PLUS/PREMIUM)',
     example: 'price_1Xxxx',
   })
   @IsOptional()

@@ -212,7 +212,8 @@ export class AdminService {
         family: { select: { id: true, name: true } },
       },
     });
-    if (!member) throw new NotFoundException('Không tìm thấy thành viên gia đình');
+    if (!member)
+      throw new NotFoundException('Không tìm thấy thành viên gia đình');
     return member;
   }
 

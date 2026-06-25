@@ -32,7 +32,7 @@ import { AdminUpdateMemberDto } from '../dto/update-member.dto';
 @Roles(UserType.SYSTEM_ADMIN)
 @Controller('admin/family-members')
 export class AdminFamilyMembersController {
-  constructor(private readonly admin: AdminService) { }
+  constructor(private readonly admin: AdminService) {}
 
   @Get()
   @ResponseMessage('Lấy danh sách thành viên gia đình thành công')
@@ -54,7 +54,9 @@ export class AdminFamilyMembersController {
 
   @Patch(':id')
   @ResponseMessage('Cập nhật thành viên gia đình thành công')
-  @ApiOperation({ summary: 'Update a family member (role/relationship/status)' })
+  @ApiOperation({
+    summary: 'Update a family member (role/relationship/status)',
+  })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateMemberDto) {
     return this.admin.updateMember(id, dto);
