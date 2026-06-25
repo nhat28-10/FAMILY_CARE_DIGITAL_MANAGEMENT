@@ -8,6 +8,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type Stripe from 'stripe';
@@ -21,6 +22,7 @@ import { WebhookService } from '../webhook.service';
  * Stripe signature over the raw request body (enabled via `rawBody: true` in
  * main.ts). This is the source of truth for subscription state changes.
  */
+@SkipThrottle()
 @Controller('billing/webhooks')
 export class StripeWebhookController {
   constructor(

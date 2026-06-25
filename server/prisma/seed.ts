@@ -2,7 +2,6 @@ import {
   AccountStatus,
   FamilySubscriptionStatus,
   PrismaClient,
-  SubscriptionPlanCode,
   UserType,
   VerificationStatus,
 } from '@prisma/client';
@@ -13,21 +12,21 @@ const prisma = new PrismaClient();
 /** Base subscription tiers. Paid tiers get `stripePriceId` later (admin API). */
 const BASE_PLANS = [
   {
-    planCode: SubscriptionPlanCode.FREE,
+    planCode: 'FREE',
     name: 'Gói Miễn phí',
     annualPrice: 0,
     maxMembers: 3,
     storageLimit: 1024,
   },
   {
-    planCode: SubscriptionPlanCode.PLUS,
+    planCode: 'PLUS',
     name: 'Gói Plus',
     annualPrice: 990000,
     maxMembers: 10,
     storageLimit: 5120,
   },
   {
-    planCode: SubscriptionPlanCode.PREMIUM,
+    planCode: 'PREMIUM',
     name: 'Gói Premium',
     annualPrice: 1990000,
     maxMembers: 20,
@@ -86,11 +85,9 @@ async function main() {
  * instead of PATCHing each DB by hand:
  *   STRIPE_PRICE_PLUS, STRIPE_PRICE_PREMIUM
  */
-function stripePriceIdFor(planCode: SubscriptionPlanCode): string | undefined {
-  if (planCode === SubscriptionPlanCode.PLUS) return process.env.STRIPE_PRICE_PLUS;
-  if (planCode === SubscriptionPlanCode.PREMIUM) {
-    return process.env.STRIPE_PRICE_PREMIUM;
-  }
+function stripePriceIdFor(planCode: string): string | undefined {
+  if (planCode === 'PLUS') return process.env.STRIPE_PRICE_PLUS;
+  if (planCode === 'PREMIUM') return process.env.STRIPE_PRICE_PREMIUM;
   return undefined;
 }
 
@@ -126,7 +123,7 @@ async function seedPlans() {
 /** Give every family without a subscription a FREE one (status ACTIVE). */
 async function backfillFreeSubscriptions() {
   const freePlan = await prisma.subscriptionPlan.findUnique({
-    where: { planCode: SubscriptionPlanCode.FREE },
+    where: { planCode: 'FREE' },
   });
   if (!freePlan) return;
 

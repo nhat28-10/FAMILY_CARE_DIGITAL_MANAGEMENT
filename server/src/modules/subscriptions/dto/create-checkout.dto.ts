@@ -1,13 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SubscriptionPlanCode } from '@prisma/client';
-import { IsEnum } from 'class-validator';
+import { IsString, MaxLength } from 'class-validator';
 
 export class CreateCheckoutDto {
   @ApiProperty({
-    enum: SubscriptionPlanCode,
-    example: SubscriptionPlanCode.PLUS,
-    description: 'Mã gói muốn nâng cấp (chỉ gói trả phí: PLUS/PREMIUM)',
+    example: 'PLUS',
+    description: 'Mã gói muốn nâng cấp (gói trả phí, không phải FREE)',
   })
-  @IsEnum(SubscriptionPlanCode)
-  planCode: SubscriptionPlanCode;
+  @IsString()
+  @MaxLength(50)
+  planCode: string;
 }

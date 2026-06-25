@@ -18,6 +18,7 @@ import {
 
 import { ResponseMessage } from '../../../common/decorators/response-message.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { VerifiedGuard } from '../../auth/guards/verified.guard';
 import { FamilyRoles } from '../../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { CreateCheckoutDto } from '../dto/create-checkout.dto';
@@ -48,6 +49,7 @@ export class FamilySubscriptionController {
   }
 
   @Post('checkout')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...BILLING_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Tạo liên kết thanh toán Stripe để nâng gói' })

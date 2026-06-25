@@ -64,19 +64,30 @@ mọi family đều có row `family_subscriptions` gói FREE.
 ### 4.1 Lấy Secret key
 Dashboard (bật **Test mode**) → Developers → API keys → copy `sk_test_...` → điền `.env`.
 
-### 4.2 Tạo 2 **recurring** Price rồi gắn vào DB
-Product catalog → Add product → Price: **Recurring**, **Yearly**, nhập giá → Save. Làm cho
-Plus & Premium, copy 2 **Price ID** (`price_...`).
+### 4.2 Gắn `stripePriceId` cho gói trả phí
+Có 2 cách:
 
-> ⚠️ **Bắt buộc là `Recurring`** (không phải One-time/Monthly nếu muốn annual). Price
-> one-time sẽ làm checkout lỗi `must provide at least one recurring price in subscription mode`.
+**Cách A — Tự động (khuyên dùng).** Khi admin **tạo/sửa gói** trả phí qua API mà **KHÔNG**
+truyền `stripePriceId`, BE tự gọi Stripe tạo **recurring yearly Price** từ `name` +
+`annualPrice` rồi lưu lại. Khi `annualPrice` đổi (update), BE tạo Price mới và **archive**
+Price cũ (Stripe Price bất biến). Admin khỏi đụng Dashboard.
+- Yêu cầu: `STRIPE_SECRET_KEY` đã cấu hình. Nếu chưa, BE bỏ qua (gói tạo ra `stripePriceId`
+  = null, checkout sẽ báo "Gói này chưa được cấu hình thanh toán").
+- Tiền tệ mặc định: **VND**, chu kỳ **year** (xem `stripe.service.ts` + `stripe-currency.ts`).
+- `npm run seed` cũng tự gắn `stripePriceId` từ env `STRIPE_PRICE_PLUS/PREMIUM` (nếu có).
 
-Gắn `stripePriceId` cho gói (qua admin API, cần token SYSTEM_ADMIN):
+**Cách B — Thủ công.** Tự tạo Price trên Dashboard (Product catalog → Add product → Price:
+**Recurring**, **Yearly**), copy `price_...`, rồi truyền vào khi tạo gói hoặc:
 ```bash
 PATCH /api/v1/admin/subscription-plans/:id
 Body: { "stripePriceId": "price_xxx" }
 ```
-(FREE không cần `stripePriceId`.)
+> Truyền `stripePriceId` thủ công luôn **được ưu tiên** hơn auto-create.
+> ⚠️ Price **bắt buộc Recurring** (one-time/monthly sẽ làm checkout lỗi
+> `must provide at least one recurring price in subscription mode`).
+
+(FREE không cần `stripePriceId`. `SubscriptionPlanCode` hiện là enum `FREE/PLUS/PREMIUM` —
+muốn thêm tier khác phải sửa enum trong `schema.prisma`.)
 
 ### 4.3 Chạy webhook listener (giữ mở khi test local)
 Cài Stripe CLI (https://github.com/stripe/stripe-cli/releases), rồi:

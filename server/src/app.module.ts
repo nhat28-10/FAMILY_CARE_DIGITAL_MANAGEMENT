@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
@@ -36,6 +38,19 @@ import { AdminModule } from './modules/admin/admin.module';
       load: [configuration],
     }),
 
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            // @nestjs/throttler dùng ttl theo MILLIGIÂY.
+            ttl: config.get<number>('throttle.ttl', 60) * 1000,
+            limit: config.get<number>('throttle.limit', 100),
+          },
+        ],
+      }),
+    }),
+
     PrismaModule,
     MailModule,
 
@@ -62,5 +77,6 @@ import { AdminModule } from './modules/admin/admin.module';
     AiChatbotModule,
     AdminModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

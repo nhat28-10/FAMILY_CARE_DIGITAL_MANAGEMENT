@@ -1,32 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  FamilySubscriptionStatus,
-  Prisma,
-  SubscriptionPlanCode,
-} from '@prisma/client';
+import { FamilySubscriptionStatus, Prisma } from '@prisma/client';
 import Stripe from 'stripe';
 
 import { PrismaService } from '../../prisma/prisma.service';
-
-/** Stripe currencies that have no minor unit — amounts are already whole. */
-const ZERO_DECIMAL_CURRENCIES = new Set([
-  'bif',
-  'clp',
-  'djf',
-  'gnf',
-  'jpy',
-  'kmf',
-  'krw',
-  'mga',
-  'pyg',
-  'rwf',
-  'ugx',
-  'vnd',
-  'vuv',
-  'xaf',
-  'xof',
-  'xpf',
-]);
+import { FREE_PLAN_CODE } from '../subscription-plans/subscription-plans.constants';
+import { fromMinorUnit } from './stripe-currency';
 
 /**
  * Applies verified Stripe webhook events to `FamilySubscription`. Uses
@@ -144,7 +122,7 @@ export class WebhookService {
   /** Subscription canceled at Stripe → revert family to FREE. */
   private async onSubscriptionDeleted(familyId: string): Promise<void> {
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { planCode: SubscriptionPlanCode.FREE },
+      where: { planCode: FREE_PLAN_CODE },
     });
     await this.prisma.familySubscription.update({
       where: { familyId },
@@ -236,12 +214,8 @@ export class WebhookService {
       (object['amount_paid'] as number | undefined) ??
       (object['amount_total'] as number | undefined);
     if (typeof minor !== 'number') return null;
-    // Zero-decimal currencies (VND, JPY, KRW, ...) are already in the main unit;
-    // others use the minor unit (cents) and must be divided by 100.
-    const currency = this.extractCurrency(event);
-    const divisor =
-      currency && ZERO_DECIMAL_CURRENCIES.has(currency.toLowerCase()) ? 1 : 100;
-    return new Prisma.Decimal(minor / divisor);
+    const currency = this.extractCurrency(event) ?? 'usd';
+    return new Prisma.Decimal(fromMinorUnit(minor, currency));
   }
 
   private extractCurrency(event: Stripe.Event): string | null {

@@ -24,6 +24,7 @@ import {
 
 import { ResponseMessage } from '../../../common/decorators/response-message.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { VerifiedGuard } from '../../auth/guards/verified.guard';
 import { CurrentFamilyMember } from '../../family-members/decorators/current-family-member.decorator';
 import { FamilyRoles } from '../../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
@@ -94,6 +95,7 @@ export class FinanceController {
   }
 
   @Post('monthly-finances/me')
+  @UseGuards(VerifiedGuard)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo thông tin tài chính tháng thành công')
   @ApiOperation({
@@ -111,6 +113,7 @@ export class FinanceController {
   }
 
   @Put('monthly-finances/me')
+  @UseGuards(VerifiedGuard)
   @ResponseMessage('Cập nhật thông tin tài chính tháng thành công')
   @ApiOperation({
     summary: 'Cập nhật thông tin tài chính tháng của thành viên hiện tại',
@@ -155,6 +158,7 @@ export class FinanceController {
   }
 
   @Post('models')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo mô hình tài chính thành công')
@@ -173,6 +177,7 @@ export class FinanceController {
   }
 
   @Patch('models/:modelId/activate')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Kích hoạt mô hình tài chính thành công')
   @ApiOperation({
@@ -204,6 +209,7 @@ export class FinanceController {
   }
 
   @Post('jars')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo hũ tài chính thành công')
@@ -220,6 +226,7 @@ export class FinanceController {
   }
 
   @Patch('jars/:jarId')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Cập nhật hũ tài chính thành công')
   @ApiOperation({ summary: 'Cập nhật hũ tài chính của gia đình' })
@@ -249,6 +256,7 @@ export class FinanceController {
   }
 
   @Post('categories')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo danh mục tài chính thành công')
@@ -294,6 +302,7 @@ export class FinanceController {
   }
 
   @Post('support-requests')
+  @UseGuards(VerifiedGuard)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo yêu cầu hỗ trợ chi tiêu thành công')
   @ApiOperation({ summary: 'Tạo yêu cầu hỗ trợ chi tiêu cho bản thân' })
@@ -334,6 +343,7 @@ export class FinanceController {
   }
 
   @Patch('support-requests/:requestId/review')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Duyệt yêu cầu hỗ trợ chi tiêu thành công')
   @ApiOperation({ summary: 'Phê duyệt hoặc từ chối yêu cầu hỗ trợ chi tiêu' })
@@ -357,6 +367,7 @@ export class FinanceController {
   }
 
   @Patch('support-requests/:requestId/cancel')
+  @UseGuards(VerifiedGuard)
   @ResponseMessage('Hủy yêu cầu hỗ trợ chi tiêu thành công')
   @ApiOperation({
     summary: 'Hủy yêu cầu hỗ trợ chi tiêu đang chờ của bản thân',
@@ -412,6 +423,7 @@ export class FinanceController {
   }
 
   @Post('alerts/recompute')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Tính lại cảnh báo tài chính thành công')
   @ApiOperation({
@@ -431,6 +443,7 @@ export class FinanceController {
   }
 
   @Patch('alerts/:alertId/acknowledge')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Xác nhận cảnh báo tài chính thành công')
   @ApiOperation({ summary: 'Xác nhận đã xem cảnh báo tài chính' })
@@ -449,6 +462,7 @@ export class FinanceController {
   }
 
   @Patch('alerts/:alertId/resolve')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Giải quyết cảnh báo tài chính thành công')
   @ApiOperation({ summary: 'Đánh dấu cảnh báo tài chính đã được giải quyết' })
@@ -531,6 +545,7 @@ export class FinanceController {
   }
 
   @Post('financial-goals')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo mục tiêu tài chính thành công')
@@ -561,6 +576,7 @@ export class FinanceController {
   }
 
   @Patch('financial-goals/:goalId')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Cập nhật mục tiêu tài chính thành công')
   @ApiOperation({ summary: 'Cập nhật mục tiêu tài chính gia đình' })
@@ -581,6 +597,7 @@ export class FinanceController {
   }
 
   @Patch('financial-goals/:goalId/cancel')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Hủy mục tiêu tài chính thành công')
   @ApiOperation({ summary: 'Hủy mục tiêu tài chính gia đình' })
@@ -798,6 +815,7 @@ export class FinanceController {
   }
 
   @Post('financial-goals/:goalId/allocations')
+  @UseGuards(VerifiedGuard)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Phân bổ giao dịch vào mục tiêu thành công')
   @ApiOperation({
@@ -820,6 +838,7 @@ export class FinanceController {
   }
 
   @Patch('goal-allocations/:allocationId')
+  @UseGuards(VerifiedGuard)
   @ResponseMessage('Cập nhật phân bổ mục tiêu thành công')
   @ApiOperation({ summary: 'Cập nhật số tiền phân bổ vào mục tiêu' })
   @ApiParam({ name: 'allocationId', format: 'uuid' })
@@ -839,6 +858,7 @@ export class FinanceController {
   }
 
   @Delete('goal-allocations/:allocationId')
+  @UseGuards(VerifiedGuard)
   @ResponseMessage('Xóa phân bổ mục tiêu thành công')
   @ApiOperation({ summary: 'Xóa phân bổ khỏi mục tiêu tài chính' })
   @ApiParam({ name: 'allocationId', format: 'uuid' })
@@ -868,6 +888,7 @@ export class FinanceController {
   }
 
   @Post('budget-plans')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo kế hoạch ngân sách thành công')
@@ -902,6 +923,7 @@ export class FinanceController {
   }
 
   @Patch('budget-plans/:budgetPlanId')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Cập nhật kế hoạch ngân sách thành công')
   @ApiOperation({
@@ -921,6 +943,7 @@ export class FinanceController {
   }
 
   @Patch('budget-plans/:budgetPlanId/activate')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Kích hoạt kế hoạch ngân sách thành công')
   @ApiOperation({ summary: 'Kích hoạt kế hoạch ngân sách' })
@@ -937,6 +960,7 @@ export class FinanceController {
   }
 
   @Patch('budget-plans/:budgetPlanId/close')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Đóng kế hoạch ngân sách thành công')
   @ApiOperation({ summary: 'Đóng kế hoạch ngân sách đang hoạt động' })
@@ -953,6 +977,7 @@ export class FinanceController {
   }
 
   @Patch('budget-plans/:budgetPlanId/cancel')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Hủy kế hoạch ngân sách thành công')
   @ApiOperation({ summary: 'Hủy kế hoạch ngân sách DRAFT hoặc ACTIVE' })
@@ -981,6 +1006,7 @@ export class FinanceController {
   }
 
   @Post('budget-plans/:budgetPlanId/lines')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo dòng ngân sách thành công')
@@ -996,6 +1022,7 @@ export class FinanceController {
   }
 
   @Patch('budget-lines/:budgetLineId')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Cập nhật dòng ngân sách thành công')
   @ApiOperation({ summary: 'Cập nhật dòng ngân sách thuộc kế hoạch DRAFT' })
@@ -1010,6 +1037,7 @@ export class FinanceController {
   }
 
   @Delete('budget-lines/:budgetLineId')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @ResponseMessage('Xóa dòng ngân sách thành công')
   @ApiOperation({ summary: 'Xóa dòng ngân sách thuộc kế hoạch DRAFT' })
@@ -1038,6 +1066,7 @@ export class FinanceController {
   }
 
   @Post('ledger/entries')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo giao dịch trong sổ tài chính chung thành công')

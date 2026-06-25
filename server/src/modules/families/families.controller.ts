@@ -21,6 +21,7 @@ import {
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { VerifiedGuard } from '../auth/guards/verified.guard';
 import { FamilyRoles } from '../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { CreateFamilyDto } from './dto/create-family.dto';
@@ -35,10 +36,12 @@ export class FamiliesController {
   constructor(private readonly familiesService: FamiliesService) {}
 
   @Post()
+  @UseGuards(VerifiedGuard)
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo gia đình thành công')
   @ApiOperation({ summary: 'Create a family (creator becomes MANAGER)' })
   @ApiResponse({ status: 201, description: 'Family created' })
+  @ApiResponse({ status: 403, description: 'Account not verified' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateFamilyDto) {
     return this.familiesService.create(userId, dto);
   }

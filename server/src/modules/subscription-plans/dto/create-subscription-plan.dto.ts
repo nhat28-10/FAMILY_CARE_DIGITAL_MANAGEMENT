@@ -1,24 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlanCode } from '@prisma/client';
 import {
   IsBoolean,
-  IsEnum,
   IsInt,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
 
 export class CreateSubscriptionPlanDto {
   @ApiProperty({
-    enum: SubscriptionPlanCode,
-    example: SubscriptionPlanCode.PLUS,
+    example: 'GOLD',
+    description:
+      'Mã gói duy nhất, CHỮ HOA/số/gạch dưới (vd FREE, PLUS, PREMIUM, GOLD). FREE là mã dành riêng cho gói mặc định.',
   })
-  @IsEnum(SubscriptionPlanCode)
-  planCode: SubscriptionPlanCode;
+  @IsString()
+  @MaxLength(50)
+  @Matches(/^[A-Z][A-Z0-9_]*$/, {
+    message: 'planCode chỉ gồm chữ in hoa, số và gạch dưới (bắt đầu bằng chữ)',
+  })
+  planCode: string;
 
   @ApiProperty({ example: 'Gói Plus' })
   @IsString()

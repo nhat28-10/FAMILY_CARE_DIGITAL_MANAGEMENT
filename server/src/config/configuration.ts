@@ -32,12 +32,20 @@ export default () => ({
     expiresInDays: parseInt(process.env.INVITATION_EXPIRES_IN_DAYS || '7', 10),
   },
   mail: {
+    // '' = tự dò (RESEND_API_KEY → resend; BREVO_API_KEY → brevo; SMTP_HOST → smtp).
+    // Ép kênh: 'resend' | 'brevo' | 'smtp'.
+    provider: process.env.MAIL_PROVIDER || '',
+    from: process.env.MAIL_FROM || 'Family Care <onboarding@resend.dev>',
+    // Resend HTTP API (cổng 443) — dùng cho VPS chặn cổng SMTP.
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    // Brevo HTTP API (cổng 443) — lựa chọn thay thế.
+    brevoApiKey: process.env.BREVO_API_KEY || '',
+    // SMTP (nodemailer) — tiện cho dev local.
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.MAIL_FROM || 'Family Care <no-reply@familycare.local>',
   },
   emailVerification: {
     otpExpiresMinutes: parseInt(
@@ -64,5 +72,10 @@ export default () => ({
     checkoutCancelUrl:
       process.env.STRIPE_CHECKOUT_CANCEL_URL ||
       'http://localhost:5173/subscription/cancel',
+  },
+  throttle: {
+    // TTL tính bằng GIÂY trong ENV; module sẽ nhân 1000 sang ms.
+    ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
+    limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
 });
