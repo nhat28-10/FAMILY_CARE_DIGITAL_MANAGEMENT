@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { FinanceService } from './finance.service';
 
 describe('FinanceService budget planning', () => {
@@ -21,6 +22,7 @@ describe('FinanceService budget planning', () => {
   const lineId = 'line-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { createForMembers: jest.Mock };
   let service: FinanceService;
 
   beforeEach(() => {
@@ -48,7 +50,13 @@ describe('FinanceService budget planning', () => {
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn() },
     };
-    service = new FinanceService(prisma as unknown as PrismaService);
+    notifications = {
+      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    service = new FinanceService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
   });
 
   it('rejects a budget line without a category or jar', async () => {

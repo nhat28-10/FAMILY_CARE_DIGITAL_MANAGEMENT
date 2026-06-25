@@ -6,9 +6,12 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
 } from '@prisma/client';
 
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FinanceService } from './finance.service';
 
@@ -22,6 +25,7 @@ describe('FinanceService financial goals', () => {
   const goalId = 'goal-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { createForMembers: jest.Mock };
   let service: FinanceService;
 
   const goal = {
@@ -71,11 +75,20 @@ describe('FinanceService financial goals', () => {
       $transaction: jest.fn((callback: (client: typeof tx) => unknown) =>
         callback(tx),
       ),
-      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
+      familyMember: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       financialGoal: { findFirst: jest.fn() },
       goalAllocation: { aggregate: jest.fn() },
     };
-    service = new FinanceService(prisma as unknown as PrismaService);
+    notifications = {
+      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+    };
+    service = new FinanceService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
   });
 
   it('hides jar-linked goals from normal members when jars have no visibility metadata', async () => {
@@ -536,7 +549,7 @@ describe('FinanceService financial goals', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('approves a pending contribution by creating ledger entry and goal allocation', async () => {
+  it('approves a pending contribution by creating ledger entry and goal allocation and notifies managers about shortage', async () => {
     tx.familyMember.findFirst.mockResolvedValue({
       id: memberId,
       familyId,
@@ -592,6 +605,9 @@ describe('FinanceService financial goals', () => {
       },
     ]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+    (
+      prisma.familyMember as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([{ id: memberId }, { id: 'deputy-id' }]);
 
     const result = (await service.approveGoalContributionPlan(
       familyId,
@@ -634,6 +650,111 @@ describe('FinanceService financial goals', () => {
       }),
     );
     expect(result.members[0].actualAmount).toBe(1500000);
+    expect(notifications.createForMembers).toHaveBeenCalledWith(
+      familyId,
+      [memberId, 'deputy-id'],
+      expect.objectContaining({
+        type: NotificationType.GENERAL,
+        priority: NotificationPriority.HIGH,
+        referenceType: 'FINANCIAL_GOAL',
+        referenceId: goalId,
+        body: expect.stringContaining('500000'),
+      }),
+    );
+  });
+
+  it('does not notify managers when an approved contribution fully pays the plan', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.goalContributionPlan.findFirst.mockResolvedValue({
+      id: 'plan-id',
+      familyId,
+      goalId,
+      memberId: 'contributor-id',
+      periodMonth: 6,
+      periodYear: 2026,
+      plannedAmount: new Prisma.Decimal(1500000),
+      pendingAmount: new Prisma.Decimal(1500000),
+      dueDate: new Date('2026-06-30T00:00:00.000Z'),
+      status: GoalContributionPlanStatus.PENDING_CONFIRMATION,
+      submittedAt: new Date('2026-06-15T00:00:00.000Z'),
+      submittedNote: 'Da chuyen khoan',
+    });
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.create.mockResolvedValue({ id: 'entry-id' });
+    tx.goalAllocation.create.mockResolvedValue({ id: 'allocation-id' });
+    tx.goalAllocation.findMany.mockResolvedValue([
+      {
+        amount: new Prisma.Decimal(1500000),
+        ledgerEntry: { createdByMemberId: 'contributor-id' },
+      },
+    ]);
+    tx.goalContributionPlan.update.mockResolvedValue({});
+    tx.goalContributionPlan.findMany.mockResolvedValue([
+      {
+        id: 'plan-id',
+        familyId,
+        goalId,
+        memberId: 'contributor-id',
+        periodMonth: 6,
+        periodYear: 2026,
+        plannedAmount: new Prisma.Decimal(1500000),
+        pendingAmount: null,
+        dueDate: new Date('2026-06-30T00:00:00.000Z'),
+        status: GoalContributionPlanStatus.PAID,
+        submittedAt: new Date('2026-06-15T00:00:00.000Z'),
+        submittedNote: 'Da chuyen khoan',
+        reviewedAt: new Date('2026-06-16T00:00:00.000Z'),
+        reviewNote: 'ok',
+        member: {
+          id: 'contributor-id',
+          displayName: 'Member A',
+          user: { fullName: 'User A' },
+        },
+      },
+    ]);
+    tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = (await service.approveGoalContributionPlan(
+      familyId,
+      memberId,
+      goalId,
+      'plan-id',
+      { note: 'ok' },
+    )) as unknown as ContributionPlanView;
+
+    expect(result.members[0]).toMatchObject({
+      actualAmount: 1500000,
+      shortageAmount: 0,
+      status: GoalContributionPlanStatus.PAID,
+    });
+    expect(notifications.createForMembers).not.toHaveBeenCalled();
+  });
+
+  it('prevents a normal member from approving contribution plans', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await expect(
+      service.approveGoalContributionPlan(
+        familyId,
+        memberId,
+        goalId,
+        'plan-id',
+        { note: 'ok' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(notifications.createForMembers).not.toHaveBeenCalled();
   });
 
   it('rejects a pending contribution without creating ledger entries', async () => {

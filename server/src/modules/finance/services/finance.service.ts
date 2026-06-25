@@ -22,6 +22,8 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
   SpendingSupportRequestStatus,
 } from '@prisma/client';
@@ -30,6 +32,7 @@ import {
   buildPaginated,
   skipFor,
 } from '../../../common/types/paginated-result';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FINANCE_MODEL_TEMPLATES } from '../constants/finance-model-templates.constant';
 import { BudgetAlertQueryDto } from '../dto/budget-alert-query.dto';
@@ -109,7 +112,10 @@ const GOAL_ELIGIBLE_ENTRY_TYPES = [
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   getMyMonthlyFinance(memberId: string, period: RequiredFinancePeriodDto) {
     return this.prisma.memberMonthlyFinance.findUnique({
@@ -1595,7 +1601,23 @@ export class FinanceService {
     planId: string,
     dto: ReviewGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(
+    return this.approveGoalContributionPlanAndNotify(
+      familyId,
+      reviewerMemberId,
+      goalId,
+      planId,
+      dto,
+    );
+  }
+
+  private async approveGoalContributionPlanAndNotify(
+    familyId: string,
+    reviewerMemberId: string,
+    goalId: string,
+    planId: string,
+    dto: ReviewGoalContributionPlanDto,
+  ) {
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const reviewer = await this.getMemberInFamilyOrThrow(
           familyId,
@@ -1678,16 +1700,28 @@ export class FinanceService {
           },
         });
 
-        return this.buildGoalContributionPlanView(
+        const view = await this.buildGoalContributionPlanView(
           tx,
           familyId,
           goal,
           plan.periodMonth,
           plan.periodYear,
         );
+        return { view, goalName: goal.goalName };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    await this.notifyContributionShortageAfterApproval(
+      familyId,
+      goalId,
+      result.goalName,
+      result.view.periodMonth,
+      result.view.periodYear,
+      result.view.totalShortageAmount,
+    );
+
+    return result.view;
   }
 
   rejectGoalContributionPlan(
@@ -3525,6 +3559,43 @@ export class FinanceService {
     if (percent.lessThanOrEqualTo(10)) return BudgetAlertSeverity.LOW;
     if (percent.lessThanOrEqualTo(25)) return BudgetAlertSeverity.MEDIUM;
     return BudgetAlertSeverity.HIGH;
+  }
+
+  private async notifyContributionShortageAfterApproval(
+    familyId: string,
+    goalId: string,
+    goalName: string,
+    periodMonth: number,
+    periodYear: number,
+    totalShortageAmount: number,
+  ) {
+    if (totalShortageAmount <= 0) {
+      return;
+    }
+
+    const recipients = await this.prisma.familyMember.findMany({
+      where: {
+        familyId,
+        status: MemberStatus.ACTIVE,
+        familyRole: {
+          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+        },
+      },
+      select: { id: true },
+    });
+
+    await this.notificationsService.createForMembers(
+      familyId,
+      recipients.map((recipient) => recipient.id),
+      {
+        type: NotificationType.GENERAL,
+        priority: NotificationPriority.HIGH,
+        title: 'Quy muc tieu con thieu dong gop',
+        body: `${goalName} thang ${periodMonth}/${periodYear} con thieu ${totalShortageAmount}.`,
+        referenceType: 'FINANCIAL_GOAL',
+        referenceId: goalId,
+      },
+    );
   }
 
   private async calculateGoalAllocatedAmount(
