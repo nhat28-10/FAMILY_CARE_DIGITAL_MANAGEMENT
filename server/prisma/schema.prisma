@@ -287,13 +287,6 @@ enum TaskProofType {
   FILE
 }
 
-/// Subscription plan tier offered to family workspaces (ERD: plan_code).
-enum SubscriptionPlanCode {
-  FREE
-  PLUS
-  PREMIUM
-}
-
 // ===========================================================================
 // Models
 // ===========================================================================
@@ -646,7 +639,9 @@ model LedgerEntry {
 /// admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.
 model SubscriptionPlan {
   id            String               @id @default(uuid())
-  planCode      SubscriptionPlanCode @unique
+  /// Unique plan code, e.g. FREE / PLUS / PREMIUM / GOLD. `FREE` is reserved as
+  /// the default plan for new families.
+  planCode      String               @unique
   name          String
   /// ERD: annual_price — paid plans are billed yearly.
   annualPrice   Decimal              @db.Decimal(18, 2)

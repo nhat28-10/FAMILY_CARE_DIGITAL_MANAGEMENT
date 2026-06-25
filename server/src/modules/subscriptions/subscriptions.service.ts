@@ -9,11 +9,11 @@ import {
   FamilySubscriptionStatus,
   Prisma,
   SubscriptionPlan,
-  SubscriptionPlanCode,
 } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { StripeService } from '../billing/stripe.service';
+import { FREE_PLAN_CODE } from '../subscription-plans/subscription-plans.constants';
 
 type SubscriptionWithPlan = FamilySubscription & { plan: SubscriptionPlan };
 
@@ -58,7 +58,7 @@ export class SubscriptionsService {
     if (existing) return existing;
 
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { planCode: SubscriptionPlanCode.FREE },
+      where: { planCode: FREE_PLAN_CODE },
     });
     if (!freePlan) return null;
 
@@ -91,9 +91,9 @@ export class SubscriptionsService {
    */
   async createCheckout(
     familyId: string,
-    planCode: SubscriptionPlanCode,
+    planCode: string,
   ): Promise<{ checkoutUrl: string }> {
-    if (planCode === SubscriptionPlanCode.FREE) {
+    if (planCode === FREE_PLAN_CODE) {
       throw new BadRequestException('Không thể thanh toán cho gói miễn phí');
     }
 
