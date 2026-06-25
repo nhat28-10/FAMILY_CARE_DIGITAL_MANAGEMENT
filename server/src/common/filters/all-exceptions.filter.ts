@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ThrottlerException } from '@nestjs/throttler';
 import { Response } from 'express';
 
 export interface ApiErrorResponse {
@@ -51,6 +52,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       // Unexpected error — log the stack but never leak internals to clients.
       this.logger.error(exception.message, exception.stack);
+    }
+
+    if (exception instanceof ThrottlerException) {
+      message = 'Bạn thao tác quá nhanh, vui lòng thử lại sau';
     }
 
     const body: ApiErrorResponse = { success: false, message, statusCode };
