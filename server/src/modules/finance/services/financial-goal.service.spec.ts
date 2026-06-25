@@ -491,13 +491,13 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = (await service.submitGoalContributionPlan(
+    const result = await service.submitGoalContributionPlan(
       familyId,
       memberId,
       goalId,
       'plan-id',
       { amount: 1500000, note: 'Da chuyen khoan' },
-    )) as unknown as ContributionPlanView;
+    );
 
     expect(tx.goalContributionPlan.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -605,17 +605,17 @@ describe('FinanceService financial goals', () => {
       },
     ]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
-    (
-      prisma.familyMember as { findMany: jest.Mock }
-    ).findMany.mockResolvedValue([{ id: memberId }, { id: 'deputy-id' }]);
+    (prisma.familyMember as { findMany: jest.Mock }).findMany.mockResolvedValue(
+      [{ id: memberId }, { id: 'deputy-id' }],
+    );
 
-    const result = (await service.approveGoalContributionPlan(
+    const result = await service.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
       'plan-id',
       { note: 'ok' },
-    )) as unknown as ContributionPlanView;
+    );
 
     expect(tx.ledgerEntry.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -720,13 +720,13 @@ describe('FinanceService financial goals', () => {
     ]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = (await service.approveGoalContributionPlan(
+    const result = await service.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
       'plan-id',
       { note: 'ok' },
-    )) as unknown as ContributionPlanView;
+    );
 
     expect(result.members[0]).toMatchObject({
       actualAmount: 1500000,
@@ -804,13 +804,13 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = (await service.rejectGoalContributionPlan(
+    const result = await service.rejectGoalContributionPlan(
       familyId,
       memberId,
       goalId,
       'plan-id',
       { note: 'Sai giao dich' },
-    )) as unknown as ContributionPlanView;
+    );
 
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
     expect(tx.goalAllocation.create).not.toHaveBeenCalled();
@@ -863,7 +863,7 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = (await service.listGoalContributionPlans(
+    const result = await service.listGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -871,7 +871,7 @@ describe('FinanceService financial goals', () => {
         month: 6,
         year: 2026,
       },
-    )) as unknown as ContributionPlanView;
+    );
 
     expect(result.members[0]).toMatchObject({
       pendingAmount: 1500000,

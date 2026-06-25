@@ -36,7 +36,7 @@ interface ServiceGroup {
   /** Nhãn hiển thị trên dropdown. */
   name: string;
   /** Các module được include vào document này. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   modules: any[];
 }
 
@@ -69,7 +69,12 @@ const SERVICE_GROUPS: ServiceGroup[] = [
   {
     key: 'communication',
     name: 'Communication',
-    modules: [ChatsModule, MessagesModule, NotificationsModule, AiChatbotModule],
+    modules: [
+      ChatsModule,
+      MessagesModule,
+      NotificationsModule,
+      AiChatbotModule,
+    ],
   },
   {
     key: 'care',

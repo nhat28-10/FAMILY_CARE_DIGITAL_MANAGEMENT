@@ -43,7 +43,7 @@ const TASK_MANAGER_ROLES = [
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/tasks')
 export class TaskSchedulesController {
-  constructor(private readonly tasksService: TasksService) { }
+  constructor(private readonly tasksService: TasksService) {}
 
   @Post('recurring')
   @FamilyRoles(...TASK_MANAGER_ROLES)

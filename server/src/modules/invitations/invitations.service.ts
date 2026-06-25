@@ -113,7 +113,10 @@ export class InvitationsService {
     invitationId: string,
     dto?: ApproveInvitationDto,
   ): Promise<FamilyMember> {
-    const invitation = await this.findByIdInFamilyOrThrow(familyId, invitationId);
+    const invitation = await this.findByIdInFamilyOrThrow(
+      familyId,
+      invitationId,
+    );
     if (invitation.status !== InvitationStatus.CLAIMED) {
       throw new BadRequestException(
         'Lời mời chưa được gửi yêu cầu tham gia hoặc đã được xử lý',
@@ -172,7 +175,10 @@ export class InvitationsService {
     familyId: string,
     invitationId: string,
   ): Promise<SafeInvitation> {
-    const invitation = await this.findByIdInFamilyOrThrow(familyId, invitationId);
+    const invitation = await this.findByIdInFamilyOrThrow(
+      familyId,
+      invitationId,
+    );
     if (invitation.status !== InvitationStatus.CLAIMED) {
       throw new BadRequestException(
         'Chỉ có thể từ chối yêu cầu đang chờ duyệt',

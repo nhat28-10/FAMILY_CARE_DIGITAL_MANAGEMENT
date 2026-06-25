@@ -75,7 +75,7 @@ const FINANCE_MANAGER_ROLES = [
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) { }
+  constructor(private readonly financeService: FinanceService) {}
 
   @Get('monthly-finances/me')
   @ResponseMessage('Lấy thông tin tài chính tháng thành công')
@@ -691,7 +691,8 @@ export class FinanceController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Phê duyệt khoản đóng góp mục tiêu thành công')
   @ApiOperation({
-    summary: 'Manager/deputy phê duyệt khoản đóng góp và ghi vào sổ sách tài chính',
+    summary:
+      'Manager/deputy phê duyệt khoản đóng góp và ghi vào sổ sách tài chính',
   })
   @ApiParam({ name: 'goalId', format: 'uuid' })
   @ApiParam({ name: 'planId', format: 'uuid' })
