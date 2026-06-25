@@ -20,6 +20,7 @@ import {
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { VerifiedGuard } from '../auth/guards/verified.guard';
 import { CurrentFamilyMember } from '../family-members/decorators/current-family-member.decorator';
 import { FamilyRoles } from '../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
@@ -35,7 +36,7 @@ export class InvitationsController {
   constructor(private readonly invitationsService: InvitationsService) { }
 
   @Post('families/:familyId/invitations')
-  @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
+  @UseGuards(JwtAuthGuard, FamilyPermissionGuard, VerifiedGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
@@ -111,7 +112,7 @@ export class InvitationsController {
   }
 
   @Post('families/:familyId/invitations/:id/approve')
-  @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
+  @UseGuards(JwtAuthGuard, FamilyPermissionGuard, VerifiedGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
