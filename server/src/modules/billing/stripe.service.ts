@@ -55,19 +55,26 @@ export class StripeService {
    */
   createSubscriptionCheckout(params: {
     familyId: string;
+    purchasedByUserId: string;
     priceId: string;
     customerId?: string | null;
     successUrl: string;
     cancelUrl: string;
   }): Promise<Stripe.Checkout.Session> {
+    // Carry both ids in metadata so the webhook can attribute the purchase back
+    // to the family (workspace) and to the FAMILY_MANAGER who bought it.
+    const metadata = {
+      familyId: params.familyId,
+      purchasedByUserId: params.purchasedByUserId,
+    };
     return this.stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: params.priceId, quantity: 1 }],
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
       client_reference_id: params.familyId,
-      metadata: { familyId: params.familyId },
-      subscription_data: { metadata: { familyId: params.familyId } },
+      metadata,
+      subscription_data: { metadata },
       ...(params.customerId ? { customer: params.customerId } : {}),
     });
   }

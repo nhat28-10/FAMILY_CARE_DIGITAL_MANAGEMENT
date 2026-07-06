@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { ResponseMessage } from '../../../common/decorators/response-message.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { VerifiedGuard } from '../../auth/guards/verified.guard';
@@ -24,10 +25,9 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { CreateCheckoutDto } from '../dto/create-checkout.dto';
 import { SubscriptionsService } from '../subscriptions.service';
 
-const BILLING_MANAGER_ROLES = [
-  FamilyRole.FAMILY_MANAGER,
-  FamilyRole.DEPUTY_MEMBER,
-] as const;
+// Chỉ FAMILY_MANAGER được mua/gia hạn gói — họ là người chịu trách nhiệm tài chính
+// của workspace (theo yêu cầu hội đồng). Deputy/Member không có quyền này.
+const BILLING_MANAGER_ROLES = [FamilyRole.FAMILY_MANAGER] as const;
 
 @ApiTags('Subscriptions')
 @ApiBearerAuth()
@@ -56,8 +56,13 @@ export class FamilySubscriptionController {
   @ResponseMessage('Tạo liên kết thanh toán thành công')
   createCheckout(
     @Param('familyId') familyId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: CreateCheckoutDto,
   ) {
-    return this.subscriptionsService.createCheckout(familyId, dto.planCode);
+    return this.subscriptionsService.createCheckout(
+      familyId,
+      dto.planCode,
+      userId,
+    );
   }
 }
