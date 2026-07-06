@@ -59,6 +59,20 @@ export class CreateMemberMonthlyFinanceDto {
   @Min(0)
   actualPersonalExpense?: number | null;
 
+  @ApiPropertyOptional({ example: 2000000, nullable: true })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  expectedSharedContribution?: number | null;
+
+  @ApiPropertyOptional({ example: 1800000, nullable: true })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  actualSharedContribution?: number | null;
+
   @ApiPropertyOptional({
     enum: FinanceVisibility,
     default: FinanceVisibility.PRIVATE,
