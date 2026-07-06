@@ -408,7 +408,7 @@ model Family {
   financeModels           FinanceModel[]
   budgetPlans             BudgetPlan[]
   financialGoals          FinancialGoal[]
-  goalContributionPlans    GoalContributionPlan[]
+  goalContributionPlans   GoalContributionPlan[]
   budgetAlerts            BudgetAlert[]
   spendingSupportRequests SpendingSupportRequest[]
   taskCategories          TaskCategory[]
@@ -531,19 +531,21 @@ model Invitation {
 
 /// Monthly personal income and expense summary for a family member. This is a summary only; personal ledger entries are intentionally not modeled.
 model MemberMonthlyFinance {
-  id                      String            @id @default(uuid())
-  memberId                String
-  periodMonth             Int
-  periodYear              Int
-  expectedIncome          Decimal?          @db.Decimal(18, 2)
-  actualIncome            Decimal?          @db.Decimal(18, 2)
-  expectedPersonalExpense Decimal?          @db.Decimal(18, 2)
-  actualPersonalExpense   Decimal?          @db.Decimal(18, 2)
-  incomeVisibility        FinanceVisibility @default(PRIVATE)
-  expenseVisibility       FinanceVisibility @default(PRIVATE)
-  note                    String?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
+  id                         String            @id @default(uuid())
+  memberId                   String
+  periodMonth                Int
+  periodYear                 Int
+  expectedIncome             Decimal?          @db.Decimal(18, 2)
+  actualIncome               Decimal?          @db.Decimal(18, 2)
+  expectedPersonalExpense    Decimal?          @db.Decimal(18, 2)
+  actualPersonalExpense      Decimal?          @db.Decimal(18, 2)
+  expectedSharedContribution Decimal?          @db.Decimal(18, 2)
+  actualSharedContribution   Decimal?          @db.Decimal(18, 2)
+  incomeVisibility           FinanceVisibility @default(PRIVATE)
+  expenseVisibility          FinanceVisibility @default(PRIVATE)
+  note                       String?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
 
   member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
@@ -830,9 +832,9 @@ model FinancialGoal {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
 
-  family            Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  relatedJar        FinanceJar?        @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
-  createdByMember   FamilyMember       @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  family            Family                 @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  relatedJar        FinanceJar?            @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
+  createdByMember   FamilyMember           @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
   allocations       GoalAllocation[]
   contributionPlans GoalContributionPlan[]
   budgetAlerts      BudgetAlert[]
@@ -864,23 +866,23 @@ model GoalAllocation {
 }
 
 model GoalContributionPlan {
-  id            String                     @id @default(uuid())
-  familyId      String
-  goalId        String
-  memberId      String
-  periodMonth   Int
-  periodYear    Int
-  plannedAmount Decimal                    @db.Decimal(18, 2)
-  pendingAmount Decimal?                   @db.Decimal(18, 2)
-  dueDate       DateTime                   @db.Date
-  status        GoalContributionPlanStatus @default(PLANNED)
-  submittedAt   DateTime?
-  submittedNote String?
+  id                 String                     @id @default(uuid())
+  familyId           String
+  goalId             String
+  memberId           String
+  periodMonth        Int
+  periodYear         Int
+  plannedAmount      Decimal                    @db.Decimal(18, 2)
+  pendingAmount      Decimal?                   @db.Decimal(18, 2)
+  dueDate            DateTime                   @db.Date
+  status             GoalContributionPlanStatus @default(PLANNED)
+  submittedAt        DateTime?
+  submittedNote      String?
   reviewedByMemberId String?
-  reviewedAt    DateTime?
-  reviewNote    String?
-  createdAt     DateTime                   @default(now())
-  updatedAt     DateTime                   @updatedAt
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   family           Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
   goal             FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)

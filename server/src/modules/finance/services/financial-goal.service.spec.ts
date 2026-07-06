@@ -28,6 +28,14 @@ describe('FinanceService financial goals', () => {
   let notifications: { createForMembers: jest.Mock };
   let service: FinanceService;
 
+  beforeAll(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-16T00:00:00.000Z'));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   const goal = {
     id: goalId,
     familyId,
@@ -200,7 +208,7 @@ describe('FinanceService financial goals', () => {
     expect(result.progress.isAchieved).toBe(true);
   });
 
-  it('suggests monthly goal contributions proportionally and handles null monthly finance values', async () => {
+  it('suggests monthly goal contributions proportionally after shared contributions and handles null monthly finance values', async () => {
     (
       prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
     ).findFirst.mockResolvedValue({
@@ -226,6 +234,7 @@ describe('FinanceService financial goals', () => {
           {
             expectedIncome: new Prisma.Decimal(9000000),
             expectedPersonalExpense: new Prisma.Decimal(2000000),
+            expectedSharedContribution: new Prisma.Decimal(1000000),
           },
         ],
       },
@@ -237,6 +246,7 @@ describe('FinanceService financial goals', () => {
           {
             expectedIncome: new Prisma.Decimal(5000000),
             expectedPersonalExpense: null,
+            expectedSharedContribution: null,
           },
         ],
       },
@@ -248,6 +258,7 @@ describe('FinanceService financial goals', () => {
           {
             expectedIncome: null,
             expectedPersonalExpense: new Prisma.Decimal(1000000),
+            expectedSharedContribution: new Prisma.Decimal(500000),
           },
         ],
       },
@@ -260,17 +271,17 @@ describe('FinanceService financial goals', () => {
       { month: 6, year: 2026 },
     );
 
-    expect(result.totalAvailableAmount).toBe(12000000);
+    expect(result.totalAvailableAmount).toBe(11000000);
     expect(result.suggestions).toHaveLength(2);
     expect(result.suggestions[0]).toMatchObject({
       memberId: 'member-a',
-      availableAmount: 7000000,
-      suggestedContribution: 2916667,
+      availableAmount: 6000000,
+      suggestedContribution: 2727273,
     });
     expect(result.suggestions[1]).toMatchObject({
       memberId: 'member-b',
       availableAmount: 5000000,
-      suggestedContribution: 2083333,
+      suggestedContribution: 2272727,
     });
   });
 

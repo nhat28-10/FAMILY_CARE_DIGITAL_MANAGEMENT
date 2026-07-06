@@ -1386,6 +1386,7 @@ export class FinanceService {
           select: {
             expectedIncome: true,
             expectedPersonalExpense: true,
+            expectedSharedContribution: true,
           },
           take: 1,
         },
@@ -1400,7 +1401,14 @@ export class FinanceService {
           monthlyFinance?.expectedIncome ?? new Prisma.Decimal(0);
         const expectedPersonalExpense =
           monthlyFinance?.expectedPersonalExpense ?? new Prisma.Decimal(0);
-        const availableAmount = expectedIncome.minus(expectedPersonalExpense);
+        const expectedSharedContribution =
+          monthlyFinance?.expectedSharedContribution ?? new Prisma.Decimal(0);
+        const availableAmount = Prisma.Decimal.max(
+          expectedIncome
+            .minus(expectedPersonalExpense)
+            .minus(expectedSharedContribution),
+          0,
+        );
         return {
           memberId: familyMember.id,
           displayName: this.memberDisplayName(familyMember),

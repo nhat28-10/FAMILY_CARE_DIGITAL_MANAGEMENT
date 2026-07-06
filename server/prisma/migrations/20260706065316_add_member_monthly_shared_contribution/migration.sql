@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "goal_contribution_plans_goalId_memberId_periodMonth_periodYear_" RENAME TO "goal_contribution_plans_goalId_memberId_periodMonth_periodY_key";
