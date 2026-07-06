@@ -264,6 +264,11 @@ export class AuthService {
 
     // Persist the session using the refresh token's own expiry.
     const decoded = this.jwtService.decode(refreshToken);
+
+    if (!decoded || typeof decoded.exp !== 'number') {
+      throw new UnauthorizedException('Refresh token không hợp lệ');
+    }
+
     const expiresAt = new Date(decoded.exp * 1000);
     await this.refreshTokenService.store(jti, user.id, refreshToken, expiresAt);
 

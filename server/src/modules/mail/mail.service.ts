@@ -68,7 +68,10 @@ export class MailService {
       );
     }
     // Cảnh báo dùng sender mặc định resend.dev — chỉ gửi được tới email chủ tài khoản Resend.
-    if (this.provider === 'resend' && this.cfg.from.includes('onboarding@resend.dev')) {
+    if (
+      this.provider === 'resend' &&
+      this.cfg.from.includes('onboarding@resend.dev')
+    ) {
       this.logger.warn(
         'Đang dùng sender mặc định onboarding@resend.dev — Resend chỉ gửi tới email chủ tài khoản. Đặt MAIL_FROM bằng domain đã verify cho production.',
       );
