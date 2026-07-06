@@ -488,6 +488,8 @@ model FamilyMember {
   taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
   createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
   aiConversations                  AIConversation[]           @relation("MemberAIConversations")
+  goalContributionPlans            GoalContributionPlan[]     @relation("GoalContributionPlans")
+  reviewedGoalContributionPlans    GoalContributionPlan[]     @relation("ReviewedGoalContributionPlans")
 
   @@unique([familyId, userId])
   @@index([userId])
