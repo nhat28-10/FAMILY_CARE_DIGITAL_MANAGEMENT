@@ -84,12 +84,15 @@ export class WebhookService {
     familyId: string,
     session: Stripe.Checkout.Session,
   ): Promise<void> {
+    const purchasedByUserId = session.metadata?.purchasedByUserId ?? null;
     await this.prisma.familySubscription.update({
       where: { familyId },
       data: {
         stripeCustomerId: this.asId(session.customer),
         stripeSubscriptionId: this.asId(session.subscription),
         status: FamilySubscriptionStatus.ACTIVE,
+        // Record the FAMILY_MANAGER accountable for this paid plan.
+        ...(purchasedByUserId ? { purchasedByUserId } : {}),
       },
     });
   }
@@ -132,6 +135,8 @@ export class WebhookService {
         stripeSubscriptionId: null,
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
+        // Back on FREE → no one is accountable for a paid plan anymore.
+        purchasedByUserId: null,
       },
     });
   }

@@ -92,6 +92,7 @@ export class SubscriptionsService {
   async createCheckout(
     familyId: string,
     planCode: string,
+    purchasedByUserId: string,
   ): Promise<{ checkoutUrl: string }> {
     if (planCode === FREE_PLAN_CODE) {
       throw new BadRequestException('Không thể thanh toán cho gói miễn phí');
@@ -117,6 +118,7 @@ export class SubscriptionsService {
 
     const session = await this.stripeService.createSubscriptionCheckout({
       familyId,
+      purchasedByUserId,
       priceId: plan.stripePriceId,
       customerId: current.stripeCustomerId,
       successUrl: this.config.get<string>('stripe.checkoutSuccessUrl') ?? '',
