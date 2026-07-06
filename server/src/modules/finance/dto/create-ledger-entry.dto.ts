@@ -45,6 +45,11 @@ export class CreateLedgerEntryDto {
   @IsUUID()
   categoryId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  jarId?: string;
+
   @ApiPropertyOptional({ example: 'TASK_REWARD' })
   @IsOptional()
   @IsString()

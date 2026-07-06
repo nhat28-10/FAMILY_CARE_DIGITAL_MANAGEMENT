@@ -30,13 +30,15 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Đăng ký thành công')
-  @ApiOperation({ summary: 'Register a new account (default role: FAMILY_MANAGER)' })
+  @ApiOperation({
+    summary: 'Register a new account (default role: FAMILY_MANAGER)',
+  })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
     status: 201,
@@ -63,7 +65,9 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Làm mới token thành công')
-  @ApiOperation({ summary: 'Rotate the token pair using a valid refresh token' })
+  @ApiOperation({
+    summary: 'Rotate the token pair using a valid refresh token',
+  })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({
     status: 200,

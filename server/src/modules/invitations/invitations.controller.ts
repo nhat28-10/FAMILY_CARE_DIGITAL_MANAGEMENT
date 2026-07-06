@@ -33,7 +33,7 @@ import { InvitationsService } from './invitations.service';
 @ApiTags('Invitations')
 @Controller()
 export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) { }
+  constructor(private readonly invitationsService: InvitationsService) {}
 
   @Post('families/:familyId/invitations')
   @UseGuards(JwtAuthGuard, FamilyPermissionGuard, VerifiedGuard)
@@ -41,9 +41,17 @@ export class InvitationsController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo lời mời thành công')
-  @ApiOperation({ summary: 'Invite a member to a family (FAMILY_MANAGER only)' })
-  @ApiResponse({ status: 201, description: 'Invitation created (token returned once)' })
-  @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
+  @ApiOperation({
+    summary: 'Invite a member to a family (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Invitation created (token returned once)',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Requires family FAMILY_MANAGER role',
+  })
   create(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -103,7 +111,10 @@ export class InvitationsController {
   @ApiOperation({
     summary: 'List a family invitations (FAMILY_MANAGER only)',
   })
-  @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
+  @ApiResponse({
+    status: 403,
+    description: 'Requires family FAMILY_MANAGER role',
+  })
   list(
     @Param('familyId') familyId: string,
     @Query() query: ListInvitationsQueryDto,
@@ -118,10 +129,17 @@ export class InvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Duyệt yêu cầu tham gia thành công')
   @ApiOperation({
-    summary: 'Approve a join request → creates the member (FAMILY_MANAGER only)',
+    summary:
+      'Approve a join request → creates the member (FAMILY_MANAGER only)',
   })
-  @ApiResponse({ status: 400, description: 'Invitation is not in CLAIMED state' })
-  @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation is not in CLAIMED state',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Requires family FAMILY_MANAGER role',
+  })
   approve(
     @Param('familyId') familyId: string,
     @Param('id') id: string,
@@ -140,8 +158,14 @@ export class InvitationsController {
   @ApiOperation({
     summary: 'Reject a join request (FAMILY_MANAGER only)',
   })
-  @ApiResponse({ status: 400, description: 'Invitation is not in CLAIMED state' })
-  @ApiResponse({ status: 403, description: 'Requires family FAMILY_MANAGER role' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invitation is not in CLAIMED state',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Requires family FAMILY_MANAGER role',
+  })
   rejectClaim(@Param('familyId') familyId: string, @Param('id') id: string) {
     return this.invitationsService.rejectClaim(familyId, id);
   }
