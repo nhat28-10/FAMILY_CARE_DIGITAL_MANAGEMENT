@@ -13,24 +13,39 @@ const prisma = new PrismaClient();
 const BASE_PLANS = [
   {
     planCode: 'FREE',
-    name: 'Gói Miễn phí',
+    name: 'Gói miễn phí',
     annualPrice: 0,
     maxMembers: 3,
     storageLimit: 1024,
+    featureAccess: {
+      maxFamilies: 1,
+      aiEnabled: false,
+      advancedFinance: false,
+    },
   },
   {
-    planCode: 'PLUS',
-    name: 'Gói Plus',
+    planCode: 'MONTHLY',
+    name: 'Gói tháng',
+    annualPrice: 99000,
+    maxMembers: 10,
+    storageLimit: 5120,
+    featureAccess: {
+      maxFamilies: 3,
+      aiEnabled: true,
+      advancedFinance: true,
+    },
+  },
+  {
+    planCode: 'YEARLY',
+    name: 'Gói năm',
     annualPrice: 990000,
     maxMembers: 10,
     storageLimit: 5120,
-  },
-  {
-    planCode: 'PREMIUM',
-    name: 'Gói Premium',
-    annualPrice: 1990000,
-    maxMembers: 20,
-    storageLimit: 20480,
+    featureAccess: {
+      maxFamilies: 3,
+      aiEnabled: true,
+      advancedFinance: true,
+    },
   },
 ];
 
@@ -86,8 +101,8 @@ async function main() {
  *   STRIPE_PRICE_PLUS, STRIPE_PRICE_PREMIUM
  */
 function stripePriceIdFor(planCode: string): string | undefined {
-  if (planCode === 'PLUS') return process.env.STRIPE_PRICE_PLUS;
-  if (planCode === 'PREMIUM') return process.env.STRIPE_PRICE_PREMIUM;
+  if (planCode === 'MONTHLY') return process.env.STRIPE_PRICE_MONTHLY;
+  if (planCode === 'YEARLY') return process.env.STRIPE_PRICE_YEARLY;
   return undefined;
 }
 
@@ -116,7 +131,7 @@ async function seedPlans() {
   const configured = BASE_PLANS.filter((p) => stripePriceIdFor(p.planCode)).length;
   console.log(
     `✔ Seeded ${BASE_PLANS.length} subscription plans ` +
-      `(${configured} paid plan(s) linked to Stripe price)`,
+    `(${configured} paid plan(s) linked to Stripe price)`,
   );
 }
 
