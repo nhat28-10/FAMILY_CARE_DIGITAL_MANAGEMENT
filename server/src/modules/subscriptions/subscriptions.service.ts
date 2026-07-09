@@ -130,4 +130,36 @@ export class SubscriptionsService {
     }
     return { checkoutUrl: session.url };
   }
+
+  async isSubscriptionActive(familyId: string): Promise<boolean> {
+    const access = await this.getFamilySubscriptionAccess(familyId);
+    return access.active;
+  }
+
+  async getFamilySubscriptionAccess(familyId: string): Promise<{
+    active: boolean;
+    status: FamilySubscriptionStatus;
+    planCode: string;
+    currentPeriodEnd: Date | null;
+    message: string;
+  }> {
+    const subscription = await this.getForFamily(familyId);
+    const now = new Date();
+    const planCode = subscription.plan.planCode;
+    const periodStillValid =
+      !subscription.currentPeriodEnd || subscription.currentPeriodEnd >= now;
+    const active =
+      subscription.status === FamilySubscriptionStatus.ACTIVE &&
+      (planCode === FREE_PLAN_CODE || periodStillValid);
+
+    return {
+      active,
+      status: subscription.status,
+      planCode,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      message: active
+        ? 'Gói dịch vụ đang hoạt động.'
+        : 'Gói dịch vụ đã hết hạn hoặc chưa được thanh toán.',
+    };
+  }
 }

@@ -122,6 +122,13 @@ export class StripeService {
     }
   }
 
+  /** Retrieves a Stripe subscription for webhook/admin reconciliation. */
+  retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+    return this.stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'],
+    });
+  }
+
   /** Verifies the webhook signature and returns the typed Stripe event. */
   constructEvent(payload: Buffer, signature: string): Stripe.Event {
     const secret = this.config.get<string>('stripe.webhookSecret');

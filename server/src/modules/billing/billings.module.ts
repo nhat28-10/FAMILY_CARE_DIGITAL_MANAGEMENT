@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 
 import { StripeWebhookController } from './controllers/stripe-webhook.controller';
 import { StripeService } from './stripe.service';
+import { SubscriptionExpiryScheduler } from './subscription-expiry.scheduler';
+import { SubscriptionLifecycleService } from './subscription-lifecycle.service';
 import { WebhookService } from './webhook.service';
 
 /**
@@ -11,7 +13,12 @@ import { WebhookService } from './webhook.service';
  */
 @Module({
   controllers: [StripeWebhookController],
-  providers: [StripeService, WebhookService],
-  exports: [StripeService],
+  providers: [
+    StripeService,
+    SubscriptionLifecycleService,
+    SubscriptionExpiryScheduler,
+    WebhookService,
+  ],
+  exports: [StripeService, SubscriptionLifecycleService],
 })
 export class BillingsModule {}

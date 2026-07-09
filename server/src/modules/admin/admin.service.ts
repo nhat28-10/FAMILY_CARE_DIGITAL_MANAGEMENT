@@ -22,6 +22,7 @@ import {
   skipFor,
 } from '../../common/types/paginated-result';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SubscriptionLifecycleService } from '../billing/subscription-lifecycle.service';
 import { FREE_PLAN_CODE } from '../subscription-plans/subscription-plans.constants';
 import { sanitizeUser, SafeUser } from '../users/users.types';
 import { AdminUpdateFamilyDto } from './dto/update-family.dto';
@@ -121,7 +122,10 @@ export interface AdminPaymentListItem {
  */
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionLifecycle: SubscriptionLifecycleService,
+  ) {}
 
   // --------------------------------------------------------------------------
   // Dashboard / revenue / payments
@@ -476,6 +480,32 @@ export class AdminService {
     return {
       ...this.toSafeSubscription(updated),
       reason: dto.reason ?? null,
+    };
+  }
+
+  async syncFamilySubscriptionFromStripe(familyId: string) {
+    await this.findFamilyOrThrow(familyId);
+    const subscription = await this.prisma.familySubscription.findUnique({
+      where: { familyId },
+      select: { stripeSubscriptionId: true },
+    });
+    if (!subscription) {
+      throw new NotFoundException('Không tìm thấy gói dịch vụ của gia đình');
+    }
+    if (!subscription.stripeSubscriptionId) {
+      throw new BadRequestException(
+        'Family workspace chưa có Stripe subscription để đồng bộ.',
+      );
+    }
+
+    await this.subscriptionLifecycle.syncFamilySubscriptionFromStripe(
+      familyId,
+      subscription.stripeSubscriptionId,
+    );
+
+    return {
+      ...(await this.getFamilySubscription(familyId)),
+      message: 'Đồng bộ subscription từ Stripe thành công.',
     };
   }
 
@@ -1028,13 +1058,19 @@ export class AdminService {
   }
 
   private extractPlanCode(rawPayload: Prisma.JsonValue): string | null {
+    const direct = this.stringAt(rawPayload, ['planCode']);
+    if (direct) return direct;
+
     const priceId = this.extractStripePriceId(rawPayload);
     if (!priceId) return null;
     return this.stripePriceIdToPlanCodeCache.get(priceId) ?? null;
   }
 
   private extractStripePriceId(rawPayload: Prisma.JsonValue): string | null {
-    const object = this.eventObject(rawPayload);
+    const direct = this.stringAt(rawPayload, ['stripePriceId']);
+    if (direct) return direct;
+
+    const object = this.eventObject(rawPayload) ?? rawPayload;
     return (
       this.stringAt(object, ['lines', 'data', 0, 'price', 'id']) ??
       this.stringAt(object, [
@@ -1052,7 +1088,10 @@ export class AdminService {
   }
 
   private extractPaidAt(row: AdminPaymentRow): Date | null {
-    const object = this.eventObject(row.rawPayload);
+    const direct = this.stringAt(row.rawPayload, ['paidAt']);
+    if (direct) return new Date(direct);
+
+    const object = this.eventObject(row.rawPayload) ?? row.rawPayload;
     const paidAt =
       this.numberAt(object, ['status_transitions', 'paid_at']) ??
       this.numberAt(object, ['paid_at']);
@@ -1082,7 +1121,7 @@ export class AdminService {
 
   private eventObject(rawPayload: Prisma.JsonValue): JsonRecord | null {
     const event = this.asRecord(rawPayload);
-    return this.asRecord(this.valueAt(event, ['data', 'object']));
+    return this.asRecord(this.valueAt(event, ['data', 'object'])) ?? event;
   }
 
   private asRecord(value: unknown): JsonRecord | null {

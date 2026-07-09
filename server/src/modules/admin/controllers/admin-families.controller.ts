@@ -254,6 +254,52 @@ export class AdminFamiliesController {
     }
   }
 
+  @Post(':familyId/subscription/sync-stripe')
+  @ResponseMessage('Đồng bộ subscription từ Stripe thành công.')
+  @ApiOperation({ summary: 'Sync a family subscription from Stripe' })
+  @ApiParam({ name: 'familyId', description: 'Family UUID' })
+  @ApiResponse({
+    status: 400,
+    description: 'Family workspace has no Stripe subscription to sync',
+  })
+  @ApiResponse({ status: 404, description: 'Family or subscription not found' })
+  async syncSubscriptionFromStripe(
+    @Param('familyId') familyId: string,
+    @CurrentUser() adminUser: SafeUser,
+    @Req() request: Request,
+  ) {
+    try {
+      const result =
+        await this.admin.syncFamilySubscriptionFromStripe(familyId);
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action: 'ADMIN_SUBSCRIPTION_STRIPE_SYNC',
+        targetType: 'SUBSCRIPTION',
+        targetId: familyId,
+        result: 'SUCCESS',
+        ...this.auditLogs.requestContext(request),
+        metadata: { source: 'stripe' },
+      });
+      return result;
+    } catch (error) {
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action: 'ADMIN_SUBSCRIPTION_STRIPE_SYNC',
+        targetType: 'SUBSCRIPTION',
+        targetId: familyId,
+        result: 'FAILED',
+        ...this.auditLogs.requestContext(request),
+        metadata: { source: 'stripe' },
+        errorMessage: this.auditLogs.errorMessage(error),
+      });
+      throw error;
+    }
+  }
+
   @Patch(':id')
   @ResponseMessage('Cập nhật gia đình thành công')
   @ApiOperation({ summary: 'Update a family' })

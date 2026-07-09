@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { BillingsModule } from '../billing/billings.module';
 import { AdminAuditLogsService } from './admin-audit-logs.service';
 import { AdminBackupRestoreService } from './admin-backup-restore.service';
 import { AdminInfrastructureService } from './admin-infrastructure.service';
@@ -24,6 +25,7 @@ import { AdminUsersController } from './controllers/admin-users.controller';
  * JwtAuthGuard + RolesGuard with @Roles(UserType.SYSTEM_ADMIN).
  */
 @Module({
+  imports: [BillingsModule],
   controllers: [
     AdminAuditLogsController,
     AdminBackupRestoreController,
