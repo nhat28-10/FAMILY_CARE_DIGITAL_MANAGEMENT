@@ -61,6 +61,17 @@ export default () => ({
       10,
     ),
   },
+  passwordReset: {
+    otpExpiresMinutes: parseInt(
+      process.env.PASSWORD_RESET_OTP_EXPIRES_MINUTES || '10',
+      10,
+    ),
+    resendCooldownSeconds: parseInt(
+      process.env.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS || '60',
+      10,
+    ),
+    maxAttempts: parseInt(process.env.PASSWORD_RESET_MAX_ATTEMPTS || '5', 10),
+  },
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,

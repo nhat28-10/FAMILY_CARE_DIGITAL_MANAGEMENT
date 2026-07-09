@@ -106,6 +106,20 @@ export class MailService {
     await this.send(to, subject, text, html);
   }
 
+  /** Gửi mã OTP đặt lại mật khẩu (6 số). */
+  async sendPasswordResetOtp(to: string, code: string): Promise<void> {
+    const subject = 'Mã đặt lại mật khẩu Family Care';
+    const text =
+      `Mã đặt lại mật khẩu của bạn là: ${code}\n` +
+      `Mã có hiệu lực trong vài phút. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.`;
+    const html =
+      `<p>Mã đặt lại mật khẩu của bạn là:</p>` +
+      `<p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p>` +
+      `<p>Mã có hiệu lực trong vài phút. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>`;
+
+    await this.send(to, subject, text, html);
+  }
+
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------

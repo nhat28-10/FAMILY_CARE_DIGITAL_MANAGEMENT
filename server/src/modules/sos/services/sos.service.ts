@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import {
   NotificationPriority,
@@ -20,6 +22,7 @@ import { SosGateway } from '../sos.gateway';
 import type { CreateSosAlertDto } from '../dto/create-sos-alert.dto';
 import type { CreateSosResponseDto } from '../dto/create-sos-response.dto';
 import type { ListSosAlertQueryDto } from '../dto/list-sos-alert-query.dto';
+import type { PushSosLocationBatchDto } from '../dto/push-sos-location-batch.dto';
 import type { PushSosLocationDto } from '../dto/push-sos-location.dto';
 import type { ResolveSosAlertDto } from '../dto/resolve-sos-alert.dto';
 
@@ -53,12 +56,17 @@ const MEMBER_RESPONSE_TYPES: SosResponseType[] = [
   SosResponseType.NEED_HELP,
 ];
 
+/** Suggested GPS reporting cadence pushed to the trigger device on SOS start. */
+const SOS_TRACK_INTERVAL_SEC = 5;
+
 @Injectable()
 export class SosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly familyMembersService: FamilyMembersService,
+    // SosGateway also depends on SosService (WS ingest) — break the cycle.
+    @Inject(forwardRef(() => SosGateway))
     private readonly sosGateway: SosGateway,
   ) {}
 
@@ -103,7 +111,31 @@ export class SosService {
     );
 
     this.sosGateway.emitNewAlert(workspaceId, alert);
+
+    // Tell the trigger's own device to start high-frequency GPS streaming.
+    this.sosGateway.emitToUser(alert.triggeredByMember.user.id, 'sos:track:start', {
+      alertId: alert.sosAlertId,
+      workspaceId,
+      intervalSec: SOS_TRACK_INTERVAL_SEC,
+    });
     return alert;
+  }
+
+  /**
+   * The workspace's currently-active alert plus its last-known point, or null.
+   * Used to hand a watcher an immediate snapshot the moment they join the room.
+   */
+  async getActiveAlertForWorkspace(workspaceId: string) {
+    const alert = await this.prisma.sosAlert.findFirst({
+      where: { workspaceId, status: SosAlertStatus.ACTIVE },
+      orderBy: { triggeredAt: 'desc' },
+      include: { triggeredByMember: memberSummary },
+    });
+    if (!alert) {
+      return null;
+    }
+    const lastLocation = await this.latestPoint(alert.sosAlertId);
+    return { alert, lastLocation };
   }
 
   async listAlerts(workspaceId: string, query: ListSosAlertQueryDto) {
@@ -139,9 +171,11 @@ export class SosService {
   async pushLocation(
     workspaceId: string,
     alertId: string,
+    memberId: string,
     dto: PushSosLocationDto,
   ) {
-    await this.assertActiveAlert(workspaceId, alertId);
+    const alert = await this.assertActiveAlert(workspaceId, alertId);
+    await this.assertCanStream(alert, memberId, [dto.deviceId]);
 
     const point = await this.prisma.sosLocationPoint.create({
       data: {
@@ -157,6 +191,58 @@ export class SosService {
 
     this.sosGateway.emitLocation(workspaceId, { sosAlertId: alertId, point });
     return point;
+  }
+
+  /**
+   * Batch ingest — a device that buffered points while offline flushes them in
+   * one request. Same authorization as {@link pushLocation}: only the member
+   * who triggered the alert (optionally via their own device) may stream.
+   * Broadcasts the most recent point so watchers' maps jump to the live
+   * position; the full trajectory is persisted and readable via the alert.
+   */
+  async pushLocationBatch(
+    workspaceId: string,
+    alertId: string,
+    memberId: string,
+    dto: PushSosLocationBatchDto,
+  ) {
+    const alert = await this.assertActiveAlert(workspaceId, alertId);
+    await this.assertCanStream(
+      alert,
+      memberId,
+      dto.points.map((p) => p.deviceId),
+    );
+
+    await this.prisma.sosLocationPoint.createMany({
+      data: dto.points.map((p) => ({
+        sosAlertId: alertId,
+        deviceId: p.deviceId ?? null,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        accuracy: p.accuracy ?? null,
+        sourceType: p.sourceType,
+        recordedAt: p.recordedAt ? new Date(p.recordedAt) : new Date(),
+      })),
+    });
+
+    const latest = await this.latestPoint(alertId);
+    if (latest) {
+      this.sosGateway.emitLocation(workspaceId, {
+        sosAlertId: alertId,
+        point: latest,
+      });
+    }
+    return { count: dto.points.length, latest };
+  }
+
+  /**
+   * Last-known position of an alert (any status). Lets a watcher joining
+   * mid-event render the current location immediately instead of waiting for
+   * the next streamed point.
+   */
+  async getCurrentLocation(workspaceId: string, alertId: string) {
+    await this.loadAlert(workspaceId, alertId);
+    return this.latestPoint(alertId);
   }
 
   async respond(
@@ -288,20 +374,70 @@ export class SosService {
       resolvedBy: updated.resolvedByMember,
       resolutionNote: updated.resolutionNote,
     });
+
+    // The alert is closed — tell the trigger's device to stop streaming GPS.
+    this.sosGateway.emitToUser(
+      updated.triggeredByMember.user.id,
+      'sos:track:stop',
+      { alertId },
+    );
     return updated;
   }
 
-  /** Loads the alert, ensures it belongs to the workspace and is still ACTIVE. */
-  private async assertActiveAlert(workspaceId: string, alertId: string) {
+  /** Loads the alert and ensures it belongs to the workspace. */
+  private async loadAlert(workspaceId: string, alertId: string) {
     const alert = await this.prisma.sosAlert.findFirst({
       where: { sosAlertId: alertId, workspaceId },
     });
     if (!alert) {
       throw new NotFoundException('Không tìm thấy cảnh báo SOS');
     }
+    return alert;
+  }
+
+  /** Loads the alert, ensures it belongs to the workspace and is still ACTIVE. */
+  private async assertActiveAlert(workspaceId: string, alertId: string) {
+    const alert = await this.loadAlert(workspaceId, alertId);
     if (alert.status !== SosAlertStatus.ACTIVE) {
       throw new BadRequestException('Cảnh báo SOS đã kết thúc');
     }
     return alert;
+  }
+
+  /**
+   * Only the member who triggered the alert may stream its location. When
+   * points carry a `deviceId`, every referenced device must be paired to that
+   * member — a member cannot spoof someone else's tracker.
+   */
+  private async assertCanStream(
+    alert: { triggeredByMemberId: string },
+    memberId: string,
+    deviceIds: Array<string | null | undefined>,
+  ) {
+    if (alert.triggeredByMemberId !== memberId) {
+      throw new ForbiddenException('Chỉ người kích hoạt SOS mới được gửi vị trí');
+    }
+
+    const uniqueDeviceIds = [
+      ...new Set(deviceIds.filter((id): id is string => Boolean(id))),
+    ];
+    if (uniqueDeviceIds.length === 0) {
+      return;
+    }
+
+    const owned = await this.prisma.wearableDevice.count({
+      where: { deviceId: { in: uniqueDeviceIds }, ownerMemberId: memberId },
+    });
+    if (owned !== uniqueDeviceIds.length) {
+      throw new ForbiddenException('Thiết bị không thuộc về bạn');
+    }
+  }
+
+  /** Most recently recorded GPS point of an alert, or null if none yet. */
+  private latestPoint(alertId: string) {
+    return this.prisma.sosLocationPoint.findFirst({
+      where: { sosAlertId: alertId },
+      orderBy: { recordedAt: 'desc' },
+    });
   }
 }

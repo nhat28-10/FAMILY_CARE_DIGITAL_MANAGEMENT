@@ -21,11 +21,14 @@ import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
 import { UsersService } from '../users/users.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtPayload } from './types/jwt-payload.type';
 
@@ -46,6 +49,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly passwordResetService: PasswordResetService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -217,6 +221,20 @@ export class AuthService {
       enforceCooldown: true,
     });
     return null;
+  }
+
+  /** Gửi OTP đặt lại mật khẩu (im lặng nếu email không tồn tại — chống dò email). */
+  forgotPassword(dto: ForgotPasswordDto): Promise<null> {
+    return this.passwordResetService.requestReset(dto.email);
+  }
+
+  /** Đặt lại mật khẩu bằng OTP; thu hồi toàn bộ refresh token sau khi đổi. */
+  resetPassword(dto: ResetPasswordDto): Promise<null> {
+    return this.passwordResetService.reset(
+      dto.email,
+      dto.code,
+      dto.newPassword,
+    );
   }
 
   // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
@@ -10,12 +10,25 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { AccountStatus } from '@prisma/client';
+import { AccountStatus, GpsSourceType } from '@prisma/client';
 import type { Server, Socket } from 'socket.io';
 
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { FamilyMembersService } from '../family-members/family-members.service';
 import { UsersService } from '../users/users.service';
+import { SosService } from './services/sos.service';
+
+/** Inbound payload for a device streaming a live GPS point over the socket. */
+interface LocationPushBody {
+  workspaceId?: string;
+  alertId?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  sourceType?: GpsSourceType;
+  recordedAt?: string;
+  deviceId?: string;
+}
 
 // CORS origins resolved at module load (mirrors config `cors.origins`).
 const WS_CORS_ORIGINS = (process.env.CORS_ORIGINS ?? '')
@@ -58,6 +71,9 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
     private readonly familyMembersService: FamilyMembersService,
+    // SosService also depends on this gateway (emit*) — break the cycle.
+    @Inject(forwardRef(() => SosService))
+    private readonly sosService: SosService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -126,7 +142,64 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     await client.join(this.room(workspaceId));
+
+    // Hand the newcomer the live situation immediately (Messenger-style): the
+    // active alert + last-known position, so their map renders without waiting
+    // for the next streamed point.
+    const snapshot =
+      await this.sosService.getActiveAlertForWorkspace(workspaceId);
+    if (snapshot) {
+      client.emit('sos:snapshot', snapshot);
+    }
+
     return { joined: true, workspaceId };
+  }
+
+  /**
+   * Live GPS ingest over the socket — lower latency than the HTTP endpoint for
+   * continuous streaming. Only the member who triggered the alert may push
+   * (enforced inside `SosService.pushLocation`), which also broadcasts the
+   * point to the workspace room.
+   */
+  @SubscribeMessage('sos:location:push')
+  async handleLocationPush(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: LocationPushBody,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const userId = (client.data as SosSocketData)?.userId;
+    if (!userId) {
+      return { ok: false, error: 'Chưa xác thực' };
+    }
+
+    const { workspaceId, alertId } = body ?? {};
+    if (!workspaceId || !alertId) {
+      return { ok: false, error: 'Thiếu workspaceId hoặc alertId' };
+    }
+    if (!this.isValidCoord(body.latitude, body.longitude)) {
+      return { ok: false, error: 'Toạ độ không hợp lệ' };
+    }
+
+    const membership = await this.familyMembersService.findByFamilyAndUser(
+      workspaceId,
+      userId,
+    );
+    if (!membership) {
+      return { ok: false, error: 'Không phải thành viên' };
+    }
+
+    try {
+      await this.sosService.pushLocation(workspaceId, alertId, membership.id, {
+        latitude: body.latitude as number,
+        longitude: body.longitude as number,
+        accuracy: body.accuracy,
+        sourceType: body.sourceType ?? GpsSourceType.MOBILE_GPS,
+        recordedAt: body.recordedAt,
+        deviceId: body.deviceId,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
   }
 
   @SubscribeMessage('sos:leave')
@@ -158,6 +231,20 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitResolved(workspaceId: string, payload: unknown): void {
     this.server.to(this.room(workspaceId)).emit('sos:resolved', payload);
+  }
+
+  /**
+   * Targeted emit to every live socket of a single user (not a room). Used to
+   * signal the trigger's own device, e.g. `sos:track:start` / `sos:track:stop`.
+   */
+  emitToUser(userId: string, event: string, payload: unknown): void {
+    const sockets = this.userSockets.get(userId);
+    if (!sockets) {
+      return;
+    }
+    for (const socketId of sockets) {
+      this.server.to(socketId).emit(event, payload);
+    }
   }
 
   /**
@@ -197,5 +284,18 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private room(workspaceId: string): string {
     return `workspace:${workspaceId}`;
+  }
+
+  private isValidCoord(lat?: number, lng?: number): boolean {
+    return (
+      typeof lat === 'number' &&
+      Number.isFinite(lat) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      typeof lng === 'number' &&
+      Number.isFinite(lng) &&
+      lng >= -180 &&
+      lng <= 180
+    );
   }
 }

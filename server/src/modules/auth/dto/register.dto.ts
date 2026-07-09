@@ -9,10 +9,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-
-const PASSWORD_RULE =
-  'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number and one special character';
+import { PASSWORD_REGEX, PASSWORD_RULE } from './password.constants';
 
 export class RegisterDto {
   @ApiProperty({ example: 'john.doe@example.com' })

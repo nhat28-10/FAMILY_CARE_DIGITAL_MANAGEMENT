@@ -45,13 +45,14 @@ Table email_verification_tokens {
 Table password_reset_tokens {
   id String [pk]
   userId String [not null]
-  tokenHash String [unique, not null]
+  codeHash String [not null]
   expiresAt DateTime [not null]
   usedAt DateTime
+  attempts Int [not null, default: 0]
   createdAt DateTime [default: `now()`, not null]
   user users [not null]
 
-  Note: 'One-time password reset tokens (ERD: PasswordResetToken). The raw token is never stored — only its sha256/bcrypt hash. `usedAt` marks single use.'
+  Note: 'Mã OTP đặt lại mật khẩu (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng/vô hiệu; `attempts` đếm số lần nhập sai để khóa tạm.'
 }
 
 Table refresh_tokens {
@@ -83,6 +84,7 @@ Table families {
   financeModels finance_models [not null]
   budgetPlans budget_plans [not null]
   financialGoals financial_goals [not null]
+  goalContributionPlans goal_contribution_plans [not null]
   budgetAlerts budget_alerts [not null]
   spendingSupportRequests spending_support_requests [not null]
   taskCategories task_categories [not null]
@@ -123,6 +125,8 @@ Table family_members {
   createdBudgetPlans budget_plans [not null]
   createdFinancialGoals financial_goals [not null]
   goalAllocations goal_allocations [not null]
+  goalContributionPlans goal_contribution_plans [not null]
+  reviewedGoalContributionPlans goal_contribution_plans [not null]
   requestedSpendingSupportRequests spending_support_requests [not null]
   reviewedSpendingSupportRequests spending_support_requests [not null]
   createdTasks tasks [not null]
@@ -269,6 +273,7 @@ Table finance_jars {
   financeModel finance_models [not null]
   budgetLines budget_lines [not null]
   financialGoals financial_goals [not null]
+  ledgerEntries ledger_entries [not null]
   budgetAlerts budget_alerts [not null]
   rewardAllocations reward_allocations [not null]
 
@@ -283,6 +288,7 @@ Table ledger_entries {
   id String [pk]
   ledgerId String [not null]
   categoryId String
+  jarId String
   createdByMemberId String [not null]
   entryType LedgerEntryType [not null]
   amount Decimal [not null]
@@ -296,6 +302,7 @@ Table ledger_entries {
   updatedAt DateTime [not null]
   ledger finance_ledgers [not null]
   category finance_categories
+  jar finance_jars
   createdByMember family_members [not null]
   goalAllocations goal_allocations [not null]
   rewardAllocations reward_allocations [not null]
@@ -429,6 +436,7 @@ Table financial_goals {
   relatedJar finance_jars
   createdByMember family_members [not null]
   allocations goal_allocations [not null]
+  contributionPlans goal_contribution_plans [not null]
   budgetAlerts budget_alerts [not null]
   rewardAllocations reward_allocations [not null]
 }
@@ -443,6 +451,34 @@ Table goal_allocations {
   goal financial_goals [not null]
   ledgerEntry ledger_entries [not null]
   allocatedByMember family_members [not null]
+}
+
+Table goal_contribution_plans {
+  id String [pk]
+  familyId String [not null]
+  goalId String [not null]
+  memberId String [not null]
+  periodMonth Int [not null]
+  periodYear Int [not null]
+  plannedAmount Decimal [not null]
+  pendingAmount Decimal
+  dueDate DateTime [not null]
+  status GoalContributionPlanStatus [not null, default: 'PLANNED']
+  submittedAt DateTime
+  submittedNote String
+  reviewedByMemberId String
+  reviewedAt DateTime
+  reviewNote String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  goal financial_goals [not null]
+  member family_members [not null]
+  reviewedByMember family_members
+
+  indexes {
+    (goalId, memberId, periodMonth, periodYear) [unique]
+  }
 }
 
 Table budget_alerts {
@@ -1153,6 +1189,15 @@ Enum FinancialGoalStatus {
   AT_RISK
 }
 
+Enum GoalContributionPlanStatus {
+  PLANNED
+  PENDING_CONFIRMATION
+  PARTIAL
+  PAID
+  MISSED
+  REJECTED
+}
+
 Enum BudgetAlertType {
   OVER_BUDGET
   GOAL_AT_RISK
@@ -1465,6 +1510,8 @@ Ref: ledger_entries.ledgerId > finance_ledgers.id [delete: Cascade]
 
 Ref: ledger_entries.categoryId > finance_categories.id [delete: Set Null]
 
+Ref: ledger_entries.jarId > finance_jars.id [delete: Set Null]
+
 Ref: ledger_entries.createdByMemberId > family_members.id [delete: Restrict]
 
 Ref: family_subscriptions.familyId - families.id [delete: Cascade]
@@ -1506,6 +1553,14 @@ Ref: goal_allocations.goalId > financial_goals.id [delete: Cascade]
 Ref: goal_allocations.ledgerEntryId > ledger_entries.id [delete: Restrict]
 
 Ref: goal_allocations.allocatedByMemberId > family_members.id [delete: Restrict]
+
+Ref: goal_contribution_plans.familyId > families.id [delete: Cascade]
+
+Ref: goal_contribution_plans.goalId > financial_goals.id [delete: Cascade]
+
+Ref: goal_contribution_plans.memberId > family_members.id [delete: Cascade]
+
+Ref: goal_contribution_plans.reviewedByMemberId > family_members.id [delete: Cascade]
 
 Ref: budget_alerts.familyId > families.id [delete: Cascade]
 

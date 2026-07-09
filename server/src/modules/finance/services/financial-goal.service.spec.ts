@@ -428,7 +428,7 @@ describe('FinanceService financial goals', () => {
         [Prisma.GoalAllocationFindManyArgs]
       >
     ).mock.calls[0][0];
-    expect(actualQuery.where.ledgerEntry).toMatchObject({
+    expect(actualQuery.where!.ledgerEntry).toMatchObject({
       entryType: LedgerEntryType.CONTRIBUTION,
       status: LedgerEntryStatus.ACTIVE,
       createdByMemberId: { in: ['member-a'] },
