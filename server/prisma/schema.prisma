@@ -458,8 +458,6 @@ model FamilyMember {
   createdBudgetPlans               BudgetPlan[]               @relation("CreatedBudgetPlans")
   createdFinancialGoals            FinancialGoal[]            @relation("CreatedFinancialGoals")
   goalAllocations                  GoalAllocation[]           @relation("GoalAllocations")
-  goalContributionPlans            GoalContributionPlan[]     @relation("GoalContributionPlans")
-  reviewedGoalContributionPlans    GoalContributionPlan[]     @relation("ReviewedGoalContributionPlans")
   requestedSpendingSupportRequests SpendingSupportRequest[]   @relation("RequestedSpendingSupportRequests")
   reviewedSpendingSupportRequests  SpendingSupportRequest[]   @relation("ReviewedSpendingSupportRequests")
   createdTasks                     Task[]                     @relation("CreatedTasks")
@@ -491,6 +489,8 @@ model FamilyMember {
   taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
   createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
   aiConversations                  AIConversation[]           @relation("MemberAIConversations")
+  goalContributionPlans            GoalContributionPlan[]     @relation("GoalContributionPlans")
+  reviewedGoalContributionPlans    GoalContributionPlan[]     @relation("ReviewedGoalContributionPlans")
 
   @@unique([familyId, userId])
   @@index([userId])
