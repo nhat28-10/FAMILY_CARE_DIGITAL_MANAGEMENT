@@ -355,13 +355,14 @@ model EmailVerificationToken {
   @@map("email_verification_tokens")
 }
 
-/// One-time password reset tokens (ERD: PasswordResetToken). The raw token is never stored — only its sha256/bcrypt hash. `usedAt` marks single use.
+/// Mã OTP đặt lại mật khẩu (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng/vô hiệu; `attempts` đếm số lần nhập sai để khóa tạm.
 model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String
-  tokenHash String    @unique
+  codeHash  String
   expiresAt DateTime
   usedAt    DateTime?
+  attempts  Int       @default(0)
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

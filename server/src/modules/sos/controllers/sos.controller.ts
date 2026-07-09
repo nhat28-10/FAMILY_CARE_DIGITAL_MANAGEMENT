@@ -27,6 +27,7 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { CreateSosAlertDto } from '../dto/create-sos-alert.dto';
 import { CreateSosResponseDto } from '../dto/create-sos-response.dto';
 import { ListSosAlertQueryDto } from '../dto/list-sos-alert-query.dto';
+import { PushSosLocationBatchDto } from '../dto/push-sos-location-batch.dto';
 import { PushSosLocationDto } from '../dto/push-sos-location.dto';
 import { ResolveSosAlertDto } from '../dto/resolve-sos-alert.dto';
 import { SosService } from '../services/sos.service';
@@ -81,13 +82,43 @@ export class SosController {
   @Post('alerts/:alertId/locations')
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Đã ghi nhận vị trí')
-  @ApiOperation({ summary: 'Gửi điểm vị trí cho cảnh báo đang active' })
+  @ApiOperation({
+    summary: 'Gửi 1 điểm vị trí cho cảnh báo đang active (chỉ người kích hoạt)',
+  })
   pushLocation(
     @Param('familyId') familyId: string,
     @Param('alertId', ParseUUIDPipe) alertId: string,
+    @CurrentFamilyMember('id') memberId: string,
     @Body() dto: PushSosLocationDto,
   ) {
-    return this.sosService.pushLocation(familyId, alertId, dto);
+    return this.sosService.pushLocation(familyId, alertId, memberId, dto);
+  }
+
+  @Post('alerts/:alertId/locations/batch')
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Đã ghi nhận các điểm vị trí')
+  @ApiOperation({
+    summary: 'Gửi nhiều điểm vị trí theo lô (buffer offline flush)',
+  })
+  pushLocationBatch(
+    @Param('familyId') familyId: string,
+    @Param('alertId', ParseUUIDPipe) alertId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Body() dto: PushSosLocationBatchDto,
+  ) {
+    return this.sosService.pushLocationBatch(familyId, alertId, memberId, dto);
+  }
+
+  @Get('alerts/:alertId/location/current')
+  @ResponseMessage('Lấy vị trí hiện tại thành công')
+  @ApiOperation({
+    summary: 'Vị trí mới nhất của cảnh báo (cho người theo dõi vừa vào)',
+  })
+  getCurrentLocation(
+    @Param('familyId') familyId: string,
+    @Param('alertId', ParseUUIDPipe) alertId: string,
+  ) {
+    return this.sosService.getCurrentLocation(familyId, alertId);
   }
 
   @Post('alerts/:alertId/responses')
