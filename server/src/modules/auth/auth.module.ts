@@ -6,6 +6,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -30,6 +31,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     RefreshTokenService,
     EmailVerificationService,
+    PasswordResetService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,

@@ -61,13 +61,14 @@ Table email_verification_tokens {
 Table password_reset_tokens {
   id String [pk]
   userId String [not null]
-  tokenHash String [unique, not null]
+  codeHash String [not null]
   expiresAt DateTime [not null]
   usedAt DateTime
+  attempts Int [not null, default: 0]
   createdAt DateTime [default: `now()`, not null]
   user users [not null]
 
-  Note: 'One-time password reset tokens (ERD: PasswordResetToken). The raw token is never stored — only its sha256/bcrypt hash. `usedAt` marks single use.'
+  Note: 'Mã OTP đặt lại mật khẩu (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng/vô hiệu; `attempts` đếm số lần nhập sai để khóa tạm.'
 }
 
 Table refresh_tokens {
@@ -140,6 +141,8 @@ Table family_members {
   createdBudgetPlans budget_plans [not null]
   createdFinancialGoals financial_goals [not null]
   goalAllocations goal_allocations [not null]
+  goalContributionPlans goal_contribution_plans [not null]
+  reviewedGoalContributionPlans goal_contribution_plans [not null]
   requestedSpendingSupportRequests spending_support_requests [not null]
   reviewedSpendingSupportRequests spending_support_requests [not null]
   createdTasks tasks [not null]

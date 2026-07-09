@@ -20,10 +20,12 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import type { SafeUser } from '../users/users.types';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -135,5 +137,39 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
   resendVerification(@CurrentUser() user: SafeUser) {
     return this.authService.resendVerification(user);
+  }
+
+  @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi')
+  @ApiOperation({
+    summary:
+      'Request a password-reset OTP (always returns 200 to prevent email enumeration)',
+  })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: 200, description: 'OTP sent if the email exists' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đặt lại mật khẩu thành công')
+  @ApiOperation({
+    summary: 'Reset the password with the 6-digit OTP; revokes all sessions',
+  })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset, all refresh tokens revoked',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid, expired or over-attempted OTP',
+  })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

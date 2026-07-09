@@ -4,6 +4,8 @@ import { BadRequestException, ValidationError } from '@nestjs/common';
 const FIELD_LABELS: Record<string, string> = {
   email: 'Email',
   password: 'Mật khẩu',
+  newPassword: 'Mật khẩu mới',
+  code: 'Mã xác thực',
   phone: 'Số điện thoại',
   fullName: 'Họ tên',
   name: 'Tên',
@@ -95,9 +97,17 @@ const DOCKER_LOG_QUERY_FIELDS = new Set([
 function messageFor(property: string, key: string): string {
   const label = FIELD_LABELS[property] ?? property;
 
-  // Password complexity (covers @MinLength + @Matches on the password field).
-  if (property === 'password' && (key === 'matches' || key === 'minLength')) {
+  // Password complexity (covers @MinLength + @Matches on password fields).
+  if (
+    (property === 'password' || property === 'newPassword') &&
+    (key === 'matches' || key === 'minLength')
+  ) {
     return PASSWORD_RULE;
+  }
+
+  // OTP 6 số (verify-email / reset-password).
+  if (property === 'code' && key === 'matches') {
+    return 'Mã xác thực phải gồm 6 chữ số';
   }
 
   switch (key) {
