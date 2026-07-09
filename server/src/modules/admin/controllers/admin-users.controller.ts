@@ -8,20 +8,28 @@ import {
   Param,
   Patch,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { UserType } from '@prisma/client';
+import { AccountStatus, UserType } from '@prisma/client';
 import {
+  ApiBody,
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 
 import { ResponseMessage } from '../../../common/decorators/response-message.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import type { SafeUser } from '../../users/users.types';
+import { AdminAuditLogsService } from '../admin-audit-logs.service';
 import { AdminService } from '../admin.service';
 import { ListUsersQueryDto } from '../dto/list-users-query.dto';
 import { AdminUpdateUserDto } from '../dto/update-user.dto';
@@ -32,11 +40,19 @@ import { AdminUpdateUserDto } from '../dto/update-user.dto';
 @Roles(UserType.SYSTEM_ADMIN)
 @Controller('admin/users')
 export class AdminUsersController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly auditLogs: AdminAuditLogsService,
+  ) {}
 
   @Get()
   @ResponseMessage('Lấy danh sách người dùng thành công')
   @ApiOperation({ summary: 'List users (paginated, SYSTEM_ADMIN only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'userType', required: false, enum: UserType })
+  @ApiQuery({ name: 'accountStatus', required: false, enum: AccountStatus })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListUsersQueryDto) {
     return this.admin.listUsers(query);
@@ -45,6 +61,7 @@ export class AdminUsersController {
   @Get(':id')
   @ResponseMessage('Lấy thông tin người dùng thành công')
   @ApiOperation({ summary: 'Get a user by id' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiResponse({ status: 404, description: 'User not found' })
   get(@Param('id') id: string) {
     return this.admin.getUser(id);
@@ -53,17 +70,75 @@ export class AdminUsersController {
   @Patch(':id')
   @ResponseMessage('Cập nhật người dùng thành công')
   @ApiOperation({ summary: 'Update a user (status/type/profile)' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
+  @ApiBody({ type: AdminUpdateUserDto })
   @ApiResponse({ status: 404, description: 'User not found' })
-  update(@Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
-    return this.admin.updateUser(id, dto);
+  async update(
+    @Param('id') id: string,
+    @CurrentUser() adminUser: SafeUser,
+    @Req() request: Request,
+    @Body() dto: AdminUpdateUserDto,
+  ) {
+    const action = this.auditActionForAccountStatus(dto.accountStatus);
+    try {
+      const result = await this.admin.updateUser(id, dto);
+      if (action) {
+        await this.auditLogs.record({
+          adminUserId: adminUser.id,
+          adminEmail: adminUser.email,
+          adminName: adminUser.fullName,
+          action,
+          targetType: 'USER',
+          targetId: id,
+          result: 'SUCCESS',
+          ...this.auditLogs.requestContext(request),
+          metadata: {
+            accountStatus: dto.accountStatus,
+            changedFields: Object.keys(dto),
+          },
+        });
+      }
+      return result;
+    } catch (error) {
+      if (action) {
+        await this.auditLogs.record({
+          adminUserId: adminUser.id,
+          adminEmail: adminUser.email,
+          adminName: adminUser.fullName,
+          action,
+          targetType: 'USER',
+          targetId: id,
+          result: 'FAILED',
+          ...this.auditLogs.requestContext(request),
+          metadata: {
+            accountStatus: dto.accountStatus,
+            changedFields: Object.keys(dto),
+          },
+          errorMessage: this.auditLogs.errorMessage(error),
+        });
+      }
+      throw error;
+    }
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Xóa người dùng thành công')
   @ApiOperation({ summary: 'Delete a user' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id') id: string) {
     return this.admin.deleteUser(id);
+  }
+
+  private auditActionForAccountStatus(accountStatus?: AccountStatus) {
+    if (accountStatus === AccountStatus.ACTIVE) return 'ADMIN_USER_UNLOCK';
+    if (
+      accountStatus === AccountStatus.SUSPENDED ||
+      accountStatus === AccountStatus.INACTIVE
+    ) {
+      return 'ADMIN_USER_LOCK';
+    }
+    return null;
   }
 }
