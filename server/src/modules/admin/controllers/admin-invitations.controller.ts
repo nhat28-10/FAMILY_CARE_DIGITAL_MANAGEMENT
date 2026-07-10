@@ -10,10 +10,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UserType } from '@prisma/client';
+import { InvitationStatus, UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
+  ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -37,6 +40,10 @@ export class AdminInvitationsController {
   @Get()
   @ResponseMessage('Lấy danh sách lời mời thành công')
   @ApiOperation({ summary: 'List invitations (paginated, SYSTEM_ADMIN only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'status', required: false, enum: InvitationStatus })
+  @ApiQuery({ name: 'familyId', required: false, type: String })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListInvitationsQueryDto) {
     return this.admin.listInvitations(query);
@@ -45,6 +52,7 @@ export class AdminInvitationsController {
   @Get(':id')
   @ResponseMessage('Lấy thông tin lời mời thành công')
   @ApiOperation({ summary: 'Get an invitation by id' })
+  @ApiParam({ name: 'id', description: 'Invitation UUID' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   get(@Param('id') id: string) {
     return this.admin.getInvitation(id);
@@ -53,6 +61,8 @@ export class AdminInvitationsController {
   @Patch(':id')
   @ResponseMessage('Cập nhật lời mời thành công')
   @ApiOperation({ summary: 'Update an invitation status' })
+  @ApiParam({ name: 'id', description: 'Invitation UUID' })
+  @ApiBody({ type: AdminUpdateInvitationDto })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateInvitationDto) {
     return this.admin.updateInvitation(id, dto);
@@ -62,6 +72,7 @@ export class AdminInvitationsController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Xóa lời mời thành công')
   @ApiOperation({ summary: 'Delete an invitation' })
+  @ApiParam({ name: 'id', description: 'Invitation UUID' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   remove(@Param('id') id: string) {
     return this.admin.deleteInvitation(id);

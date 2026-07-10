@@ -10,10 +10,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UserType } from '@prisma/client';
+import { FamilyRole, MemberStatus, UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
+  ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -39,6 +42,12 @@ export class AdminFamilyMembersController {
   @ApiOperation({
     summary: 'List family members (paginated, SYSTEM_ADMIN only)',
   })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'familyId', required: false, type: String })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'familyRole', required: false, enum: FamilyRole })
+  @ApiQuery({ name: 'status', required: false, enum: MemberStatus })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: ListMembersQueryDto) {
     return this.admin.listMembers(query);
@@ -47,6 +56,7 @@ export class AdminFamilyMembersController {
   @Get(':id')
   @ResponseMessage('Lấy thông tin thành viên gia đình thành công')
   @ApiOperation({ summary: 'Get a family member by id' })
+  @ApiParam({ name: 'id', description: 'Family member UUID' })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   get(@Param('id') id: string) {
     return this.admin.getMember(id);
@@ -57,6 +67,8 @@ export class AdminFamilyMembersController {
   @ApiOperation({
     summary: 'Update a family member (role/relationship/status)',
   })
+  @ApiParam({ name: 'id', description: 'Family member UUID' })
+  @ApiBody({ type: AdminUpdateMemberDto })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   update(@Param('id') id: string, @Body() dto: AdminUpdateMemberDto) {
     return this.admin.updateMember(id, dto);
@@ -66,6 +78,7 @@ export class AdminFamilyMembersController {
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Xóa thành viên gia đình thành công')
   @ApiOperation({ summary: 'Remove a family member' })
+  @ApiParam({ name: 'id', description: 'Family member UUID' })
   @ApiResponse({ status: 404, description: 'Family member not found' })
   remove(@Param('id') id: string) {
     return this.admin.deleteMember(id);

@@ -29,6 +29,22 @@ Table users {
   purchasedSubscriptions family_subscriptions [not null]
 }
 
+Table admin_audit_logs {
+  id String [pk]
+  adminUserId String [not null]
+  adminEmail String
+  adminName String
+  action String [not null]
+  targetType String [not null]
+  targetId String
+  result String [not null]
+  ipAddress String
+  userAgent String
+  metadata Json
+  errorMessage String
+  createdAt DateTime [default: `now()`, not null]
+}
+
 Table email_verification_tokens {
   id String [pk]
   userId String [not null]

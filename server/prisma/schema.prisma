@@ -339,6 +339,30 @@ model User {
   @@map("users")
 }
 
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  adminUserId  String
+  adminEmail   String?
+  adminName    String?
+  action       String
+  targetType   String
+  targetId     String?
+  result       String
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([targetType])
+  @@index([targetId])
+  @@index([result])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
 /// Mã OTP xác thực email (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng; `attempts` đếm số lần nhập sai để khóa tạm.
 model EmailVerificationToken {
   id        String    @id @default(uuid())

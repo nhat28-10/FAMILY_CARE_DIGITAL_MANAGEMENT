@@ -26,6 +26,18 @@ const FIELD_LABELS: Record<string, string> = {
   familyRole: 'Vai trò gia đình',
   relationship: 'Quan hệ',
   activationStatus: 'Trạng thái kích hoạt',
+  target: 'Mục backup/restore',
+  backupId: 'Mã backup',
+  restoreId: 'Mã yêu cầu restore',
+  confirmationText: 'Nội dung xác nhận restore',
+  auditLogId: 'Mã audit log',
+  adminUserId: 'Mã admin',
+  action: 'Hành động audit',
+  targetType: 'Loại đối tượng audit',
+  targetId: 'Mã đối tượng audit',
+  result: 'Kết quả audit',
+  from: 'Thời gian bắt đầu',
+  to: 'Thời gian kết thúc',
 
   title: 'Tên công việc',
   taskCategoryId: 'Danh mục công việc',
@@ -45,7 +57,7 @@ const FIELD_LABELS: Record<string, string> = {
   proofType: 'Loại minh chứng',
   fileUrl: 'Đường dẫn file minh chứng',
   thumbnailUrl: 'Đường dẫn ảnh đại diện minh chứng',
-  note: 'Ghi chú minh chứng',
+  note: 'Ghi chú',
   submissionNote: 'Ghi chú nộp minh chứng',
   decision: 'Quyết định duyệt',
   reviewNote: 'Ghi chú đánh giá',
@@ -71,6 +83,15 @@ const FIELD_LABELS: Record<string, string> = {
 
 const PASSWORD_RULE =
   'Mật khẩu phải tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt';
+
+const DOCKER_LOG_QUERY_FIELDS = new Set([
+  'tail',
+  'timestamps',
+  'stdout',
+  'stderr',
+  'since',
+  'until',
+]);
 
 /** Builds a Vietnamese message for a single failed constraint. */
 function messageFor(property: string, key: string): string {
@@ -155,7 +176,11 @@ export function viValidationExceptionFactory(
     : undefined;
 
   const message =
-    first && key ? messageFor(first.property, key) : 'Dữ liệu không hợp lệ';
+    first && DOCKER_LOG_QUERY_FIELDS.has(first.property)
+      ? 'Tham số lấy log container không hợp lệ.'
+      : first && key
+        ? messageFor(first.property, key)
+        : 'Dữ liệu không hợp lệ';
 
   return new BadRequestException(message);
 }
