@@ -78,7 +78,8 @@ minio-data/
 
 # Local uploaded files
 uploads/
-storage/
+# Chỉ ignore thư mục backup ở gốc server/ — KHÔNG ignore src/modules/storage.
+/storage/
 public/uploads/
 
 # Generated API docs

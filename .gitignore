@@ -37,7 +37,8 @@ pgdata/
 
 # Uploads/local storage
 uploads/
-storage/
+# Chỉ ignore thư mục backup server/storage — KHÔNG ignore src/modules/storage.
+server/storage/
 public/uploads/
 
 # Keys/certificates

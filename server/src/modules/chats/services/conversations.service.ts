@@ -7,7 +7,6 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import {
-  ConversationStatus,
   ConversationType,
   FamilyRole,
   MemberStatus,
