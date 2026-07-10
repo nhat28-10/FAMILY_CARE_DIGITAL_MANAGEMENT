@@ -141,8 +141,6 @@ Table family_members {
   createdBudgetPlans budget_plans [not null]
   createdFinancialGoals financial_goals [not null]
   goalAllocations goal_allocations [not null]
-  goalContributionPlans goal_contribution_plans [not null]
-  reviewedGoalContributionPlans goal_contribution_plans [not null]
   requestedSpendingSupportRequests spending_support_requests [not null]
   reviewedSpendingSupportRequests spending_support_requests [not null]
   createdTasks tasks [not null]
@@ -167,6 +165,8 @@ Table family_members {
   createdConversations conversations [not null]
   conversationParticipations conversation_participants [not null]
   sentMessages messages [not null]
+  pinnedMessages messages [not null]
+  messageReactions message_reactions [not null]
   createdAnnouncements family_announcements [not null]
   createdCalendarEvents calendar_events [not null]
   calendarEventParticipations calendar_event_participants [not null]
@@ -898,6 +898,9 @@ Table conversations {
   conversationName String
   createdByMemberId String [not null]
   status ConversationStatus [not null, default: 'ACTIVE']
+  isDefault Boolean [not null, default: false, note: 'Nhóm chat chung mặc định của family (duy nhất 1/workspace — partial unique index trong migration).']
+  directKey String [unique, note: 'Dedupe chat 1-1: "<memberIdNhỏ>:<memberIdLớn>" (sort 2 memberId). GROUP = null.']
+  lastMessageAt DateTime [note: 'Thời điểm tin nhắn cuối — sort danh sách hội thoại.']
   createdAt DateTime [default: `now()`, not null]
   workspace families [not null]
   createdByMember family_members [not null]
@@ -914,6 +917,7 @@ Table conversation_participants {
   joinedAt DateTime [default: `now()`, not null]
   leftAt DateTime
   participantStatus ParticipantStatus [not null, default: 'ACTIVE']
+  lastReadAt DateTime [note: 'Read receipt: đã đọc tới thời điểm này (đếm unread = message sentAt > lastReadAt).']
   conversation conversations [not null]
   member family_members [not null]
 
@@ -930,14 +934,37 @@ Table messages {
   senderMemberId String [not null]
   messageType MessageType [not null, default: 'TEXT']
   content String
+  replyToMessageId String [note: 'Reply/quote: tin nhắn được trả lời (cùng hội thoại).']
+  pinnedAt DateTime [note: 'Ghim tin nhắn trong hội thoại.']
+  pinnedByMemberId String
   sentAt DateTime [default: `now()`, not null]
   editedAt DateTime
   deletedAt DateTime
   conversation conversations [not null]
   senderMember family_members [not null]
+  replyTo messages
+  replies messages [not null]
+  pinnedByMember family_members
   attachments message_attachments [not null]
+  reactions message_reactions [not null]
 
   Note: 'Tin nhắn trong một hội thoại.'
+}
+
+Table message_reactions {
+  reactionId String [pk]
+  messageId String [not null]
+  memberId String [not null]
+  emoji String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  message messages [not null]
+  member family_members [not null]
+
+  indexes {
+    (messageId, memberId, emoji) [unique]
+  }
+
+  Note: 'Reaction (thả cảm xúc) trên một tin nhắn.'
 }
 
 Table message_attachments {
@@ -1705,6 +1732,14 @@ Ref: conversation_participants.memberId > family_members.id [delete: Cascade]
 Ref: messages.conversationId > conversations.conversationId [delete: Cascade]
 
 Ref: messages.senderMemberId > family_members.id [delete: Cascade]
+
+Ref: messages.replyToMessageId - messages.messageId [delete: Set Null]
+
+Ref: messages.pinnedByMemberId > family_members.id [delete: Cascade]
+
+Ref: message_reactions.messageId > messages.messageId [delete: Cascade]
+
+Ref: message_reactions.memberId > family_members.id [delete: Cascade]
 
 Ref: message_attachments.messageId > messages.messageId [delete: Cascade]
 

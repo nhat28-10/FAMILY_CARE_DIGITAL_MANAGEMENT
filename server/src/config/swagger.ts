@@ -14,7 +14,6 @@ import { FamilyMembersModule } from '../modules/family-members/family-members.mo
 import { FinanceModule } from '../modules/finance/finance.module';
 import { InvitationsModule } from '../modules/invitations/invitations.module';
 import { LocationsModule } from '../modules/locations/locations.module';
-import { MessagesModule } from '../modules/messages/messages.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { RewardsModule } from '../modules/rewards/rewards.module';
 import { RolesPermissionsModule } from '../modules/roles-permissions/roles-permissions.module';
@@ -69,12 +68,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
   {
     key: 'communication',
     name: 'Communication',
-    modules: [
-      ChatsModule,
-      MessagesModule,
-      NotificationsModule,
-      AiChatbotModule,
-    ],
+    modules: [ChatsModule, NotificationsModule, AiChatbotModule],
   },
   {
     key: 'care',

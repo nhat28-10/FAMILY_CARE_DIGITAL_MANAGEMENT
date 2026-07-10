@@ -84,8 +84,9 @@ describe('PasswordResetService', () => {
         data: { usedAt: expect.any(Date) as Date },
       });
 
-      const createArgs = prisma.passwordResetToken.create.mock
-        .calls[0][0] as { data: { userId: string; codeHash: string } };
+      const createArgs = prisma.passwordResetToken.create.mock.calls[0][0] as {
+        data: { userId: string; codeHash: string };
+      };
       expect(createArgs.data.userId).toBe(userId);
 
       const sentCode = mail.sendPasswordResetOtp.mock.calls[0][1] as string;

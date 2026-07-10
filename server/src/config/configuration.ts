@@ -89,4 +89,13 @@ export default () => ({
     ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
+  storage: {
+    // Cloudflare R2 (S3-compatible) — lưu ảnh/file chat + album. DB chỉ lưu URL.
+    r2Endpoint: process.env.R2_ENDPOINT || '',
+    r2AccessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    r2Bucket: process.env.R2_BUCKET || '',
+    // Public dev URL (https://pub-xxx.r2.dev) hoặc custom domain của bucket.
+    r2PublicUrl: process.env.R2_PUBLIC_URL || '',
+  },
 });

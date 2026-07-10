@@ -506,6 +506,8 @@ model FamilyMember {
   createdConversations             Conversation[]             @relation("CreatedConversations")
   conversationParticipations       ConversationParticipant[]  @relation("ConversationParticipations")
   sentMessages                     Message[]                  @relation("SentMessages")
+  pinnedMessages                   Message[]                  @relation("PinnedMessages")
+  messageReactions                 MessageReaction[]          @relation("MessageReactions")
   createdAnnouncements             FamilyAnnouncement[]       @relation("CreatedAnnouncements")
   createdCalendarEvents            CalendarEvent[]            @relation("CreatedCalendarEvents")
   calendarEventParticipations      CalendarEventParticipant[] @relation("CalendarEventParticipations")
@@ -1627,6 +1629,12 @@ model Conversation {
   conversationName  String?            @map("conversation_name")
   createdByMemberId String             @map("created_by_member_id")
   status            ConversationStatus @default(ACTIVE) @map("status")
+  /// Nhóm chat chung mặc định của family (duy nhất 1/workspace — partial unique index trong migration).
+  isDefault         Boolean            @default(false) @map("is_default")
+  /// Dedupe chat 1-1: "<memberIdNhỏ>:<memberIdLớn>" (sort 2 memberId). GROUP = null.
+  directKey         String?            @unique @map("direct_key")
+  /// Thời điểm tin nhắn cuối — sort danh sách hội thoại.
+  lastMessageAt     DateTime?          @map("last_message_at") @db.Timestamptz
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   workspace       Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -1648,6 +1656,8 @@ model ConversationParticipant {
   joinedAt          DateTime          @default(now()) @map("joined_at") @db.Timestamptz
   leftAt            DateTime?         @map("left_at") @db.Timestamptz
   participantStatus ParticipantStatus @default(ACTIVE) @map("participant_status")
+  /// Read receipt: đã đọc tới thời điểm này (đếm unread = message sentAt > lastReadAt).
+  lastReadAt        DateTime?         @map("last_read_at") @db.Timestamptz
 
   conversation Conversation @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
   member       FamilyMember @relation("ConversationParticipations", fields: [memberId], references: [id], onDelete: Cascade)
@@ -1660,23 +1670,50 @@ model ConversationParticipant {
 
 /// Tin nhắn trong một hội thoại.
 model Message {
-  messageId      String      @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
-  conversationId String      @map("conversation_id") @db.Uuid
-  senderMemberId String      @map("sender_member_id")
-  messageType    MessageType @default(TEXT) @map("message_type")
-  content        String?     @map("content")
-  sentAt         DateTime    @default(now()) @map("sent_at") @db.Timestamptz
-  editedAt       DateTime?   @map("edited_at") @db.Timestamptz
-  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz
+  messageId        String      @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
+  conversationId   String      @map("conversation_id") @db.Uuid
+  senderMemberId   String      @map("sender_member_id")
+  messageType      MessageType @default(TEXT) @map("message_type")
+  content          String?     @map("content")
+  /// Reply/quote: tin nhắn được trả lời (cùng hội thoại).
+  replyToMessageId String?     @map("reply_to_message_id") @db.Uuid
+  /// Ghim tin nhắn trong hội thoại.
+  pinnedAt         DateTime?   @map("pinned_at") @db.Timestamptz
+  pinnedByMemberId String?     @map("pinned_by_member_id")
+  sentAt           DateTime    @default(now()) @map("sent_at") @db.Timestamptz
+  editedAt         DateTime?   @map("edited_at") @db.Timestamptz
+  deletedAt        DateTime?   @map("deleted_at") @db.Timestamptz
 
-  conversation Conversation @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
-  senderMember FamilyMember @relation("SentMessages", fields: [senderMemberId], references: [id], onDelete: Cascade)
+  conversation   Conversation  @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
+  senderMember   FamilyMember  @relation("SentMessages", fields: [senderMemberId], references: [id], onDelete: Cascade)
+  replyTo        Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [messageId], onDelete: SetNull)
+  replies        Message[]     @relation("MessageReplies")
+  pinnedByMember FamilyMember? @relation("PinnedMessages", fields: [pinnedByMemberId], references: [id], onDelete: SetNull)
 
   attachments MessageAttachment[]
+  reactions   MessageReaction[]
 
   @@index([conversationId, sentAt])
   @@index([senderMemberId])
+  @@index([conversationId, pinnedAt])
   @@map("messages")
+}
+
+/// Reaction (thả cảm xúc) trên một tin nhắn.
+model MessageReaction {
+  reactionId String   @id @default(dbgenerated("gen_random_uuid()")) @map("reaction_id") @db.Uuid
+  messageId  String   @map("message_id") @db.Uuid
+  memberId   String   @map("member_id")
+  emoji      String   @map("emoji")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  message Message      @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  member  FamilyMember @relation("MessageReactions", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, memberId, emoji])
+  @@index([messageId])
+  @@index([memberId])
+  @@map("message_reactions")
 }
 
 /// Tệp đính kèm của một tin nhắn.
