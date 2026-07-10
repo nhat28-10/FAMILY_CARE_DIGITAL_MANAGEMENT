@@ -113,11 +113,15 @@ export class SosService {
     this.sosGateway.emitNewAlert(workspaceId, alert);
 
     // Tell the trigger's own device to start high-frequency GPS streaming.
-    this.sosGateway.emitToUser(alert.triggeredByMember.user.id, 'sos:track:start', {
-      alertId: alert.sosAlertId,
-      workspaceId,
-      intervalSec: SOS_TRACK_INTERVAL_SEC,
-    });
+    this.sosGateway.emitToUser(
+      alert.triggeredByMember.user.id,
+      'sos:track:start',
+      {
+        alertId: alert.sosAlertId,
+        workspaceId,
+        intervalSec: SOS_TRACK_INTERVAL_SEC,
+      },
+    );
     return alert;
   }
 
@@ -415,7 +419,9 @@ export class SosService {
     deviceIds: Array<string | null | undefined>,
   ) {
     if (alert.triggeredByMemberId !== memberId) {
-      throw new ForbiddenException('Chỉ người kích hoạt SOS mới được gửi vị trí');
+      throw new ForbiddenException(
+        'Chỉ người kích hoạt SOS mới được gửi vị trí',
+      );
     }
 
     const uniqueDeviceIds = [
