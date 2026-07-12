@@ -97,5 +97,71 @@ export default () => ({
     r2Bucket: process.env.R2_BUCKET || '',
     // Public dev URL (https://pub-xxx.r2.dev) hoặc custom domain của bucket.
     r2PublicUrl: process.env.R2_PUBLIC_URL || '',
+    signedUrlTtlSeconds: parseInt(
+      process.env.R2_SIGNED_URL_TTL_SECONDS || '600',
+      10,
+    ),
+  },
+  cloudflare: {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID || '',
+    apiToken: process.env.CLOUDFLARE_API_TOKEN || '',
+    aiModel:
+      process.env.CLOUDFLARE_AI_MODEL ||
+      '@cf/meta/llama-3.2-11b-vision-instruct',
+    aiTimeoutMs: parseInt(process.env.CLOUDFLARE_AI_TIMEOUT_MS || '30000', 10),
+    queueId: process.env.CLOUDFLARE_QUEUE_ID || '',
+    queueApiToken: process.env.CLOUDFLARE_QUEUE_API_TOKEN || '',
+  },
+  albumModeration: {
+    consumerEnabled: process.env.ALBUM_MODERATION_CONSUMER_ENABLED === 'true',
+    recoveryEnabled: process.env.ALBUM_MODERATION_RECOVERY_ENABLED !== 'false',
+    recoveryBatchSize: parseInt(
+      process.env.ALBUM_MODERATION_RECOVERY_BATCH_SIZE || '20',
+      10,
+    ),
+    pollIntervalMs: parseInt(
+      process.env.ALBUM_MODERATION_POLL_INTERVAL_MS || '5000',
+      10,
+    ),
+    batchSize: parseInt(process.env.ALBUM_MODERATION_BATCH_SIZE || '2', 10),
+    visibilityTimeoutMs: parseInt(
+      process.env.ALBUM_MODERATION_VISIBILITY_TIMEOUT_MS || '180000',
+      10,
+    ),
+    maxAttempts: parseInt(process.env.ALBUM_MODERATION_MAX_ATTEMPTS || '3', 10),
+    retryDelaySeconds: parseInt(
+      process.env.ALBUM_MODERATION_RETRY_DELAY_SECONDS || '60',
+      10,
+    ),
+    staleProcessingMinutes: parseInt(
+      process.env.ALBUM_MODERATION_STALE_PROCESSING_MINUTES || '10',
+      10,
+    ),
+    reviewThreshold: parseFloat(
+      process.env.ALBUM_MODERATION_REVIEW_THRESHOLD || '0.45',
+    ),
+    flagThreshold: parseFloat(
+      process.env.ALBUM_MODERATION_FLAG_THRESHOLD || '0.80',
+    ),
+    ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+    ffprobePath: process.env.FFPROBE_PATH || 'ffprobe',
+    videoFrameIntervalSeconds: parseInt(
+      process.env.ALBUM_VIDEO_FRAME_INTERVAL_SECONDS || '5',
+      10,
+    ),
+    videoMaxFrames: parseInt(process.env.ALBUM_VIDEO_MAX_FRAMES || '12', 10),
+    videoFrameConcurrency: parseInt(
+      process.env.ALBUM_VIDEO_FRAME_CONCURRENCY || '1',
+      10,
+    ),
+  },
+  albumCleanup: {
+    enabled: process.env.ALBUM_CLEANUP_ENABLED !== 'false',
+    batchSize: parseInt(process.env.ALBUM_CLEANUP_BATCH_SIZE || '10', 10),
+    maxAttempts: parseInt(process.env.ALBUM_CLEANUP_MAX_ATTEMPTS || '5', 10),
+    retryDelaySeconds: parseInt(
+      process.env.ALBUM_CLEANUP_RETRY_DELAY_SECONDS || '60',
+      10,
+    ),
   },
 });

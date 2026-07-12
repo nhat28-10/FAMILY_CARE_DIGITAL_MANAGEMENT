@@ -117,6 +117,7 @@ Table families {
   familyAnnouncements family_announcements [not null]
   calendarEvents calendar_events [not null]
   albumMedia album_media [not null]
+  storageCleanupJobs storage_cleanup_jobs [not null]
   aiConversations ai_conversations [not null]
 }
 
@@ -171,6 +172,8 @@ Table family_members {
   createdCalendarEvents calendar_events [not null]
   calendarEventParticipations calendar_event_participants [not null]
   uploadedAlbumMedia album_media [not null]
+  deletedAlbumMedia album_media [not null]
+  reviewedModerationChecks media_moderation_checks [not null]
   taggedAlbumMediaTags album_media_tags [not null]
   createdAlbumMediaTags album_media_tags [not null]
   aiConversations ai_conversations [not null]
@@ -1035,16 +1038,32 @@ Table album_media {
   workspaceId String [not null]
   uploadedByMemberId String [not null]
   mediaType AlbumMediaType [not null]
-  mediaUrl String [not null]
+  mediaUrl String
+  storageKey String
+  originalFileName String
+  mimeType String
+  fileSize Int
   thumbnailUrl String
   caption String
   visibilityScope AlbumVisibilityScope [not null, default: 'FAMILY']
   moderationStatus MediaModerationStatus [not null, default: 'PENDING']
   uploadedAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  deletedByMemberId String
+  deleteReason String
+  moderationStartedAt DateTime
+  moderationCompletedAt DateTime
+  moderationAttemptCount Int [not null, default: 0]
+  lastModerationError String
+  latestModerationJobId String
+  moderationQueuedAt DateTime
   workspace families [not null]
   uploadedByMember family_members [not null]
+  deletedByMember family_members
   tags album_media_tags [not null]
   moderationChecks media_moderation_checks [not null]
+  cleanupJobs storage_cleanup_jobs [not null]
 
   Note: 'Ảnh/video trong album gia đình.'
 }
@@ -1060,17 +1079,52 @@ Table album_media_tags {
   taggedMember family_members [not null]
   taggedByMember family_members [not null]
 
+  indexes {
+    (mediaId, taggedMemberId) [unique]
+  }
+
   Note: 'Tag gắn thành viên vào một media (manual tagging cho MVP).'
+}
+
+Table storage_cleanup_jobs {
+  cleanupJobId String [pk]
+  workspaceId String
+  mediaId String
+  storageKey String [unique, not null]
+  reason StorageCleanupReason [not null]
+  status StorageCleanupStatus [not null, default: 'PENDING']
+  attemptCount Int [not null, default: 0]
+  lastError String
+  nextRetryAt DateTime [default: `now()`]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families
+  media album_media
+
+  Note: 'Durable retry record for R2/database cleanup; never stores signed URLs or credentials.'
 }
 
 Table media_moderation_checks {
   moderationId String [pk]
   mediaId String [not null]
+  jobId String [unique]
   checkType MediaCheckType [not null]
+  provider String
+  modelName String
   resultStatus MediaCheckResult [not null]
   confidenceScore Decimal
+  categories Json
+  reasonCode String
+  summary String
+  errorCode String
+  errorMessage String
+  reviewedByMemberId String
+  reviewNote String
+  reviewedAt DateTime
   checkedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
   media album_media [not null]
+  reviewedByMember family_members
 
   Note: 'Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).'
 }
@@ -1422,6 +1476,7 @@ Enum SensorEventType {
 Enum NotificationType {
   SOS
   GENERAL
+  ALBUM_TAG
 }
 
 Enum NotificationPriority {
@@ -1493,11 +1548,14 @@ Enum AlbumMediaType {
 Enum AlbumVisibilityScope {
   FAMILY
   PRIVATE
+  MANAGER_ONLY
 }
 
 Enum MediaModerationStatus {
   PENDING
+  PROCESSING
   SAFE
+  NEED_REVIEW
   FLAGGED
 }
 
@@ -1510,6 +1568,19 @@ Enum MediaCheckResult {
   SAFE
   FLAGGED
   NEED_REVIEW
+}
+
+Enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
 }
 
 Enum AiSenderType {
@@ -1759,13 +1830,21 @@ Ref: album_media.workspaceId > families.id [delete: Cascade]
 
 Ref: album_media.uploadedByMemberId > family_members.id [delete: Cascade]
 
+Ref: album_media.deletedByMemberId > family_members.id [delete: Cascade]
+
 Ref: album_media_tags.mediaId > album_media.mediaId [delete: Cascade]
 
 Ref: album_media_tags.taggedMemberId > family_members.id [delete: Cascade]
 
 Ref: album_media_tags.taggedByMemberId > family_members.id [delete: Cascade]
 
+Ref: storage_cleanup_jobs.workspaceId > families.id [delete: Set Null]
+
+Ref: storage_cleanup_jobs.mediaId > album_media.mediaId [delete: Set Null]
+
 Ref: media_moderation_checks.mediaId > album_media.mediaId [delete: Cascade]
+
+Ref: media_moderation_checks.reviewedByMemberId > family_members.id [delete: Set Null]
 
 Ref: ai_conversations.workspaceId > families.id [delete: Cascade]
 
