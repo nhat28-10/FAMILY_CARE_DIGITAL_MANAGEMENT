@@ -8,9 +8,12 @@ import { withResponseMessage } from '../types/dynamic-response';
 import { TransformInterceptor } from './transform.interceptor';
 
 describe('TransformInterceptor', () => {
+  const routeHandler = () => undefined;
+  class TestController {}
+
   const context = {
-    getHandler: jest.fn(),
-    getClass: jest.fn(),
+    getHandler: jest.fn(() => routeHandler),
+    getClass: jest.fn(() => TestController),
   } as unknown as ExecutionContext;
 
   const handleWith = (data: unknown) => ({
@@ -19,7 +22,9 @@ describe('TransformInterceptor', () => {
 
   it('serializes Decimal values before wrapping a normal response', async () => {
     const reflector = new Reflector();
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue('OK');
+    const getAllAndOverrideSpy = jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue('OK');
     const interceptor = new TransformInterceptor(reflector);
 
     const result = await lastValueFrom(
@@ -31,10 +36,10 @@ describe('TransformInterceptor', () => {
       ),
     );
 
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
-      RESPONSE_MESSAGE_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    expect(getAllAndOverrideSpy).toHaveBeenCalledWith(RESPONSE_MESSAGE_KEY, [
+      routeHandler,
+      TestController,
+    ]);
     expect(result).toEqual({
       success: true,
       message: 'OK',

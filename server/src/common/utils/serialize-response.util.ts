@@ -7,7 +7,7 @@ const isPlainObject = (value: unknown): value is SerializableObject => {
     return false;
   }
 
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = Reflect.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 };
 
