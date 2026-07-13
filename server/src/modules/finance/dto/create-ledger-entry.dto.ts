@@ -18,19 +18,19 @@ export class CreateLedgerEntryDto {
   @IsEnum(LedgerEntryType)
   entryType!: LedgerEntryType;
 
-  @ApiProperty({ example: 250000, description: 'Must be greater than zero' })
+  @ApiProperty({ example: 250000, description: 'Số tiền phải lớn hơn 0' })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   amount!: number;
 
-  @ApiProperty({ example: 'Weekly groceries' })
+  @ApiProperty({ example: 'Mua thực phẩm trong tuần' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
   description!: string;
 
-  @ApiPropertyOptional({ example: 'Purchased at the local market' })
+  @ApiPropertyOptional({ example: 'Mua tại chợ gần nhà' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)

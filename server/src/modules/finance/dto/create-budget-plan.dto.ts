@@ -17,7 +17,7 @@ import {
 import { CreateBudgetLineDto } from './create-budget-line.dto';
 
 export class CreateBudgetPlanDto {
-  @ApiProperty({ example: 'Household budget - June 2026' })
+  @ApiProperty({ example: 'Ngân sách gia đình - tháng 6/2026' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(150)

@@ -49,7 +49,7 @@ export class CreateBudgetLineDto {
   @IsEnum(EssentialType)
   essentialType?: EssentialType;
 
-  @ApiPropertyOptional({ example: 'Monthly grocery budget' })
+  @ApiPropertyOptional({ example: 'Ngân sách thực phẩm hằng tháng' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
