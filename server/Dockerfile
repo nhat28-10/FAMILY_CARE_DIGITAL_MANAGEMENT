@@ -26,7 +26,7 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 # node_modules is copied as-is (it includes the Prisma CLI) so that

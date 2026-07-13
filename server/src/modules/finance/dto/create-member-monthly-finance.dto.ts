@@ -30,7 +30,8 @@ export class CreateMemberMonthlyFinanceDto {
   @ApiPropertyOptional({
     example: 15000000,
     nullable: true,
-    description: 'Null means not declared or not applicable; zero is explicit',
+    description:
+      'Null nghĩa là chưa khai báo hoặc không áp dụng; 0 là giá trị được khai báo rõ ràng',
   })
   @IsOptional()
   @Type(() => Number)
@@ -90,7 +91,7 @@ export class CreateMemberMonthlyFinanceDto {
   expenseVisibility?: FinanceVisibility;
 
   @ApiPropertyOptional({
-    example: 'Expected bonus is not included',
+    example: 'Chưa bao gồm khoản thưởng dự kiến',
     nullable: true,
   })
   @IsOptional()

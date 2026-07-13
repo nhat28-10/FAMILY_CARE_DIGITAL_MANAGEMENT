@@ -450,6 +450,7 @@ model Family {
   familyAnnouncements     FamilyAnnouncement[]
   calendarEvents          CalendarEvent[]
   albumMedia              AlbumMedia[]
+  storageCleanupJobs      StorageCleanupJob[]
   aiConversations         AIConversation[]
 
   @@map("families")
@@ -512,6 +513,8 @@ model FamilyMember {
   createdCalendarEvents            CalendarEvent[]            @relation("CreatedCalendarEvents")
   calendarEventParticipations      CalendarEventParticipant[] @relation("CalendarEventParticipations")
   uploadedAlbumMedia               AlbumMedia[]               @relation("UploadedAlbumMedia")
+  deletedAlbumMedia                AlbumMedia[]               @relation("DeletedAlbumMedia")
+  reviewedModerationChecks         MediaModerationCheck[]     @relation("ReviewedModerationChecks")
   taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
   createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
   aiConversations                  AIConversation[]           @relation("MemberAIConversations")
@@ -1279,6 +1282,7 @@ enum SensorEventType {
 enum NotificationType {
   SOS
   GENERAL
+  ALBUM_TAG
 }
 
 enum NotificationPriority {
@@ -1568,11 +1572,14 @@ enum AlbumMediaType {
 enum AlbumVisibilityScope {
   FAMILY
   PRIVATE
+  MANAGER_ONLY
 }
 
 enum MediaModerationStatus {
   PENDING
+  PROCESSING
   SAFE
+  NEED_REVIEW
   FLAGGED
 }
 
@@ -1585,6 +1592,19 @@ enum MediaCheckResult {
   SAFE
   FLAGGED
   NEED_REVIEW
+}
+
+enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
 }
 
 enum AiSenderType {
@@ -1795,26 +1815,48 @@ model CalendarEventParticipant {
 
 /// Ảnh/video trong album gia đình.
 model AlbumMedia {
-  mediaId            String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
-  workspaceId        String                @map("workspace_id")
-  uploadedByMemberId String                @map("uploaded_by_member_id")
-  mediaType          AlbumMediaType        @map("media_type")
-  mediaUrl           String                @map("media_url")
-  thumbnailUrl       String?               @map("thumbnail_url")
-  caption            String?               @map("caption")
-  visibilityScope    AlbumVisibilityScope  @default(FAMILY) @map("visibility_scope")
-  moderationStatus   MediaModerationStatus @default(PENDING) @map("moderation_status")
-  uploadedAt         DateTime              @default(now()) @map("uploaded_at") @db.Timestamptz
+  mediaId                String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
+  workspaceId            String                @map("workspace_id")
+  uploadedByMemberId     String                @map("uploaded_by_member_id")
+  mediaType              AlbumMediaType        @map("media_type")
+  mediaUrl               String?               @map("media_url")
+  storageKey             String?               @map("storage_key")
+  originalFileName       String?               @map("original_file_name")
+  mimeType               String?               @map("mime_type")
+  fileSize               Int?                  @map("file_size")
+  thumbnailUrl           String?               @map("thumbnail_url")
+  caption                String?               @map("caption")
+  visibilityScope        AlbumVisibilityScope  @default(FAMILY) @map("visibility_scope")
+  moderationStatus       MediaModerationStatus @default(PENDING) @map("moderation_status")
+  uploadedAt             DateTime              @default(now()) @map("uploaded_at") @db.Timestamptz
+  updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?             @map("deleted_at") @db.Timestamptz
+  deletedByMemberId      String?               @map("deleted_by_member_id")
+  deleteReason           String?               @map("delete_reason")
+  moderationStartedAt    DateTime?             @map("moderation_started_at") @db.Timestamptz
+  moderationCompletedAt  DateTime?             @map("moderation_completed_at") @db.Timestamptz
+  moderationAttemptCount Int                   @default(0) @map("moderation_attempt_count")
+  lastModerationError    String?               @map("last_moderation_error")
+  latestModerationJobId  String?               @map("latest_moderation_job_id") @db.Uuid
+  moderationQueuedAt     DateTime?             @map("moderation_queued_at") @db.Timestamptz
 
-  workspace        Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  uploadedByMember FamilyMember @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  workspace        Family        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedByMember FamilyMember  @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  deletedByMember  FamilyMember? @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
 
   tags             AlbumMediaTag[]
   moderationChecks MediaModerationCheck[]
+  cleanupJobs      StorageCleanupJob[]    @relation("MediaCleanupJobs")
 
   @@index([workspaceId])
   @@index([uploadedByMemberId])
   @@index([moderationStatus])
+  @@index([workspaceId, uploadedAt])
+  @@index([workspaceId, deletedAt, uploadedAt])
+  @@index([workspaceId, moderationStatus, uploadedAt])
+  @@index([moderationStatus, moderationStartedAt])
+  @@index([moderationStatus, moderationQueuedAt])
+  @@index([deletedByMemberId])
   @@map("album_media")
 }
 
@@ -1831,25 +1873,64 @@ model AlbumMediaTag {
   taggedMember   FamilyMember @relation("TaggedAlbumMediaTags", fields: [taggedMemberId], references: [id], onDelete: Cascade)
   taggedByMember FamilyMember @relation("CreatedAlbumMediaTags", fields: [taggedByMemberId], references: [id], onDelete: Cascade)
 
+  @@unique([mediaId, taggedMemberId])
   @@index([mediaId])
   @@index([taggedMemberId])
   @@index([taggedByMemberId])
   @@map("album_media_tags")
 }
 
+/// Durable retry record for R2/database cleanup; never stores signed URLs or credentials.
+model StorageCleanupJob {
+  cleanupJobId String               @id @default(dbgenerated("gen_random_uuid()")) @map("cleanup_job_id") @db.Uuid
+  workspaceId  String?              @map("workspace_id")
+  mediaId      String?              @map("media_id") @db.Uuid
+  storageKey   String               @unique @map("storage_key")
+  reason       StorageCleanupReason @map("reason")
+  status       StorageCleanupStatus @default(PENDING) @map("status")
+  attemptCount Int                  @default(0) @map("attempt_count")
+  lastError    String?              @map("last_error")
+  nextRetryAt  DateTime?            @default(now()) @map("next_retry_at") @db.Timestamptz
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace Family?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  media     AlbumMedia? @relation("MediaCleanupJobs", fields: [mediaId], references: [mediaId], onDelete: SetNull)
+
+  @@index([status, nextRetryAt])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@map("storage_cleanup_jobs")
+}
+
 /// Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).
 model MediaModerationCheck {
-  moderationId    String           @id @default(dbgenerated("gen_random_uuid()")) @map("moderation_id") @db.Uuid
-  mediaId         String           @map("media_id") @db.Uuid
-  checkType       MediaCheckType   @map("check_type")
-  resultStatus    MediaCheckResult @map("result_status")
-  confidenceScore Decimal?         @map("confidence_score") @db.Decimal(5, 4)
-  checkedAt       DateTime         @default(now()) @map("checked_at") @db.Timestamptz
+  moderationId       String           @id @default(dbgenerated("gen_random_uuid()")) @map("moderation_id") @db.Uuid
+  mediaId            String           @map("media_id") @db.Uuid
+  jobId              String?          @unique @map("job_id") @db.Uuid
+  checkType          MediaCheckType   @map("check_type")
+  provider           String?          @map("provider")
+  modelName          String?          @map("model_name")
+  resultStatus       MediaCheckResult @map("result_status")
+  confidenceScore    Decimal?         @map("confidence_score") @db.Decimal(5, 4)
+  categories         Json?            @map("categories")
+  reasonCode         String?          @map("reason_code")
+  summary            String?          @map("summary")
+  errorCode          String?          @map("error_code")
+  errorMessage       String?          @map("error_message")
+  reviewedByMemberId String?          @map("reviewed_by_member_id")
+  reviewNote         String?          @map("review_note")
+  reviewedAt         DateTime?        @map("reviewed_at") @db.Timestamptz
+  checkedAt          DateTime         @default(now()) @map("checked_at") @db.Timestamptz
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
-  media AlbumMedia @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media            AlbumMedia    @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  reviewedByMember FamilyMember? @relation("ReviewedModerationChecks", fields: [reviewedByMemberId], references: [id], onDelete: SetNull)
 
   @@index([mediaId])
+  @@index([mediaId, checkedAt])
   @@index([checkType])
+  @@index([reviewedByMemberId])
   @@map("media_moderation_checks")
 }
 

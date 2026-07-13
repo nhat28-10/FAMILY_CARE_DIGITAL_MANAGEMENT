@@ -7,7 +7,7 @@ export class CreateFinanceModelDto {
   @IsEnum(FinanceModelType)
   modelType!: FinanceModelType;
 
-  @ApiProperty({ example: 'Family five jars plan' })
+  @ApiProperty({ example: 'Kế hoạch 5 hũ của gia đình' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)

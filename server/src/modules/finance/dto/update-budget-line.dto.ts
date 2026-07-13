@@ -61,7 +61,10 @@ export class UpdateBudgetLineDto {
   @IsEnum(EssentialType)
   essentialType?: EssentialType | null;
 
-  @ApiPropertyOptional({ example: 'Updated budget note', nullable: true })
+  @ApiPropertyOptional({
+    example: 'Ghi chú ngân sách đã cập nhật',
+    nullable: true,
+  })
   @IsOptional()
   @ValidateIf((_, value: unknown) => value !== null)
   @IsString()
