@@ -83,7 +83,7 @@ export class TaskSubmissionsController {
   @ApiOperation({
     summary: 'Lấy danh sách minh chứng hoàn thành của một phân công',
     description:
-      'Quản lý và phó thành viên xem tất cả minh chứng; thành viên thường chỉ xem minh chứng của phân công được giao cho mình.',
+      'Quản lý và phó thành viên xem tất cả minh chứng; thành viên thường chỉ xem minh chứng của phân công được giao cho mình. Danh sách trả về proofCount và metadata proofs của ảnh, video, file hoặc ghi chú minh chứng.',
   })
   @ApiParam({
     name: 'assignmentId',
