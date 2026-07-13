@@ -10,6 +10,7 @@ import { map } from 'rxjs/operators';
 
 import { RESPONSE_MESSAGE_KEY } from '../decorators/response-message.decorator';
 import { isDynamicResponse } from '../types/dynamic-response';
+import { serializeResponse } from '../utils/serialize-response.util';
 
 export interface ApiSuccessResponse<T> {
   success: true;
@@ -47,14 +48,14 @@ export class TransformInterceptor<T> implements NestInterceptor<
           return {
             success: true as const,
             message: data.__responseMessage,
-            data: data.data,
+            data: serializeResponse(data.data),
           };
         }
 
         return {
           success: true as const,
           message,
-          data: (data ?? null) as T,
+          data: serializeResponse((data ?? null) as T),
         };
       }),
     );
