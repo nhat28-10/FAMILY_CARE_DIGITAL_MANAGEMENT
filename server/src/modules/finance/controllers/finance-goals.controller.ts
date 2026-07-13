@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -31,6 +32,7 @@ import { ConfirmGoalContributionPlanDto } from '../dto/confirm-goal-contribution
 import { CreateFinancialGoalDto } from '../dto/create-financial-goal.dto';
 import { CreateGoalAllocationDto } from '../dto/create-goal-allocation.dto';
 import { FinancialGoalQueryDto } from '../dto/financial-goal-query.dto';
+import { FinancialGoalDetailApiResponseDto } from '../dto/financial-goal-response.dto';
 import { ReviewGoalContributionPlanDto } from '../dto/review-goal-contribution-plan.dto';
 import { SubmitGoalContributionPlanDto } from '../dto/submit-goal-contribution-plan.dto';
 import { UpdateFinancialGoalDto } from '../dto/update-financial-goal.dto';
@@ -79,6 +81,10 @@ export class FinanceGoalsController {
   @Get('financial-goals/:goalId')
   @ResponseMessage('Lấy mục tiêu tài chính thành công')
   @ApiOperation({ summary: 'Lấy chi tiết và tiến độ mục tiêu tài chính' })
+  @ApiOkResponse({
+    description: 'Chi tiết mục tiêu tài chính và tiến độ theo envelope chuẩn',
+    type: FinancialGoalDetailApiResponseDto,
+  })
   @ApiParam({
     name: 'goalId',
     description: 'ID mục tiêu tài chính cần thao tác',
@@ -153,7 +159,11 @@ export class FinanceGoalsController {
     description: 'ID mục tiêu tài chính cần thao tác',
     format: 'uuid',
   })
-  @ApiResponse({ status: 200, description: 'Tiến độ mục tiêu tài chính' })
+  @ApiOkResponse({
+    description:
+      'Endpoint cũ trả cùng envelope và data { goal, progress } như chi tiết mục tiêu',
+    type: FinancialGoalDetailApiResponseDto,
+  })
   getFinancialGoalProgress(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
