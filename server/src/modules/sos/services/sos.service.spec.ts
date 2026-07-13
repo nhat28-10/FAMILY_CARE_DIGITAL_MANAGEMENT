@@ -11,7 +11,7 @@ describe('SosService location tracking', () => {
   const workspaceId = 'family-id';
   const triggerMemberId = 'trigger-member';
   const otherMemberId = 'other-member';
-  const alertId = 'alert-id';
+  const alertId = '1f7a184c-5d85-4e06-a5d9-54b58339f2fd';
 
   const activeAlert = {
     sosAlertId: alertId,
@@ -175,8 +175,10 @@ describe('SosService location tracking', () => {
       { id: otherMemberId },
     ]);
 
-    await service.trigger(workspaceId, triggerMemberId, {});
+    const result = await service.trigger(workspaceId, triggerMemberId, {});
 
+    expect(result).toEqual(expect.objectContaining({ sosAlertId: alertId }));
+    expect(result).not.toHaveProperty('id');
     expect(gateway.emitNewAlert).toHaveBeenCalledWith(workspaceId, created);
     expect(gateway.emitToUser).toHaveBeenCalledWith(
       'user-1',

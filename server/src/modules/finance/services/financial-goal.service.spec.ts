@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
+  FinanceVisibility,
   FinancialGoalStatus,
   GoalContributionPlanStatus,
   LedgerEntryStatus,
@@ -121,6 +122,35 @@ describe('FinanceService financial goals', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('returns goal detail as a goal and progress wrapper', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (
+      prisma.financialGoal as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue(goal);
+    (
+      prisma.goalAllocation as { aggregate: jest.Mock }
+    ).aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(25) },
+    });
+
+    const result = await service.getFinancialGoal(familyId, memberId, goalId);
+
+    expect(result.goal.id).toBe(goalId);
+    expect(result.goal.targetAmount).toBe(goal.targetAmount);
+    expect(result.goal.status).toBe(FinancialGoalStatus.ACTIVE);
+    expect(result.progress.currentAmount.equals(25)).toBe(true);
+    expect(result.progress.targetAmount).toBe(goal.targetAmount);
+    expect(result.progress.remainingAmount.equals(75)).toBe(true);
+    expect(result.progress.progressPercent.equals(25)).toBe(true);
+  });
+
   it('prevents a normal member from allocating another member ledger entry', async () => {
     tx.familyMember.findFirst.mockResolvedValue({
       id: memberId,
@@ -235,6 +265,8 @@ describe('FinanceService financial goals', () => {
             expectedIncome: new Prisma.Decimal(9000000),
             expectedPersonalExpense: new Prisma.Decimal(2000000),
             expectedSharedContribution: new Prisma.Decimal(1000000),
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
           },
         ],
       },
@@ -247,6 +279,8 @@ describe('FinanceService financial goals', () => {
             expectedIncome: new Prisma.Decimal(5000000),
             expectedPersonalExpense: null,
             expectedSharedContribution: null,
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
           },
         ],
       },
@@ -259,6 +293,8 @@ describe('FinanceService financial goals', () => {
             expectedIncome: null,
             expectedPersonalExpense: new Prisma.Decimal(1000000),
             expectedSharedContribution: new Prisma.Decimal(500000),
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
           },
         ],
       },

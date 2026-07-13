@@ -13,6 +13,7 @@ import {
 import { FamilyRole, TaskSubmissionStatus } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -28,6 +29,7 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { CreateTaskSubmissionDto } from '../dto/create-task-submission.dto';
 import { ReviewTaskSubmissionDto } from '../dto/review-task-submission.dto';
 import { TaskSubmissionQueryDto } from '../dto/task-submission-query.dto';
+import { TaskSubmissionListApiResponseDto } from '../dto/task-submission-response.dto';
 import { TasksService } from '../services/tasks.service';
 
 const TASK_MANAGER_ROLES = [
@@ -84,6 +86,11 @@ export class TaskSubmissionsController {
     summary: 'Lấy danh sách minh chứng hoàn thành của một phân công',
     description:
       'Quản lý và phó thành viên xem tất cả minh chứng; thành viên thường chỉ xem minh chứng của phân công được giao cho mình. Danh sách trả về proofCount và metadata proofs của ảnh, video, file hoặc ghi chú minh chứng.',
+  })
+  @ApiOkResponse({
+    description:
+      'Danh sách submission theo trang, mỗi item giữ proofCount và có mảng proofs',
+    type: TaskSubmissionListApiResponseDto,
   })
   @ApiParam({
     name: 'assignmentId',
