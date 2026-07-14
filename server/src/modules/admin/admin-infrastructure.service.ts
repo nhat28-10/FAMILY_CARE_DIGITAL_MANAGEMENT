@@ -56,16 +56,26 @@ export class AdminInfrastructureService {
   private readonly docker = new Docker({ socketPath: DOCKER_SOCKET_PATH });
 
   getHost() {
+    const cpus = os.cpus();
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMem = Math.max(totalMem - freeMem, 0);
 
     return {
+      os: {
+        platform: os.platform(),
+        hostname: os.hostname(),
+      },
       cpu: {
-        cpuCount: os.cpus().length,
+        cores: cpus.length,
+        model: cpus[0]?.model ?? null,
+        cpuCount: cpus.length,
         loadAverage: os.loadavg().map((value) => this.round(value)),
       },
       memory: {
+        total: totalMem,
+        free: freeMem,
+        used: usedMem,
         totalMb: this.bytesToMb(totalMem),
         freeMb: this.bytesToMb(freeMem),
         usedMb: this.bytesToMb(usedMem),
@@ -350,6 +360,9 @@ export class AdminInfrastructureService {
       const used = Math.max(total - free, 0);
 
       return {
+        total,
+        free,
+        used,
         totalMb: this.bytesToMb(total),
         freeMb: this.bytesToMb(free),
         usedMb: this.bytesToMb(used),

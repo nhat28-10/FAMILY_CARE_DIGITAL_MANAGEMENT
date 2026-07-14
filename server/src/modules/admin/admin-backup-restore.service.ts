@@ -46,6 +46,10 @@ type BackupJob = {
   errorMessage?: string;
 };
 
+type BackupView = BackupJob & {
+  id: string;
+};
+
 type RestoreJob = {
   restoreId: string;
   backupId: string;
@@ -62,7 +66,7 @@ type RestoreJob = {
   errorMessage?: string;
 };
 
-type BackupResponse = BackupJob & { message: string };
+type BackupResponse = BackupView & { message: string };
 type RestoreResponse = RestoreJob & { message: string };
 
 type BackupExecutionResult = {
@@ -141,7 +145,7 @@ export class AdminBackupRestoreService {
           : 'Tạo backup thất bại.';
 
       return withResponseMessage(message, {
-        ...finishedJob,
+        ...this.toBackupView(finishedJob),
         message,
       });
     });
@@ -149,28 +153,30 @@ export class AdminBackupRestoreService {
 
   async listBackups(
     query: ListBackupsQueryDto,
-  ): Promise<PaginatedResult<BackupJob>> {
+  ): Promise<PaginatedResult<BackupView>> {
     const jobs = await this.readBackupJobs();
     const filtered = jobs
       .filter((job) => !query.status || job.status === query.status)
       .filter((job) => !query.target || job.target === query.target)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const items = filtered.slice(
-      skipFor(query.page, query.limit),
-      skipFor(query.page, query.limit) + query.limit,
-    );
+    const items = filtered
+      .slice(
+        skipFor(query.page, query.limit),
+        skipFor(query.page, query.limit) + query.limit,
+      )
+      .map((job) => this.toBackupView(job));
 
     return buildPaginated(items, filtered.length, query.page, query.limit);
   }
 
-  async getBackup(backupId: string): Promise<BackupJob> {
+  async getBackup(backupId: string): Promise<BackupView> {
     this.validateUuid(backupId, 'Mã backup không hợp lệ.');
     const jobs = await this.readBackupJobs();
     const job = jobs.find((item) => item.backupId === backupId);
     if (!job) {
       throw new NotFoundException('Không tìm thấy backup.');
     }
-    return job;
+    return this.toBackupView(job);
   }
 
   async createRestore(
@@ -528,6 +534,13 @@ export class AdminBackupRestoreService {
       throw new NotFoundException('Không tìm thấy backup.');
     }
     return backup;
+  }
+
+  private toBackupView(job: BackupJob): BackupView {
+    return {
+      id: job.backupId,
+      ...job,
+    };
   }
 
   private withStorageLock<T>(operation: () => Promise<T>): Promise<T> {
