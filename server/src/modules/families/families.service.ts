@@ -3,7 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FamilyRole, MemberStatus, Relationship } from '@prisma/client';
+import {
+  FamilyRole,
+  MemberStatus,
+  ProvisioningActionType,
+  ProvisioningStatus,
+  Relationship,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
@@ -45,6 +51,7 @@ export class FamiliesService {
    */
   async create(userId: string, dto: CreateFamilyDto) {
     const family = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       const created = await tx.family.create({
         data: {
           name: dto.name,
@@ -60,6 +67,18 @@ export class FamiliesService {
           userId,
           familyRole: FamilyRole.FAMILY_MANAGER,
           relationship: dto.relationship ?? Relationship.OTHER,
+        },
+      });
+
+      await tx.workspaceProvisioningLog.create({
+        data: {
+          workspaceId: created.id,
+          actionType: ProvisioningActionType.CREATE,
+          status: ProvisioningStatus.SUCCESS,
+          message: 'Family workspace được tạo và kích hoạt thành công.',
+          startedAt: now,
+          finishedAt: now,
+          createdByUserId: userId,
         },
       });
 
