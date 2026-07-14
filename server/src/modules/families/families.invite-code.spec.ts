@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { FamiliesService } from './families.service';
@@ -68,6 +68,19 @@ describe('FamiliesService invite code', () => {
       const result = await service.regenerateInviteCode(familyId);
       expect(result.inviteCode).toHaveLength(INVITE_CODE_LENGTH);
       expect(prisma.family.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('ném BadRequestException sau 5 lần trùng mã liên tiếp', async () => {
+      const p2002 = new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
+      prisma.family.update.mockRejectedValue(p2002);
+
+      await expect(service.regenerateInviteCode(familyId)).rejects.toThrow(
+        new BadRequestException('Không thể tạo mã mời, vui lòng thử lại'),
+      );
+      expect(prisma.family.update).toHaveBeenCalledTimes(5);
     });
   });
 });
