@@ -62,7 +62,7 @@ export class NotificationsService {
 
   async markRead(memberId: string, notificationId: string) {
     const notification = await this.prisma.notification.findUnique({
-      where: { notificationId },
+      where: { id: notificationId },
     });
     if (!notification) {
       throw new NotFoundException('Không tìm thấy thông báo');
@@ -75,7 +75,7 @@ export class NotificationsService {
     }
 
     return this.prisma.notification.update({
-      where: { notificationId },
+      where: { id: notificationId },
       data: { isRead: true, readAt: new Date() },
     });
   }

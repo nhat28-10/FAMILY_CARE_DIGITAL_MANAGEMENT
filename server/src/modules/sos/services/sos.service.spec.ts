@@ -14,7 +14,7 @@ describe('SosService location tracking', () => {
   const alertId = '1f7a184c-5d85-4e06-a5d9-54b58339f2fd';
 
   const activeAlert = {
-    sosAlertId: alertId,
+    id: alertId,
     workspaceId,
     triggeredByMemberId: triggerMemberId,
     status: SosAlertStatus.ACTIVE,
@@ -134,6 +134,24 @@ describe('SosService location tracking', () => {
     expect(gateway.emitLocation).toHaveBeenCalledTimes(1);
   });
 
+  it('defaults recordedAt in array order so the last batch point is latest', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    prisma.sosLocationPoint.createMany.mockResolvedValue({ count: 3 });
+    prisma.sosLocationPoint.findFirst.mockResolvedValue({ id: 'p3', ...point });
+
+    await service.pushLocationBatch(workspaceId, alertId, triggerMemberId, {
+      points: [point, point, point],
+    });
+
+    const rows = prisma.sosLocationPoint.createMany.mock.calls[0][0]
+      .data as Array<{ recordedAt: Date }>;
+    const times = rows.map((row) => row.recordedAt.getTime());
+    expect(times[0]).toBeLessThan(times[1]);
+    expect(times[1]).toBeLessThan(times[2]);
+    // recordedAt tự sinh không được nằm ở tương lai.
+    expect(times[2]).toBeLessThanOrEqual(Date.now());
+  });
+
   it('forbids a non-triggering member from batch-pushing', async () => {
     prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
 
@@ -155,14 +173,14 @@ describe('SosService location tracking', () => {
     expect(prisma.sosLocationPoint.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { sosAlertId: alertId },
-        orderBy: { recordedAt: 'desc' },
+        orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
       }),
     );
   });
 
   it('signals the trigger device to start streaming on activation', async () => {
     const created = {
-      sosAlertId: alertId,
+      id: alertId,
       triggeredByMember: {
         id: triggerMemberId,
         displayName: 'Người A',
@@ -177,8 +195,8 @@ describe('SosService location tracking', () => {
 
     const result = await service.trigger(workspaceId, triggerMemberId, {});
 
-    expect(result).toEqual(expect.objectContaining({ sosAlertId: alertId }));
-    expect(result).not.toHaveProperty('id');
+    expect(result).toEqual(expect.objectContaining({ id: alertId }));
+    expect(result).not.toHaveProperty('sosAlertId');
     expect(gateway.emitNewAlert).toHaveBeenCalledWith(workspaceId, created);
     expect(gateway.emitToUser).toHaveBeenCalledWith(
       'user-1',
@@ -195,7 +213,7 @@ describe('SosService location tracking', () => {
 
   it('returns the active alert + last location as a join snapshot', async () => {
     prisma.sosAlert.findFirst.mockResolvedValue({
-      sosAlertId: alertId,
+      id: alertId,
       status: SosAlertStatus.ACTIVE,
     });
     prisma.sosLocationPoint.findFirst.mockResolvedValue({ id: 'p1', ...point });
@@ -203,7 +221,7 @@ describe('SosService location tracking', () => {
     const snapshot = await service.getActiveAlertForWorkspace(workspaceId);
 
     expect(snapshot).toEqual({
-      alert: expect.objectContaining({ sosAlertId: alertId }),
+      alert: expect.objectContaining({ id: alertId }),
       lastLocation: expect.objectContaining({ id: 'p1' }),
     });
   });

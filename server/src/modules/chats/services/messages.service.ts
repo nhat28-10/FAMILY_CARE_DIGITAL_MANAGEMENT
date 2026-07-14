@@ -118,9 +118,9 @@ export class MessagesService {
           : {}),
       },
       include: messageInclude,
-      orderBy: [{ sentAt: 'desc' }, { messageId: 'desc' }],
+      orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { messageId: query.cursor }, skip: 1 } : {}),
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
 
     const hasMore = messages.length > limit;
@@ -129,7 +129,7 @@ export class MessagesService {
     );
     return {
       items,
-      nextCursor: hasMore ? items[items.length - 1].messageId : null,
+      nextCursor: hasMore ? items[items.length - 1].id : null,
     };
   }
 
@@ -166,11 +166,11 @@ export class MessagesService {
     if (dto.replyToMessageId) {
       const replyTo = await this.prisma.message.findFirst({
         where: {
-          messageId: dto.replyToMessageId,
+          id: dto.replyToMessageId,
           conversationId,
           deletedAt: null,
         },
-        select: { messageId: true },
+        select: { id: true },
       });
       if (!replyTo) {
         throw new BadRequestException(
@@ -207,7 +207,7 @@ export class MessagesService {
         include: messageInclude,
       });
       await tx.conversation.update({
-        where: { conversationId },
+        where: { id: conversationId },
         data: { lastMessageAt: created.sentAt },
       });
       // Người gửi mặc nhiên đã đọc tới tin của chính mình.
@@ -247,7 +247,7 @@ export class MessagesService {
     }
 
     const updated = await this.prisma.message.update({
-      where: { messageId },
+      where: { id: messageId },
       data: { content: dto.content.trim(), editedAt: new Date() },
       include: messageInclude,
     });
@@ -282,7 +282,7 @@ export class MessagesService {
     }
 
     await this.prisma.message.update({
-      where: { messageId },
+      where: { id: messageId },
       data: { deletedAt: new Date() },
     });
     this.chatsGateway.emitMessageDeleted(conversationId, {
@@ -361,7 +361,7 @@ export class MessagesService {
       throw new BadRequestException('Không thể ghim tin nhắn đã thu hồi');
     }
     const updated = await this.prisma.message.update({
-      where: { messageId },
+      where: { id: messageId },
       data: { pinnedAt: new Date(), pinnedByMemberId: memberId },
       include: messageInclude,
     });
@@ -383,7 +383,7 @@ export class MessagesService {
       messageId,
     );
     const updated = await this.prisma.message.update({
-      where: { messageId },
+      where: { id: messageId },
       data: { pinnedAt: null, pinnedByMemberId: null },
       include: messageInclude,
     });
@@ -419,7 +419,7 @@ export class MessagesService {
       memberId,
     );
     const message = await this.prisma.message.findFirst({
-      where: { messageId, conversationId },
+      where: { id: messageId, conversationId },
     });
     if (!message) {
       throw new NotFoundException('Không tìm thấy tin nhắn');

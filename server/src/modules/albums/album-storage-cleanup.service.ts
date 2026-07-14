@@ -107,7 +107,7 @@ export class AlbumStorageCleanupService {
   private async claimAndProcess(job: StorageCleanupJob): Promise<void> {
     const claimed = await this.prisma.storageCleanupJob.updateMany({
       where: {
-        cleanupJobId: job.cleanupJobId,
+        id: job.id,
         status: {
           in: [StorageCleanupStatus.PENDING, StorageCleanupStatus.FAILED],
         },
@@ -125,7 +125,7 @@ export class AlbumStorageCleanupService {
     try {
       await this.cleanup(job);
       await this.prisma.storageCleanupJob.update({
-        where: { cleanupJobId: job.cleanupJobId },
+        where: { id: job.id },
         data: {
           status: StorageCleanupStatus.COMPLETED,
           lastError: null,
@@ -137,7 +137,7 @@ export class AlbumStorageCleanupService {
       const delaySeconds =
         this.retryDelaySeconds * Math.min(16, 2 ** Math.max(0, attempt - 1));
       await this.prisma.storageCleanupJob.update({
-        where: { cleanupJobId: job.cleanupJobId },
+        where: { id: job.id },
         data: {
           status: exhausted
             ? StorageCleanupStatus.FAILED
@@ -161,8 +161,8 @@ export class AlbumStorageCleanupService {
     }
 
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId: job.mediaId, workspaceId: job.workspaceId },
-      select: { mediaId: true, storageKey: true, deletedAt: true },
+      where: { id: job.mediaId, workspaceId: job.workspaceId },
+      select: { id: true, storageKey: true, deletedAt: true },
     });
     if (!media) return;
     if (!media.deletedAt || media.storageKey !== job.storageKey) {
@@ -171,7 +171,7 @@ export class AlbumStorageCleanupService {
 
     await this.storage.deleteFileByKey(job.storageKey, true);
     await this.prisma.albumMedia.delete({
-      where: { mediaId: job.mediaId, workspaceId: job.workspaceId },
+      where: { id: job.mediaId, workspaceId: job.workspaceId },
     });
   }
 }

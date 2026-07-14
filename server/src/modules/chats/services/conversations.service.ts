@@ -71,7 +71,7 @@ export class ConversationsService {
     memberId: string,
   ) {
     const conversation = await this.prisma.conversation.findFirst({
-      where: { conversationId, workspaceId },
+      where: { id: conversationId, workspaceId },
     });
     if (!conversation) {
       throw new NotFoundException('Không tìm thấy hội thoại');
@@ -115,7 +115,7 @@ export class ConversationsService {
   async ensureDefaultConversation(workspaceId: string): Promise<void> {
     let conversation = await this.prisma.conversation.findFirst({
       where: { workspaceId, isDefault: true },
-      select: { conversationId: true },
+      select: { id: true },
     });
 
     if (!conversation) {
@@ -140,7 +140,7 @@ export class ConversationsService {
             createdByMemberId: manager.id,
             isDefault: true,
           },
-          select: { conversationId: true },
+          select: { id: true },
         });
       } catch (err) {
         // Partial unique index (workspace_id WHERE is_default) bắt race — đọc lại.
@@ -150,7 +150,7 @@ export class ConversationsService {
         ) {
           conversation = await this.prisma.conversation.findFirst({
             where: { workspaceId, isDefault: true },
-            select: { conversationId: true },
+            select: { id: true },
           });
         } else {
           throw err;
@@ -167,7 +167,7 @@ export class ConversationsService {
         select: { id: true },
       }),
       this.prisma.conversationParticipant.findMany({
-        where: { conversationId: conversation.conversationId },
+        where: { conversationId: conversation.id },
         select: { memberId: true, participantStatus: true },
       }),
     ]);
@@ -193,7 +193,7 @@ export class ConversationsService {
     if (toCreate.length + toReactivate.length + toDeactivate.length === 0) {
       return;
     }
-    const conversationId = conversation.conversationId;
+    const conversationId = conversation.id;
     await this.prisma.$transaction([
       this.prisma.conversationParticipant.createMany({
         data: toCreate.map((memberId) => ({ conversationId, memberId })),
@@ -249,7 +249,7 @@ export class ConversationsService {
         );
         return this.prisma.message.count({
           where: {
-            conversationId: conversation.conversationId,
+            conversationId: conversation.id,
             deletedAt: null,
             senderMemberId: { not: memberId },
             ...(me?.lastReadAt ? { sentAt: { gt: me.lastReadAt } } : {}),
@@ -303,12 +303,12 @@ export class ConversationsService {
       // Kích hoạt lại participant đã LEFT (mở lại hội thoại cũ).
       await this.prisma.conversationParticipant.updateMany({
         where: {
-          conversationId: existing.conversationId,
+          conversationId: existing.id,
           participantStatus: ParticipantStatus.LEFT,
         },
         data: { participantStatus: ParticipantStatus.ACTIVE, leftAt: null },
       });
-      return this.getById(existing.conversationId);
+      return this.getById(existing.id);
     }
 
     try {
@@ -391,7 +391,7 @@ export class ConversationsService {
     this.assertGroupManageable(conversation, caller, 'chỉnh sửa');
 
     const updated = await this.prisma.conversation.update({
-      where: { conversationId },
+      where: { id: conversationId },
       data: {
         ...(dto.conversationName !== undefined
           ? { conversationName: dto.conversationName.trim() }
@@ -523,7 +523,7 @@ export class ConversationsService {
     );
     const lastReadAt = new Date();
     await this.prisma.conversationParticipant.update({
-      where: { participantId: participant.participantId },
+      where: { id: participant.id },
       data: { lastReadAt },
     });
     this.chatsGateway.emitRead(conversationId, {
@@ -557,7 +557,7 @@ export class ConversationsService {
 
   private getById(conversationId: string) {
     return this.prisma.conversation.findUnique({
-      where: { conversationId },
+      where: { id: conversationId },
       include: conversationInclude,
     });
   }
@@ -623,16 +623,13 @@ export class ConversationsService {
   private notifyConversationCreated(
     workspaceId: string,
     conversation: {
-      conversationId: string;
+      id: string;
       participants: { member: { user: { id: string } } }[];
     },
   ): void {
     const userIds = conversation.participants.map((p) => p.member.user.id);
-    this.chatsGateway.joinUsersToConversation(
-      userIds,
-      conversation.conversationId,
-    );
-    this.chatsGateway.emitConversationNew(conversation.conversationId, {
+    this.chatsGateway.joinUsersToConversation(userIds, conversation.id);
+    this.chatsGateway.emitConversationNew(conversation.id, {
       workspaceId,
       conversation,
     });

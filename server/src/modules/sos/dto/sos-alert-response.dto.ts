@@ -43,7 +43,7 @@ export class SosMemberSummaryResponseDto {
 
 export class SosWearableDeviceResponseDto {
   @ApiProperty({ format: 'uuid' })
-  deviceId!: string;
+  id!: string;
 
   @ApiProperty({ format: 'uuid' })
   workspaceId!: string;
@@ -81,7 +81,7 @@ export class SosWearableDeviceResponseDto {
 
 export class SosLocationPointResponseDto {
   @ApiProperty({ format: 'uuid' })
-  locationPointId!: string;
+  id!: string;
 
   @ApiProperty({ format: 'uuid' })
   sosAlertId!: string;
@@ -110,7 +110,7 @@ export class SosLocationPointResponseDto {
 
 export class SosResponseResponseDto {
   @ApiProperty({ format: 'uuid' })
-  responseId!: string;
+  id!: string;
 
   @ApiProperty({ format: 'uuid' })
   sosAlertId!: string;
@@ -133,7 +133,7 @@ export class SosResponseResponseDto {
 
 export class SosAlertResponseDto {
   @ApiProperty({ format: 'uuid' })
-  sosAlertId!: string;
+  id!: string;
 
   @ApiProperty({ format: 'uuid' })
   workspaceId!: string;
@@ -206,7 +206,7 @@ export class SosAlertCountResponseDto {
 
 export class SosAlertListItemResponseDto {
   @ApiProperty({ format: 'uuid' })
-  sosAlertId!: string;
+  id!: string;
 
   @ApiProperty({ format: 'uuid' })
   workspaceId!: string;
