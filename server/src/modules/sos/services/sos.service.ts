@@ -106,7 +106,7 @@ export class SosService {
         title: 'Cảnh báo SOS',
         body: `${triggeredByName} đã kích hoạt SOS`,
         referenceType: 'SOS_ALERT',
-        referenceId: alert.sosAlertId,
+        referenceId: alert.id,
       },
     );
 
@@ -117,7 +117,7 @@ export class SosService {
       alert.triggeredByMember.user.id,
       'sos:track:start',
       {
-        alertId: alert.sosAlertId,
+        alertId: alert.id,
         workspaceId,
         intervalSec: SOS_TRACK_INTERVAL_SEC,
       },
@@ -138,7 +138,7 @@ export class SosService {
     if (!alert) {
       return null;
     }
-    const lastLocation = await this.latestPoint(alert.sosAlertId);
+    const lastLocation = await this.latestPoint(alert.id);
     return { alert, lastLocation };
   }
 
@@ -159,7 +159,7 @@ export class SosService {
 
   async getAlert(workspaceId: string, alertId: string) {
     const alert = await this.prisma.sosAlert.findFirst({
-      where: { sosAlertId: alertId, workspaceId },
+      where: { id: alertId, workspaceId },
       include: alertInclude,
     });
     if (!alert) {
@@ -217,15 +217,22 @@ export class SosService {
       dto.points.map((p) => p.deviceId),
     );
 
+    // Point thiếu recordedAt: gán timestamp cách nhau 1ms theo thứ tự mảng
+    // (điểm cuối = mới nhất, không vượt quá hiện tại). Nếu cả lô dùng chung
+    // một mốc "now" thì orderBy recordedAt hòa nhau và "latest" trở thành
+    // ngẫu nhiên (thực tế Postgres trả điểm ĐẦU của lô).
+    const fallbackBase = Date.now() - (dto.points.length - 1);
     await this.prisma.sosLocationPoint.createMany({
-      data: dto.points.map((p) => ({
+      data: dto.points.map((p, index) => ({
         sosAlertId: alertId,
         deviceId: p.deviceId ?? null,
         latitude: p.latitude,
         longitude: p.longitude,
         accuracy: p.accuracy ?? null,
         sourceType: p.sourceType,
-        recordedAt: p.recordedAt ? new Date(p.recordedAt) : new Date(),
+        recordedAt: p.recordedAt
+          ? new Date(p.recordedAt)
+          : new Date(fallbackBase + index),
       })),
     });
 
@@ -352,7 +359,7 @@ export class SosService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const alert = await tx.sosAlert.update({
-        where: { sosAlertId: alertId },
+        where: { id: alertId },
         data: {
           status,
           resolvedByMemberId: memberId,
@@ -391,7 +398,7 @@ export class SosService {
   /** Loads the alert and ensures it belongs to the workspace. */
   private async loadAlert(workspaceId: string, alertId: string) {
     const alert = await this.prisma.sosAlert.findFirst({
-      where: { sosAlertId: alertId, workspaceId },
+      where: { id: alertId, workspaceId },
     });
     if (!alert) {
       throw new NotFoundException('Không tìm thấy cảnh báo SOS');
@@ -432,7 +439,7 @@ export class SosService {
     }
 
     const owned = await this.prisma.wearableDevice.count({
-      where: { deviceId: { in: uniqueDeviceIds }, ownerMemberId: memberId },
+      where: { id: { in: uniqueDeviceIds }, ownerMemberId: memberId },
     });
     if (owned !== uniqueDeviceIds.length) {
       throw new ForbiddenException('Thiết bị không thuộc về bạn');
@@ -443,7 +450,8 @@ export class SosService {
   private latestPoint(alertId: string) {
     return this.prisma.sosLocationPoint.findFirst({
       where: { sosAlertId: alertId },
-      orderBy: { recordedAt: 'desc' },
+      // createdAt phá hòa khi hai request khác nhau ghi cùng một mốc recordedAt.
+      orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
     });
   }
 }

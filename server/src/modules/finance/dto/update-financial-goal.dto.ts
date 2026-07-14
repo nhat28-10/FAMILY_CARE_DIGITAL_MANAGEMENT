@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 
 export class UpdateFinancialGoalDto {
-  @ApiPropertyOptional({ example: 'Updated emergency fund' })
+  @ApiPropertyOptional({ example: 'Quỹ dự phòng khẩn cấp đã cập nhật' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()

@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 
 export class CreateFinancialGoalDto {
-  @ApiProperty({ example: 'Emergency fund' })
+  @ApiProperty({ example: 'Quỹ dự phòng khẩn cấp' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(150)

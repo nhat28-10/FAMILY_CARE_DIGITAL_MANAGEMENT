@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationPriority, NotificationType } from '@prisma/client';
+import { NotificationPriority, NotificationType, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -30,12 +30,13 @@ export class NotificationsService {
     familyId: string,
     recipientMemberIds: string[],
     input: CreateNotificationInput,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     if (recipientMemberIds.length === 0) {
       return Promise.resolve({ count: 0 });
     }
 
-    return this.prisma.notification.createMany({
+    return client.notification.createMany({
       data: recipientMemberIds.map((recipientMemberId) => ({
         familyId,
         recipientMemberId,
@@ -61,7 +62,7 @@ export class NotificationsService {
 
   async markRead(memberId: string, notificationId: string) {
     const notification = await this.prisma.notification.findUnique({
-      where: { notificationId },
+      where: { id: notificationId },
     });
     if (!notification) {
       throw new NotFoundException('Không tìm thấy thông báo');
@@ -74,7 +75,7 @@ export class NotificationsService {
     }
 
     return this.prisma.notification.update({
-      where: { notificationId },
+      where: { id: notificationId },
       data: { isRead: true, readAt: new Date() },
     });
   }

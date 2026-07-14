@@ -17,7 +17,7 @@ export class CreateFinanceJarDto {
   @IsUUID()
   financeModelId!: string;
 
-  @ApiProperty({ example: 'Necessities' })
+  @ApiProperty({ example: 'Chi tiêu thiết yếu' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
@@ -36,7 +36,7 @@ export class CreateFinanceJarDto {
   @Max(100)
   allocationPercentage!: number;
 
-  @ApiPropertyOptional({ example: 'Essential household expenses' })
+  @ApiPropertyOptional({ example: 'Các khoản chi thiết yếu của gia đình' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)

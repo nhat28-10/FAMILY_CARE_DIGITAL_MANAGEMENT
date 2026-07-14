@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { FamilyRole } from '@prisma/client';
 import {
+  ApiCreatedResponse,
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -30,6 +32,10 @@ import { ListSosAlertQueryDto } from '../dto/list-sos-alert-query.dto';
 import { PushSosLocationBatchDto } from '../dto/push-sos-location-batch.dto';
 import { PushSosLocationDto } from '../dto/push-sos-location.dto';
 import { ResolveSosAlertDto } from '../dto/resolve-sos-alert.dto';
+import {
+  SosAlertApiResponseDto,
+  SosAlertListApiResponseDto,
+} from '../dto/sos-alert-response.dto';
 import { SosService } from '../services/sos.service';
 
 const MANAGER_ROLES = [
@@ -49,6 +55,10 @@ export class SosController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Đã kích hoạt cảnh báo SOS')
   @ApiOperation({ summary: 'Kích hoạt cảnh báo SOS (mọi thành viên)' })
+  @ApiCreatedResponse({
+    description: 'Cảnh báo SOS vừa được tạo, data dùng id làm ID chuẩn',
+    type: SosAlertApiResponseDto,
+  })
   trigger(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -60,6 +70,10 @@ export class SosController {
   @Get('alerts')
   @ResponseMessage('Lấy danh sách cảnh báo SOS thành công')
   @ApiOperation({ summary: 'Lịch sử cảnh báo SOS của gia đình' })
+  @ApiOkResponse({
+    description: 'Danh sách cảnh báo SOS, mỗi item dùng id làm ID chuẩn',
+    type: SosAlertListApiResponseDto,
+  })
   list(
     @Param('familyId') familyId: string,
     @Query() query: ListSosAlertQueryDto,
@@ -71,6 +85,10 @@ export class SosController {
   @ResponseMessage('Lấy chi tiết cảnh báo SOS thành công')
   @ApiOperation({
     summary: 'Chi tiết một cảnh báo SOS (kèm phản hồi + vị trí)',
+  })
+  @ApiOkResponse({
+    description: 'Chi tiết cảnh báo SOS, data dùng id làm ID chuẩn',
+    type: SosAlertApiResponseDto,
   })
   getOne(
     @Param('familyId') familyId: string,
@@ -154,6 +172,10 @@ export class SosController {
   @ApiOperation({
     summary: 'Resolve cảnh báo SOS (FAMILY_MANAGER / DEPUTY_MEMBER)',
   })
+  @ApiOkResponse({
+    description: 'Cảnh báo SOS sau khi resolve, data dùng id làm ID chuẩn',
+    type: SosAlertApiResponseDto,
+  })
   resolve(
     @Param('familyId') familyId: string,
     @Param('alertId', ParseUUIDPipe) alertId: string,
@@ -168,6 +190,10 @@ export class SosController {
   @ResponseMessage('Đã hủy cảnh báo SOS')
   @ApiOperation({
     summary: 'Hủy cảnh báo SOS (FAMILY_MANAGER / DEPUTY_MEMBER)',
+  })
+  @ApiOkResponse({
+    description: 'Cảnh báo SOS sau khi hủy, data dùng id làm ID chuẩn',
+    type: SosAlertApiResponseDto,
   })
   cancel(
     @Param('familyId') familyId: string,

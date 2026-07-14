@@ -12,7 +12,7 @@ import {
 } from 'class-validator';
 
 export class UpdateFinanceJarDto {
-  @ApiPropertyOptional({ example: 'Necessities' })
+  @ApiPropertyOptional({ example: 'Chi tiêu thiết yếu' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
@@ -35,7 +35,7 @@ export class UpdateFinanceJarDto {
   allocationPercentage?: number;
 
   @ApiPropertyOptional({
-    example: 'Essential household expenses',
+    example: 'Các khoản chi thiết yếu của gia đình',
     nullable: true,
   })
   @IsOptional()

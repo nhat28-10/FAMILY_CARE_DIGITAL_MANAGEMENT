@@ -15,7 +15,7 @@ export class SubmitGoalContributionPlanDto {
   @Min(0.01)
   amount!: number;
 
-  @ApiPropertyOptional({ example: 'Da chuyen khoan cho quy' })
+  @ApiPropertyOptional({ example: 'Đã chuyển khoản cho quỹ' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)

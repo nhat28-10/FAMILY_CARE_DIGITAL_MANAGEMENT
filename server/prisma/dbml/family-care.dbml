@@ -117,6 +117,7 @@ Table families {
   familyAnnouncements family_announcements [not null]
   calendarEvents calendar_events [not null]
   albumMedia album_media [not null]
+  storageCleanupJobs storage_cleanup_jobs [not null]
   aiConversations ai_conversations [not null]
 }
 
@@ -171,6 +172,8 @@ Table family_members {
   createdCalendarEvents calendar_events [not null]
   calendarEventParticipations calendar_event_participants [not null]
   uploadedAlbumMedia album_media [not null]
+  deletedAlbumMedia album_media [not null]
+  reviewedModerationChecks media_moderation_checks [not null]
   taggedAlbumMediaTags album_media_tags [not null]
   createdAlbumMediaTags album_media_tags [not null]
   aiConversations ai_conversations [not null]
@@ -708,7 +711,7 @@ Table task_proofs {
 }
 
 Table sos_settings {
-  sosSettingId String [pk]
+  id String [pk]
   workspaceId String [unique, not null]
   isEnabled Boolean [not null, default: true]
   notifyAllMembers Boolean [not null, default: true]
@@ -725,7 +728,7 @@ Table sos_settings {
 }
 
 Table emergency_contacts {
-  contactId String [pk]
+  id String [pk]
   sosSettingId String [not null]
   contactName String [not null]
   phoneNumber String [not null]
@@ -740,7 +743,7 @@ Table emergency_contacts {
 }
 
 Table wearable_devices {
-  deviceId String [pk]
+  id String [pk]
   workspaceId String [not null]
   ownerMemberId String [not null]
   deviceName String [not null]
@@ -767,7 +770,7 @@ Table wearable_devices {
 }
 
 Table sos_alerts {
-  sosAlertId String [pk]
+  id String [pk]
   workspaceId String [not null]
   triggeredByMemberId String [not null]
   deviceId String
@@ -795,7 +798,7 @@ Table sos_alerts {
 }
 
 Table sos_location_points {
-  locationPointId String [pk]
+  id String [pk]
   sosAlertId String [not null]
   deviceId String
   latitude Decimal [not null]
@@ -811,7 +814,7 @@ Table sos_location_points {
 }
 
 Table sos_responses {
-  responseId String [pk]
+  id String [pk]
   sosAlertId String [not null]
   responderMemberId String [not null]
   responseType SosResponseType [not null]
@@ -824,7 +827,7 @@ Table sos_responses {
 }
 
 Table sensor_events {
-  sensorEventId String [pk]
+  id String [pk]
   deviceId String [not null]
   eventType SensorEventType [not null]
   rawValue Json
@@ -839,7 +842,7 @@ Table sensor_events {
 }
 
 Table member_location_points {
-  locationPointId String [pk]
+  id String [pk]
   workspaceId String [not null]
   memberId String [not null]
   deviceId String
@@ -857,7 +860,7 @@ Table member_location_points {
 }
 
 Table notifications {
-  notificationId String [pk]
+  id String [pk]
   familyId String [not null]
   recipientMemberId String [not null]
   type NotificationType [not null]
@@ -876,7 +879,7 @@ Table notifications {
 }
 
 Table workspace_provisioning_logs {
-  provisioningLogId String [pk]
+  id String [pk]
   workspaceId String [not null]
   actionType ProvisioningActionType [not null]
   status ProvisioningStatus [not null, default: 'PENDING']
@@ -892,7 +895,7 @@ Table workspace_provisioning_logs {
 }
 
 Table conversations {
-  conversationId String [pk]
+  id String [pk]
   workspaceId String [not null]
   conversationType ConversationType [not null, default: 'GROUP']
   conversationName String
@@ -911,7 +914,7 @@ Table conversations {
 }
 
 Table conversation_participants {
-  participantId String [pk]
+  id String [pk]
   conversationId String [not null]
   memberId String [not null]
   joinedAt DateTime [default: `now()`, not null]
@@ -929,7 +932,7 @@ Table conversation_participants {
 }
 
 Table messages {
-  messageId String [pk]
+  id String [pk]
   conversationId String [not null]
   senderMemberId String [not null]
   messageType MessageType [not null, default: 'TEXT']
@@ -952,7 +955,7 @@ Table messages {
 }
 
 Table message_reactions {
-  reactionId String [pk]
+  id String [pk]
   messageId String [not null]
   memberId String [not null]
   emoji String [not null]
@@ -968,7 +971,7 @@ Table message_reactions {
 }
 
 Table message_attachments {
-  attachmentId String [pk]
+  id String [pk]
   messageId String [not null]
   fileType String [not null]
   fileUrl String [not null]
@@ -981,7 +984,7 @@ Table message_attachments {
 }
 
 Table family_announcements {
-  announcementId String [pk]
+  id String [pk]
   workspaceId String [not null]
   createdByMemberId String [not null]
   title String [not null]
@@ -996,7 +999,7 @@ Table family_announcements {
 }
 
 Table calendar_events {
-  eventId String [pk]
+  id String [pk]
   workspaceId String [not null]
   title String [not null]
   description String
@@ -1015,7 +1018,7 @@ Table calendar_events {
 }
 
 Table calendar_event_participants {
-  eventParticipantId String [pk]
+  id String [pk]
   eventId String [not null]
   memberId String [not null]
   responseStatus EventResponseStatus [not null, default: 'INVITED']
@@ -1031,26 +1034,42 @@ Table calendar_event_participants {
 }
 
 Table album_media {
-  mediaId String [pk]
+  id String [pk]
   workspaceId String [not null]
   uploadedByMemberId String [not null]
   mediaType AlbumMediaType [not null]
-  mediaUrl String [not null]
+  mediaUrl String
+  storageKey String
+  originalFileName String
+  mimeType String
+  fileSize Int
   thumbnailUrl String
   caption String
   visibilityScope AlbumVisibilityScope [not null, default: 'FAMILY']
   moderationStatus MediaModerationStatus [not null, default: 'PENDING']
   uploadedAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  deletedByMemberId String
+  deleteReason String
+  moderationStartedAt DateTime
+  moderationCompletedAt DateTime
+  moderationAttemptCount Int [not null, default: 0]
+  lastModerationError String
+  latestModerationJobId String
+  moderationQueuedAt DateTime
   workspace families [not null]
   uploadedByMember family_members [not null]
+  deletedByMember family_members
   tags album_media_tags [not null]
   moderationChecks media_moderation_checks [not null]
+  cleanupJobs storage_cleanup_jobs [not null]
 
   Note: 'Ảnh/video trong album gia đình.'
 }
 
 Table album_media_tags {
-  tagId String [pk]
+  id String [pk]
   mediaId String [not null]
   taggedMemberId String [not null]
   taggedByMemberId String [not null]
@@ -1060,23 +1079,58 @@ Table album_media_tags {
   taggedMember family_members [not null]
   taggedByMember family_members [not null]
 
+  indexes {
+    (mediaId, taggedMemberId) [unique]
+  }
+
   Note: 'Tag gắn thành viên vào một media (manual tagging cho MVP).'
 }
 
+Table storage_cleanup_jobs {
+  id String [pk]
+  workspaceId String
+  mediaId String
+  storageKey String [unique, not null]
+  reason StorageCleanupReason [not null]
+  status StorageCleanupStatus [not null, default: 'PENDING']
+  attemptCount Int [not null, default: 0]
+  lastError String
+  nextRetryAt DateTime [default: `now()`]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families
+  media album_media
+
+  Note: 'Durable retry record for R2/database cleanup; never stores signed URLs or credentials.'
+}
+
 Table media_moderation_checks {
-  moderationId String [pk]
+  id String [pk]
   mediaId String [not null]
+  jobId String [unique]
   checkType MediaCheckType [not null]
+  provider String
+  modelName String
   resultStatus MediaCheckResult [not null]
   confidenceScore Decimal
+  categories Json
+  reasonCode String
+  summary String
+  errorCode String
+  errorMessage String
+  reviewedByMemberId String
+  reviewNote String
+  reviewedAt DateTime
   checkedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
   media album_media [not null]
+  reviewedByMember family_members
 
   Note: 'Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).'
 }
 
 Table ai_conversations {
-  aiConversationId String [pk]
+  id String [pk]
   workspaceId String [not null]
   memberId String [not null]
   conversationTitle String
@@ -1089,7 +1143,7 @@ Table ai_conversations {
 }
 
 Table ai_messages {
-  aiMessageId String [pk]
+  id String [pk]
   aiConversationId String [not null]
   senderType AiSenderType [not null]
   messageContent String [not null]
@@ -1422,6 +1476,7 @@ Enum SensorEventType {
 Enum NotificationType {
   SOS
   GENERAL
+  ALBUM_TAG
 }
 
 Enum NotificationPriority {
@@ -1493,11 +1548,14 @@ Enum AlbumMediaType {
 Enum AlbumVisibilityScope {
   FAMILY
   PRIVATE
+  MANAGER_ONLY
 }
 
 Enum MediaModerationStatus {
   PENDING
+  PROCESSING
   SAFE
+  NEED_REVIEW
   FLAGGED
 }
 
@@ -1510,6 +1568,19 @@ Enum MediaCheckResult {
   SAFE
   FLAGGED
   NEED_REVIEW
+}
+
+Enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
 }
 
 Enum AiSenderType {
@@ -1681,7 +1752,7 @@ Ref: sos_settings.workspaceId - families.id [delete: Cascade]
 
 Ref: sos_settings.createdByMemberId > family_members.id [delete: Set Null]
 
-Ref: emergency_contacts.sosSettingId > sos_settings.sosSettingId [delete: Cascade]
+Ref: emergency_contacts.sosSettingId > sos_settings.id [delete: Cascade]
 
 Ref: wearable_devices.workspaceId > families.id [delete: Cascade]
 
@@ -1691,27 +1762,27 @@ Ref: sos_alerts.workspaceId > families.id [delete: Cascade]
 
 Ref: sos_alerts.triggeredByMemberId > family_members.id [delete: Cascade]
 
-Ref: sos_alerts.deviceId > wearable_devices.deviceId [delete: Set Null]
+Ref: sos_alerts.deviceId > wearable_devices.id [delete: Set Null]
 
 Ref: sos_alerts.resolvedByMemberId > family_members.id [delete: Cascade]
 
-Ref: sos_location_points.sosAlertId > sos_alerts.sosAlertId [delete: Cascade]
+Ref: sos_location_points.sosAlertId > sos_alerts.id [delete: Cascade]
 
-Ref: sos_location_points.deviceId > wearable_devices.deviceId [delete: Set Null]
+Ref: sos_location_points.deviceId > wearable_devices.id [delete: Set Null]
 
-Ref: sos_responses.sosAlertId > sos_alerts.sosAlertId [delete: Cascade]
+Ref: sos_responses.sosAlertId > sos_alerts.id [delete: Cascade]
 
 Ref: sos_responses.responderMemberId > family_members.id [delete: Cascade]
 
-Ref: sensor_events.deviceId > wearable_devices.deviceId [delete: Cascade]
+Ref: sensor_events.deviceId > wearable_devices.id [delete: Cascade]
 
-Ref: sensor_events.createdSosAlertId > sos_alerts.sosAlertId [delete: Set Null]
+Ref: sensor_events.createdSosAlertId > sos_alerts.id [delete: Set Null]
 
 Ref: member_location_points.workspaceId > families.id [delete: Cascade]
 
 Ref: member_location_points.memberId > family_members.id [delete: Cascade]
 
-Ref: member_location_points.deviceId > wearable_devices.deviceId [delete: Set Null]
+Ref: member_location_points.deviceId > wearable_devices.id [delete: Set Null]
 
 Ref: notifications.familyId > families.id [delete: Cascade]
 
@@ -1725,23 +1796,23 @@ Ref: conversations.workspaceId > families.id [delete: Cascade]
 
 Ref: conversations.createdByMemberId > family_members.id [delete: Restrict]
 
-Ref: conversation_participants.conversationId > conversations.conversationId [delete: Cascade]
+Ref: conversation_participants.conversationId > conversations.id [delete: Cascade]
 
 Ref: conversation_participants.memberId > family_members.id [delete: Cascade]
 
-Ref: messages.conversationId > conversations.conversationId [delete: Cascade]
+Ref: messages.conversationId > conversations.id [delete: Cascade]
 
 Ref: messages.senderMemberId > family_members.id [delete: Cascade]
 
-Ref: messages.replyToMessageId - messages.messageId [delete: Set Null]
+Ref: messages.replyToMessageId - messages.id [delete: Set Null]
 
 Ref: messages.pinnedByMemberId > family_members.id [delete: Cascade]
 
-Ref: message_reactions.messageId > messages.messageId [delete: Cascade]
+Ref: message_reactions.messageId > messages.id [delete: Cascade]
 
 Ref: message_reactions.memberId > family_members.id [delete: Cascade]
 
-Ref: message_attachments.messageId > messages.messageId [delete: Cascade]
+Ref: message_attachments.messageId > messages.id [delete: Cascade]
 
 Ref: family_announcements.workspaceId > families.id [delete: Cascade]
 
@@ -1751,7 +1822,7 @@ Ref: calendar_events.workspaceId > families.id [delete: Cascade]
 
 Ref: calendar_events.createdByMemberId > family_members.id [delete: Restrict]
 
-Ref: calendar_event_participants.eventId > calendar_events.eventId [delete: Cascade]
+Ref: calendar_event_participants.eventId > calendar_events.id [delete: Cascade]
 
 Ref: calendar_event_participants.memberId > family_members.id [delete: Cascade]
 
@@ -1759,16 +1830,24 @@ Ref: album_media.workspaceId > families.id [delete: Cascade]
 
 Ref: album_media.uploadedByMemberId > family_members.id [delete: Cascade]
 
-Ref: album_media_tags.mediaId > album_media.mediaId [delete: Cascade]
+Ref: album_media.deletedByMemberId > family_members.id [delete: Cascade]
+
+Ref: album_media_tags.mediaId > album_media.id [delete: Cascade]
 
 Ref: album_media_tags.taggedMemberId > family_members.id [delete: Cascade]
 
 Ref: album_media_tags.taggedByMemberId > family_members.id [delete: Cascade]
 
-Ref: media_moderation_checks.mediaId > album_media.mediaId [delete: Cascade]
+Ref: storage_cleanup_jobs.workspaceId > families.id [delete: Set Null]
+
+Ref: storage_cleanup_jobs.mediaId > album_media.id [delete: Set Null]
+
+Ref: media_moderation_checks.mediaId > album_media.id [delete: Cascade]
+
+Ref: media_moderation_checks.reviewedByMemberId > family_members.id [delete: Set Null]
 
 Ref: ai_conversations.workspaceId > families.id [delete: Cascade]
 
 Ref: ai_conversations.memberId > family_members.id [delete: Cascade]
 
-Ref: ai_messages.aiConversationId > ai_conversations.aiConversationId [delete: Cascade]
+Ref: ai_messages.aiConversationId > ai_conversations.id [delete: Cascade]

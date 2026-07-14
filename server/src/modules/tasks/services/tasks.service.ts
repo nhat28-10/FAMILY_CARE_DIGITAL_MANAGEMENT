@@ -520,6 +520,10 @@ const submissionListItemSelect = {
   reviewedByMember: {
     select: memberSummarySelect,
   },
+  proofs: {
+    select: proofResponseSelect,
+    orderBy: { uploadedAt: 'asc' },
+  },
   _count: {
     select: {
       proofs: true,
@@ -3755,6 +3759,7 @@ export class TasksService {
       updatedAt: submission.updatedAt,
       isLate: this.isSubmissionLate(submission),
       proofCount: submission._count.proofs,
+      proofs: submission.proofs.map((proof) => this.mapProofResponse(proof)),
       submittedByMember: this.mapMemberSummary(submission.submittedByMember),
       reviewedByMember: this.mapMemberSummary(submission.reviewedByMember),
     };

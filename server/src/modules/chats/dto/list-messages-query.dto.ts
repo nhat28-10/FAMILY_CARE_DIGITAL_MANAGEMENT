@@ -12,7 +12,8 @@ import {
 
 export class ListMessagesQueryDto {
   @ApiPropertyOptional({
-    description: 'messageId cuối của trang trước (cursor pagination, mới → cũ)',
+    description:
+      'id tin nhắn cuối của trang trước (cursor pagination, mới → cũ)',
     format: 'uuid',
   })
   @IsOptional()

@@ -450,6 +450,7 @@ model Family {
   familyAnnouncements     FamilyAnnouncement[]
   calendarEvents          CalendarEvent[]
   albumMedia              AlbumMedia[]
+  storageCleanupJobs      StorageCleanupJob[]
   aiConversations         AIConversation[]
 
   @@map("families")
@@ -512,6 +513,8 @@ model FamilyMember {
   createdCalendarEvents            CalendarEvent[]            @relation("CreatedCalendarEvents")
   calendarEventParticipations      CalendarEventParticipant[] @relation("CalendarEventParticipations")
   uploadedAlbumMedia               AlbumMedia[]               @relation("UploadedAlbumMedia")
+  deletedAlbumMedia                AlbumMedia[]               @relation("DeletedAlbumMedia")
+  reviewedModerationChecks         MediaModerationCheck[]     @relation("ReviewedModerationChecks")
   taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
   createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
   aiConversations                  AIConversation[]           @relation("MemberAIConversations")
@@ -1279,6 +1282,7 @@ enum SensorEventType {
 enum NotificationType {
   SOS
   GENERAL
+  ALBUM_TAG
 }
 
 enum NotificationPriority {
@@ -1290,7 +1294,7 @@ enum NotificationPriority {
 
 /// Per-workspace SOS configuration (1-1 with a family workspace).
 model SosSetting {
-  sosSettingId            String   @id @default(dbgenerated("gen_random_uuid()")) @map("sos_setting_id") @db.Uuid
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @map("sos_setting_id") @db.Uuid
   workspaceId             String   @unique @map("workspace_id")
   isEnabled               Boolean  @default(true) @map("is_enabled")
   notifyAllMembers        Boolean  @default(true) @map("notify_all_members")
@@ -1310,7 +1314,7 @@ model SosSetting {
 
 /// Emergency contacts attached to a workspace's SOS settings.
 model EmergencyContact {
-  contactId        String   @id @default(dbgenerated("gen_random_uuid()")) @map("contact_id") @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @map("contact_id") @db.Uuid
   sosSettingId     String   @map("sos_setting_id") @db.Uuid
   contactName      String   @map("contact_name")
   phoneNumber      String   @map("phone_number")
@@ -1320,7 +1324,7 @@ model EmergencyContact {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  sosSetting SosSetting @relation(fields: [sosSettingId], references: [sosSettingId], onDelete: Cascade)
+  sosSetting SosSetting @relation(fields: [sosSettingId], references: [id], onDelete: Cascade)
 
   @@index([sosSettingId])
   @@map("emergency_contacts")
@@ -1328,7 +1332,7 @@ model EmergencyContact {
 
 /// Wearable / tracking devices paired to a member within a workspace.
 model WearableDevice {
-  deviceId         String              @id @default(dbgenerated("gen_random_uuid()")) @map("device_id") @db.Uuid
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @map("device_id") @db.Uuid
   workspaceId      String              @map("workspace_id")
   ownerMemberId    String              @map("owner_member_id")
   deviceName       String              @map("device_name")
@@ -1360,7 +1364,7 @@ model WearableDevice {
 
 /// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
 model SosAlert {
-  sosAlertId          String         @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
   workspaceId         String         @map("workspace_id")
   triggeredByMemberId String         @map("triggered_by_member_id")
   deviceId            String?        @map("device_id") @db.Uuid
@@ -1379,7 +1383,7 @@ model SosAlert {
 
   workspace         Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   triggeredByMember FamilyMember    @relation("TriggeredSosAlerts", fields: [triggeredByMemberId], references: [id], onDelete: Cascade)
-  device            WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+  device            WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   resolvedByMember  FamilyMember?   @relation("ResolvedSosAlerts", fields: [resolvedByMemberId], references: [id], onDelete: SetNull)
 
   locationPoints SosLocationPoint[]
@@ -1396,18 +1400,18 @@ model SosAlert {
 
 /// GPS route points captured during a single SOS event.
 model SosLocationPoint {
-  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
-  sosAlertId      String        @map("sos_alert_id") @db.Uuid
-  deviceId        String?       @map("device_id") @db.Uuid
-  latitude        Decimal       @map("latitude") @db.Decimal(10, 7)
-  longitude       Decimal       @map("longitude") @db.Decimal(10, 7)
-  accuracy        Decimal?      @map("accuracy") @db.Decimal(10, 2)
-  sourceType      GpsSourceType @map("source_type")
-  recordedAt      DateTime      @map("recorded_at") @db.Timestamptz
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
+  sosAlertId String        @map("sos_alert_id") @db.Uuid
+  deviceId   String?       @map("device_id") @db.Uuid
+  latitude   Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude  Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy   Decimal?      @map("accuracy") @db.Decimal(10, 2)
+  sourceType GpsSourceType @map("source_type")
+  recordedAt DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
-  sosAlert SosAlert        @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
-  device   WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+  sosAlert SosAlert        @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  device   WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
   @@index([sosAlertId])
   @@index([deviceId])
@@ -1417,14 +1421,14 @@ model SosLocationPoint {
 
 /// Member responses to a SOS alert (viewed / safe / need help / resolved / canceled).
 model SosResponse {
-  responseId        String          @id @default(dbgenerated("gen_random_uuid()")) @map("response_id") @db.Uuid
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @map("response_id") @db.Uuid
   sosAlertId        String          @map("sos_alert_id") @db.Uuid
   responderMemberId String          @map("responder_member_id")
   responseType      SosResponseType @map("response_type")
   message           String?         @map("message")
   respondedAt       DateTime        @default(now()) @map("responded_at") @db.Timestamptz
 
-  sosAlert        SosAlert     @relation(fields: [sosAlertId], references: [sosAlertId], onDelete: Cascade)
+  sosAlert        SosAlert     @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
   responderMember FamilyMember @relation("SosResponses", fields: [responderMemberId], references: [id], onDelete: Cascade)
 
   @@index([sosAlertId])
@@ -1434,7 +1438,7 @@ model SosResponse {
 
 /// Raw sensor events emitted by wearable / simulated devices.
 model SensorEvent {
-  sensorEventId     String          @id @default(dbgenerated("gen_random_uuid()")) @map("sensor_event_id") @db.Uuid
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @map("sensor_event_id") @db.Uuid
   deviceId          String          @map("device_id") @db.Uuid
   eventType         SensorEventType @map("event_type")
   rawValue          Json?           @map("raw_value") @db.JsonB
@@ -1443,8 +1447,8 @@ model SensorEvent {
   createdSosAlertId String?         @map("created_sos_alert_id") @db.Uuid
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
-  device          WearableDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
-  createdSosAlert SosAlert?      @relation("CreatedSosAlertSensorEvents", fields: [createdSosAlertId], references: [sosAlertId], onDelete: SetNull)
+  device          WearableDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdSosAlert SosAlert?      @relation("CreatedSosAlertSensorEvents", fields: [createdSosAlertId], references: [id], onDelete: SetNull)
 
   @@index([deviceId])
   @@index([createdSosAlertId])
@@ -1454,20 +1458,20 @@ model SensorEvent {
 
 /// Everyday member location tracking — separate from SOS-event route points.
 model MemberLocationPoint {
-  locationPointId String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
-  workspaceId     String        @map("workspace_id")
-  memberId        String        @map("member_id")
-  deviceId        String?       @map("device_id") @db.Uuid
-  latitude        Decimal       @map("latitude") @db.Decimal(10, 7)
-  longitude       Decimal       @map("longitude") @db.Decimal(10, 7)
-  accuracy        Decimal?      @map("accuracy") @db.Decimal(10, 2)
-  sourceType      GpsSourceType @map("source_type")
-  recordedAt      DateTime      @map("recorded_at") @db.Timestamptz
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
+  workspaceId String        @map("workspace_id")
+  memberId    String        @map("member_id")
+  deviceId    String?       @map("device_id") @db.Uuid
+  latitude    Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude   Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy    Decimal?      @map("accuracy") @db.Decimal(10, 2)
+  sourceType  GpsSourceType @map("source_type")
+  recordedAt  DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   workspace Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   member    FamilyMember    @relation("MemberLocationPoints", fields: [memberId], references: [id], onDelete: Cascade)
-  device    WearableDevice? @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
+  device    WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
   // Plus CHECK constraints added via raw SQL in the migration:
   // latitude BETWEEN -90 AND 90, longitude BETWEEN -180 AND 180.
@@ -1480,7 +1484,7 @@ model MemberLocationPoint {
 
 /// Shared in-app notifications (reused across modules; SOS uses type=SOS).
 model Notification {
-  notificationId    String               @id @default(dbgenerated("gen_random_uuid()")) @map("notification_id") @db.Uuid
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @map("notification_id") @db.Uuid
   familyId          String               @map("family_id")
   recipientMemberId String               @map("recipient_member_id")
   type              NotificationType     @map("type")
@@ -1568,11 +1572,14 @@ enum AlbumMediaType {
 enum AlbumVisibilityScope {
   FAMILY
   PRIVATE
+  MANAGER_ONLY
 }
 
 enum MediaModerationStatus {
   PENDING
+  PROCESSING
   SAFE
+  NEED_REVIEW
   FLAGGED
 }
 
@@ -1585,6 +1592,19 @@ enum MediaCheckResult {
   SAFE
   FLAGGED
   NEED_REVIEW
+}
+
+enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
 }
 
 enum AiSenderType {
@@ -1602,15 +1622,15 @@ enum AiRelatedModule {
 
 /// Provisioning/activation audit log của một family workspace (admin).
 model WorkspaceProvisioningLog {
-  provisioningLogId String                 @id @default(dbgenerated("gen_random_uuid()")) @map("provisioning_log_id") @db.Uuid
-  workspaceId       String                 @map("workspace_id")
-  actionType        ProvisioningActionType @map("action_type")
-  status            ProvisioningStatus     @default(PENDING) @map("status")
-  message           String?                @map("message")
-  startedAt         DateTime?              @map("started_at") @db.Timestamptz
-  finishedAt        DateTime?              @map("finished_at") @db.Timestamptz
-  createdByUserId   String?                @map("created_by_user_id")
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @map("provisioning_log_id") @db.Uuid
+  workspaceId     String                 @map("workspace_id")
+  actionType      ProvisioningActionType @map("action_type")
+  status          ProvisioningStatus     @default(PENDING) @map("status")
+  message         String?                @map("message")
+  startedAt       DateTime?              @map("started_at") @db.Timestamptz
+  finishedAt      DateTime?              @map("finished_at") @db.Timestamptz
+  createdByUserId String?                @map("created_by_user_id")
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz
 
   workspace     Family @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdByUser User?  @relation("CreatedProvisioningLogs", fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -1623,7 +1643,7 @@ model WorkspaceProvisioningLog {
 
 /// Hội thoại nhóm/riêng trong một family workspace (chat).
 model Conversation {
-  conversationId    String             @id @default(dbgenerated("gen_random_uuid()")) @map("conversation_id") @db.Uuid
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @map("conversation_id") @db.Uuid
   workspaceId       String             @map("workspace_id")
   conversationType  ConversationType   @default(GROUP) @map("conversation_type")
   conversationName  String?            @map("conversation_name")
@@ -1650,7 +1670,7 @@ model Conversation {
 
 /// Thành viên tham gia một hội thoại.
 model ConversationParticipant {
-  participantId     String            @id @default(dbgenerated("gen_random_uuid()")) @map("participant_id") @db.Uuid
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @map("participant_id") @db.Uuid
   conversationId    String            @map("conversation_id") @db.Uuid
   memberId          String            @map("member_id")
   joinedAt          DateTime          @default(now()) @map("joined_at") @db.Timestamptz
@@ -1659,7 +1679,7 @@ model ConversationParticipant {
   /// Read receipt: đã đọc tới thời điểm này (đếm unread = message sentAt > lastReadAt).
   lastReadAt        DateTime?         @map("last_read_at") @db.Timestamptz
 
-  conversation Conversation @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   member       FamilyMember @relation("ConversationParticipations", fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, memberId])
@@ -1670,7 +1690,7 @@ model ConversationParticipant {
 
 /// Tin nhắn trong một hội thoại.
 model Message {
-  messageId        String      @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
   conversationId   String      @map("conversation_id") @db.Uuid
   senderMemberId   String      @map("sender_member_id")
   messageType      MessageType @default(TEXT) @map("message_type")
@@ -1684,9 +1704,9 @@ model Message {
   editedAt         DateTime?   @map("edited_at") @db.Timestamptz
   deletedAt        DateTime?   @map("deleted_at") @db.Timestamptz
 
-  conversation   Conversation  @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderMember   FamilyMember  @relation("SentMessages", fields: [senderMemberId], references: [id], onDelete: Cascade)
-  replyTo        Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [messageId], onDelete: SetNull)
+  replyTo        Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
   replies        Message[]     @relation("MessageReplies")
   pinnedByMember FamilyMember? @relation("PinnedMessages", fields: [pinnedByMemberId], references: [id], onDelete: SetNull)
 
@@ -1701,13 +1721,13 @@ model Message {
 
 /// Reaction (thả cảm xúc) trên một tin nhắn.
 model MessageReaction {
-  reactionId String   @id @default(dbgenerated("gen_random_uuid()")) @map("reaction_id") @db.Uuid
-  messageId  String   @map("message_id") @db.Uuid
-  memberId   String   @map("member_id")
-  emoji      String   @map("emoji")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @map("reaction_id") @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  memberId  String   @map("member_id")
+  emoji     String   @map("emoji")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  message Message      @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  message Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
   member  FamilyMember @relation("MessageReactions", fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, memberId, emoji])
@@ -1718,15 +1738,15 @@ model MessageReaction {
 
 /// Tệp đính kèm của một tin nhắn.
 model MessageAttachment {
-  attachmentId String   @id @default(dbgenerated("gen_random_uuid()")) @map("attachment_id") @db.Uuid
-  messageId    String   @map("message_id") @db.Uuid
-  fileType     String   @map("file_type")
-  fileUrl      String   @map("file_url")
-  fileName     String?  @map("file_name")
-  fileSize     Int?     @map("file_size")
-  uploadedAt   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @map("attachment_id") @db.Uuid
+  messageId  String   @map("message_id") @db.Uuid
+  fileType   String   @map("file_type")
+  fileUrl    String   @map("file_url")
+  fileName   String?  @map("file_name")
+  fileSize   Int?     @map("file_size")
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
 
-  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
   @@map("message_attachments")
@@ -1734,7 +1754,7 @@ model MessageAttachment {
 
 /// Thông báo/announcement do member tạo trong family workspace.
 model FamilyAnnouncement {
-  announcementId    String               @id @default(dbgenerated("gen_random_uuid()")) @map("announcement_id") @db.Uuid
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @map("announcement_id") @db.Uuid
   workspaceId       String               @map("workspace_id")
   createdByMemberId String               @map("created_by_member_id")
   title             String               @map("title")
@@ -1753,7 +1773,7 @@ model FamilyAnnouncement {
 
 /// Sự kiện lịch của family workspace.
 model CalendarEvent {
-  eventId           String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_id") @db.Uuid
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_id") @db.Uuid
   workspaceId       String              @map("workspace_id")
   title             String              @map("title")
   description       String?             @map("description")
@@ -1778,13 +1798,13 @@ model CalendarEvent {
 
 /// Thành viên được mời tham gia một sự kiện lịch.
 model CalendarEventParticipant {
-  eventParticipantId String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_participant_id") @db.Uuid
-  eventId            String              @map("event_id") @db.Uuid
-  memberId           String              @map("member_id")
-  responseStatus     EventResponseStatus @default(INVITED) @map("response_status")
-  reminderEnabled    Boolean             @default(true) @map("reminder_enabled")
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_participant_id") @db.Uuid
+  eventId         String              @map("event_id") @db.Uuid
+  memberId        String              @map("member_id")
+  responseStatus  EventResponseStatus @default(INVITED) @map("response_status")
+  reminderEnabled Boolean             @default(true) @map("reminder_enabled")
 
-  event  CalendarEvent @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  event  CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   member FamilyMember  @relation("CalendarEventParticipations", fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, memberId])
@@ -1795,67 +1815,128 @@ model CalendarEventParticipant {
 
 /// Ảnh/video trong album gia đình.
 model AlbumMedia {
-  mediaId            String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
-  workspaceId        String                @map("workspace_id")
-  uploadedByMemberId String                @map("uploaded_by_member_id")
-  mediaType          AlbumMediaType        @map("media_type")
-  mediaUrl           String                @map("media_url")
-  thumbnailUrl       String?               @map("thumbnail_url")
-  caption            String?               @map("caption")
-  visibilityScope    AlbumVisibilityScope  @default(FAMILY) @map("visibility_scope")
-  moderationStatus   MediaModerationStatus @default(PENDING) @map("moderation_status")
-  uploadedAt         DateTime              @default(now()) @map("uploaded_at") @db.Timestamptz
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
+  workspaceId            String                @map("workspace_id")
+  uploadedByMemberId     String                @map("uploaded_by_member_id")
+  mediaType              AlbumMediaType        @map("media_type")
+  mediaUrl               String?               @map("media_url")
+  storageKey             String?               @map("storage_key")
+  originalFileName       String?               @map("original_file_name")
+  mimeType               String?               @map("mime_type")
+  fileSize               Int?                  @map("file_size")
+  thumbnailUrl           String?               @map("thumbnail_url")
+  caption                String?               @map("caption")
+  visibilityScope        AlbumVisibilityScope  @default(FAMILY) @map("visibility_scope")
+  moderationStatus       MediaModerationStatus @default(PENDING) @map("moderation_status")
+  uploadedAt             DateTime              @default(now()) @map("uploaded_at") @db.Timestamptz
+  updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?             @map("deleted_at") @db.Timestamptz
+  deletedByMemberId      String?               @map("deleted_by_member_id")
+  deleteReason           String?               @map("delete_reason")
+  moderationStartedAt    DateTime?             @map("moderation_started_at") @db.Timestamptz
+  moderationCompletedAt  DateTime?             @map("moderation_completed_at") @db.Timestamptz
+  moderationAttemptCount Int                   @default(0) @map("moderation_attempt_count")
+  lastModerationError    String?               @map("last_moderation_error")
+  latestModerationJobId  String?               @map("latest_moderation_job_id") @db.Uuid
+  moderationQueuedAt     DateTime?             @map("moderation_queued_at") @db.Timestamptz
 
-  workspace        Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  uploadedByMember FamilyMember @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  workspace        Family        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedByMember FamilyMember  @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  deletedByMember  FamilyMember? @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
 
   tags             AlbumMediaTag[]
   moderationChecks MediaModerationCheck[]
+  cleanupJobs      StorageCleanupJob[]    @relation("MediaCleanupJobs")
 
   @@index([workspaceId])
   @@index([uploadedByMemberId])
   @@index([moderationStatus])
+  @@index([workspaceId, uploadedAt])
+  @@index([workspaceId, deletedAt, uploadedAt])
+  @@index([workspaceId, moderationStatus, uploadedAt])
+  @@index([moderationStatus, moderationStartedAt])
+  @@index([moderationStatus, moderationQueuedAt])
+  @@index([deletedByMemberId])
   @@map("album_media")
 }
 
 /// Tag gắn thành viên vào một media (manual tagging cho MVP).
 model AlbumMediaTag {
-  tagId            String   @id @default(dbgenerated("gen_random_uuid()")) @map("tag_id") @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @map("tag_id") @db.Uuid
   mediaId          String   @map("media_id") @db.Uuid
   taggedMemberId   String   @map("tagged_member_id")
   taggedByMemberId String   @map("tagged_by_member_id")
   tagNote          String?  @map("tag_note")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  media          AlbumMedia   @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media          AlbumMedia   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   taggedMember   FamilyMember @relation("TaggedAlbumMediaTags", fields: [taggedMemberId], references: [id], onDelete: Cascade)
   taggedByMember FamilyMember @relation("CreatedAlbumMediaTags", fields: [taggedByMemberId], references: [id], onDelete: Cascade)
 
+  @@unique([mediaId, taggedMemberId])
   @@index([mediaId])
   @@index([taggedMemberId])
   @@index([taggedByMemberId])
   @@map("album_media_tags")
 }
 
+/// Durable retry record for R2/database cleanup; never stores signed URLs or credentials.
+model StorageCleanupJob {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @map("cleanup_job_id") @db.Uuid
+  workspaceId  String?              @map("workspace_id")
+  mediaId      String?              @map("media_id") @db.Uuid
+  storageKey   String               @unique @map("storage_key")
+  reason       StorageCleanupReason @map("reason")
+  status       StorageCleanupStatus @default(PENDING) @map("status")
+  attemptCount Int                  @default(0) @map("attempt_count")
+  lastError    String?              @map("last_error")
+  nextRetryAt  DateTime?            @default(now()) @map("next_retry_at") @db.Timestamptz
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace Family?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  media     AlbumMedia? @relation("MediaCleanupJobs", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextRetryAt])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@map("storage_cleanup_jobs")
+}
+
 /// Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).
 model MediaModerationCheck {
-  moderationId    String           @id @default(dbgenerated("gen_random_uuid()")) @map("moderation_id") @db.Uuid
-  mediaId         String           @map("media_id") @db.Uuid
-  checkType       MediaCheckType   @map("check_type")
-  resultStatus    MediaCheckResult @map("result_status")
-  confidenceScore Decimal?         @map("confidence_score") @db.Decimal(5, 4)
-  checkedAt       DateTime         @default(now()) @map("checked_at") @db.Timestamptz
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @map("moderation_id") @db.Uuid
+  mediaId            String           @map("media_id") @db.Uuid
+  jobId              String?          @unique @map("job_id") @db.Uuid
+  checkType          MediaCheckType   @map("check_type")
+  provider           String?          @map("provider")
+  modelName          String?          @map("model_name")
+  resultStatus       MediaCheckResult @map("result_status")
+  confidenceScore    Decimal?         @map("confidence_score") @db.Decimal(5, 4)
+  categories         Json?            @map("categories")
+  reasonCode         String?          @map("reason_code")
+  summary            String?          @map("summary")
+  errorCode          String?          @map("error_code")
+  errorMessage       String?          @map("error_message")
+  reviewedByMemberId String?          @map("reviewed_by_member_id")
+  reviewNote         String?          @map("review_note")
+  reviewedAt         DateTime?        @map("reviewed_at") @db.Timestamptz
+  checkedAt          DateTime         @default(now()) @map("checked_at") @db.Timestamptz
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
-  media AlbumMedia @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media            AlbumMedia    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  reviewedByMember FamilyMember? @relation("ReviewedModerationChecks", fields: [reviewedByMemberId], references: [id], onDelete: SetNull)
 
   @@index([mediaId])
+  @@index([mediaId, checkedAt])
   @@index([checkType])
+  @@index([reviewedByMemberId])
   @@map("media_moderation_checks")
 }
 
 /// Phiên hội thoại với AI assistant (theo từng member trong workspace).
 model AIConversation {
-  aiConversationId  String   @id @default(dbgenerated("gen_random_uuid()")) @map("ai_conversation_id") @db.Uuid
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @map("ai_conversation_id") @db.Uuid
   workspaceId       String   @map("workspace_id")
   memberId          String   @map("member_id")
   conversationTitle String?  @map("conversation_title")
@@ -1873,7 +1954,7 @@ model AIConversation {
 
 /// Tin nhắn trong một phiên AIConversation.
 model AIMessage {
-  aiMessageId       String           @id @default(dbgenerated("gen_random_uuid()")) @map("ai_message_id") @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @map("ai_message_id") @db.Uuid
   aiConversationId  String           @map("ai_conversation_id") @db.Uuid
   senderType        AiSenderType     @map("sender_type")
   messageContent    String           @map("message_content")
@@ -1881,7 +1962,7 @@ model AIMessage {
   permissionContext Json?            @map("permission_context")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
-  aiConversation AIConversation @relation(fields: [aiConversationId], references: [aiConversationId], onDelete: Cascade)
+  aiConversation AIConversation @relation(fields: [aiConversationId], references: [id], onDelete: Cascade)
 
   @@index([aiConversationId])
   @@map("ai_messages")
