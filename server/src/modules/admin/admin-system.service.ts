@@ -44,13 +44,23 @@ export class AdminSystemService {
 
   getRuntime() {
     const memory = process.memoryUsage();
+    const uptimeSeconds = Math.floor(process.uptime());
     return {
+      nodeVersion: process.version,
+      node_version: process.version,
+      pid: process.pid,
+      uptime: uptimeSeconds,
+      memoryUsage: {
+        rss: memory.rss,
+        heapUsed: memory.heapUsed,
+        heapTotal: memory.heapTotal,
+      },
       node: {
         version: process.version,
         environment: process.env.NODE_ENV ?? 'development',
       },
       process: {
-        uptimeSeconds: Math.floor(process.uptime()),
+        uptimeSeconds,
         pid: process.pid,
       },
       memory: {
