@@ -1934,7 +1934,7 @@ model FaceScanJob {
   updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace         Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  media             AlbumMedia           @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media             AlbumMedia           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   requestedByMember FamilyMember         @relation("RequestedFaceScanJobs", fields: [requestedByMemberId], references: [id], onDelete: Restrict)
   detections        AlbumFaceDetection[]
 
@@ -1962,7 +1962,7 @@ model AlbumFaceDetection {
 
   workspace   Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   scanJob     FaceScanJob          @relation(fields: [scanJobId], references: [scanJobId], onDelete: Cascade)
-  media       AlbumMedia           @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media       AlbumMedia           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   suggestions AlbumTagSuggestion[]
 
   @@unique([scanJobId, faceIndex])
@@ -1992,7 +1992,7 @@ model AlbumTagSuggestion {
 
   workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   detection         AlbumFaceDetection @relation(fields: [detectionId], references: [detectionId], onDelete: Cascade)
-  media             AlbumMedia         @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  media             AlbumMedia         @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   suggestedMember   FamilyMember       @relation("SuggestedAlbumTagSuggestions", fields: [suggestedMemberId], references: [id], onDelete: Restrict)
   confirmedByMember FamilyMember?      @relation("ConfirmedAlbumTagSuggestions", fields: [confirmedByMemberId], references: [id], onDelete: SetNull)
   rejectedByMember  FamilyMember?      @relation("RejectedAlbumTagSuggestions", fields: [rejectedByMemberId], references: [id], onDelete: SetNull)

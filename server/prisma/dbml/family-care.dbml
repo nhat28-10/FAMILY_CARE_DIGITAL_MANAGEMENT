@@ -1996,7 +1996,7 @@ Ref: album_media_tags.taggedByMemberId > family_members.id [delete: Cascade]
 
 Ref: face_scan_jobs.workspaceId > families.id [delete: Cascade]
 
-Ref: face_scan_jobs.mediaId > album_media.mediaId [delete: Cascade]
+Ref: face_scan_jobs.mediaId > album_media.id [delete: Cascade]
 
 Ref: face_scan_jobs.requestedByMemberId > family_members.id [delete: Restrict]
 
@@ -2004,13 +2004,13 @@ Ref: album_face_detections.workspaceId > families.id [delete: Cascade]
 
 Ref: album_face_detections.scanJobId > face_scan_jobs.scanJobId [delete: Cascade]
 
-Ref: album_face_detections.mediaId > album_media.mediaId [delete: Cascade]
+Ref: album_face_detections.mediaId > album_media.id [delete: Cascade]
 
 Ref: album_tag_suggestions.workspaceId > families.id [delete: Cascade]
 
 Ref: album_tag_suggestions.detectionId > album_face_detections.detectionId [delete: Cascade]
 
-Ref: album_tag_suggestions.mediaId > album_media.mediaId [delete: Cascade]
+Ref: album_tag_suggestions.mediaId > album_media.id [delete: Cascade]
 
 Ref: album_tag_suggestions.suggestedMemberId > family_members.id [delete: Restrict]
 

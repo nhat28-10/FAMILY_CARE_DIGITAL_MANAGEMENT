@@ -71,7 +71,7 @@ type SuggestionWithDetection = Prisma.AlbumTagSuggestionGetPayload<{
 
 type ScannableMedia = Pick<
   AlbumMedia,
-  | 'mediaId'
+  | 'id'
   | 'workspaceId'
   | 'uploadedByMemberId'
   | 'mediaType'
@@ -680,7 +680,7 @@ export class AlbumFaceSuggestionsService {
     requester: FamilyMember,
   ) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId, deletedAt: null },
+      where: { id: mediaId, workspaceId, deletedAt: null },
     });
     if (!media || !this.policy.canMemberAccessMedia(media, requester)) {
       throw new NotFoundException('Không tìm thấy media');
