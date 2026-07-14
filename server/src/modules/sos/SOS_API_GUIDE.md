@@ -62,9 +62,9 @@ resolve/cancel.
 }
 ```
 
-`data` trả về: alert đầy đủ — `sosAlertId`, `status: "ACTIVE"`, `triggeredByMember`
+`data` trả về: alert đầy đủ — `id`, `status: "ACTIVE"`, `triggeredByMember`
 (kèm `user.fullName/avatarUrl`), `responses[]`, `locationPoints[]`, `triggeredAt`.
-→ **FE lưu `sosAlertId`** để dùng cho các bước sau.
+→ **FE lưu `id`** để dùng cho các bước sau (mọi resource đều dùng field `id` làm khóa chính).
 
 Side-effect: mọi thành viên khác nhận notification CRITICAL (in-app) + sự kiện
 socket `sos:new`; thiết bị người kích hoạt nhận `sos:track:start` (mục 3.3).
@@ -93,6 +93,10 @@ socket `sos:new`; thiết bị người kích hoạt nhận `sos:track:start` (m
 ```json
 { "points": [ { ...như trên... }, { ... } ] }   // 1..100 điểm
 ```
+
+Điểm nào thiếu `recordedAt` sẽ được server gán timestamp **tăng dần theo thứ tự
+mảng** (điểm cuối mảng = mới nhất) — vì vậy hãy gửi points theo đúng thứ tự thời
+gian ghi nhận; `latest` trong response và event `sos:location` sẽ là điểm cuối.
 
 Lỗi thường gặp: `403` không phải người kích hoạt / thiết bị không thuộc về bạn;
 `400` cảnh báo đã kết thúc.
@@ -325,7 +329,7 @@ async function onSosButtonPress() {
 connect /sos + sos:join ────────────────▶
                                           ◀──────────────── connect /sos + sos:join
 POST /alerts ───────────────────────────▶
-   ◀── data.sosAlertId                    ── sos:new ─────────────────▶ (mở map)
+   ◀── data.id                            ── sos:new ─────────────────▶ (mở map)
    ◀── sos:track:start {intervalSec:5}
 (mỗi 5s) sos:location:push ────────────▶  ── sos:location ───────────▶ (marker di chuyển)
                                           ◀───────── POST /responses {NEED_HELP}

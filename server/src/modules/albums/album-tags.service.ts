@@ -132,7 +132,7 @@ export class AlbumTagsService {
 
   async list(workspaceId: string, mediaId: string, requester: FamilyMember) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId, deletedAt: null },
+      where: { id: mediaId, workspaceId, deletedAt: null },
     });
     if (!media || !this.policy.canViewTags(media, requester)) {
       throw new NotFoundException('Không tìm thấy media');
@@ -141,7 +141,7 @@ export class AlbumTagsService {
     const tags = await this.prisma.albumMediaTag.findMany({
       where: { mediaId },
       include: albumTagInclude,
-      orderBy: [{ createdAt: 'asc' }, { tagId: 'asc' }],
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     return {
@@ -158,7 +158,7 @@ export class AlbumTagsService {
   ) {
     const media = await this.getScopedMedia(workspaceId, mediaId);
     const tag = await this.prisma.albumMediaTag.findFirst({
-      where: { tagId, mediaId },
+      where: { id: tagId, mediaId },
     });
     if (!tag) {
       throw new NotFoundException('Không tìm thấy tag');
@@ -167,13 +167,13 @@ export class AlbumTagsService {
       throw new ForbiddenException('Bạn không có quyền gỡ tag này');
     }
 
-    await this.prisma.albumMediaTag.delete({ where: { tagId } });
-    return { tagId, removed: true };
+    await this.prisma.albumMediaTag.delete({ where: { id: tagId } });
+    return { id: tagId, removed: true };
   }
 
   private async getScopedMedia(workspaceId: string, mediaId: string) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
     });
     if (!media) {
       throw new NotFoundException('Không tìm thấy media');
@@ -187,7 +187,7 @@ export class AlbumTagsService {
     requester: FamilyMember,
   ) {
     return {
-      tagId: tag.tagId,
+      id: tag.id,
       tagNote: tag.tagNote,
       createdAt: tag.createdAt,
       taggedMember: {

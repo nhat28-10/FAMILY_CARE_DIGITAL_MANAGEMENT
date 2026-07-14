@@ -47,7 +47,7 @@ const job: AlbumModerationJob = {
 
 function albumMedia(overrides: Partial<AlbumMedia> = {}): AlbumMedia {
   return {
-    mediaId,
+    id: mediaId,
     workspaceId,
     uploadedByMemberId: 'uploader',
     mediaType: AlbumMediaType.PHOTO,

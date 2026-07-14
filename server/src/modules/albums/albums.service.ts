@@ -115,7 +115,7 @@ export class AlbumsService {
     }
 
     await this.moderation.enqueueAfterUpload(media);
-    return this.detail(workspaceId, media.mediaId, member);
+    return this.detail(workspaceId, media.id, member);
   }
 
   async list(
@@ -200,7 +200,7 @@ export class AlbumsService {
         include: albumMediaInclude,
         skip,
         take: query.limit,
-        orderBy: [{ uploadedAt: direction }, { mediaId: direction }],
+        orderBy: [{ uploadedAt: direction }, { id: direction }],
       }),
     ]);
 
@@ -219,7 +219,7 @@ export class AlbumsService {
 
   async detail(workspaceId: string, mediaId: string, member: FamilyMember) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId, deletedAt: null },
+      where: { id: mediaId, workspaceId, deletedAt: null },
       include: albumMediaInclude,
     });
     if (!media || !this.policy.canViewMetadata(media, member)) {
@@ -246,7 +246,7 @@ export class AlbumsService {
     }
 
     const updated = await this.prisma.albumMedia.update({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
       data: {
         ...(dto.caption !== undefined
           ? { caption: this.normalizeOptionalText(dto.caption) }
@@ -274,7 +274,7 @@ export class AlbumsService {
       throw new BadRequestException('Media đã được xóa trước đó');
     }
     const updated = await this.prisma.albumMedia.update({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
       data: {
         deletedAt: new Date(),
         deletedByMemberId: member.id,
@@ -294,7 +294,7 @@ export class AlbumsService {
       throw new BadRequestException('Media chưa bị xóa');
     }
     const updated = await this.prisma.albumMedia.update({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
       data: {
         deletedAt: null,
         deletedByMemberId: null,
@@ -339,7 +339,9 @@ export class AlbumsService {
       throw error;
     }
     try {
-      await this.prisma.albumMedia.delete({ where: { mediaId, workspaceId } });
+      await this.prisma.albumMedia.delete({
+        where: { id: mediaId, workspaceId },
+      });
     } catch (error) {
       await this.cleanup.record(
         workspaceId,
@@ -349,12 +351,12 @@ export class AlbumsService {
       );
       throw error;
     }
-    return { mediaId, permanentlyDeleted: true };
+    return { id: mediaId, permanentlyDeleted: true };
   }
 
   private async getScopedMedia(workspaceId: string, mediaId: string) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
       include: albumMediaInclude,
     });
     if (!media) throw new NotFoundException('Không tìm thấy media');
@@ -416,7 +418,7 @@ export class AlbumsService {
         : null;
 
     return {
-      mediaId: media.mediaId,
+      id: media.id,
       mediaType: media.mediaType,
       caption: media.caption,
       visibilityScope: media.visibilityScope,

@@ -56,7 +56,7 @@ export class SosController {
   @ResponseMessage('Đã kích hoạt cảnh báo SOS')
   @ApiOperation({ summary: 'Kích hoạt cảnh báo SOS (mọi thành viên)' })
   @ApiCreatedResponse({
-    description: 'Cảnh báo SOS vừa được tạo, data dùng sosAlertId làm ID chuẩn',
+    description: 'Cảnh báo SOS vừa được tạo, data dùng id làm ID chuẩn',
     type: SosAlertApiResponseDto,
   })
   trigger(
@@ -71,8 +71,7 @@ export class SosController {
   @ResponseMessage('Lấy danh sách cảnh báo SOS thành công')
   @ApiOperation({ summary: 'Lịch sử cảnh báo SOS của gia đình' })
   @ApiOkResponse({
-    description:
-      'Danh sách cảnh báo SOS, mỗi item dùng sosAlertId làm ID chuẩn',
+    description: 'Danh sách cảnh báo SOS, mỗi item dùng id làm ID chuẩn',
     type: SosAlertListApiResponseDto,
   })
   list(
@@ -88,7 +87,7 @@ export class SosController {
     summary: 'Chi tiết một cảnh báo SOS (kèm phản hồi + vị trí)',
   })
   @ApiOkResponse({
-    description: 'Chi tiết cảnh báo SOS, data dùng sosAlertId làm ID chuẩn',
+    description: 'Chi tiết cảnh báo SOS, data dùng id làm ID chuẩn',
     type: SosAlertApiResponseDto,
   })
   getOne(
@@ -174,8 +173,7 @@ export class SosController {
     summary: 'Resolve cảnh báo SOS (FAMILY_MANAGER / DEPUTY_MEMBER)',
   })
   @ApiOkResponse({
-    description:
-      'Cảnh báo SOS sau khi resolve, data dùng sosAlertId làm ID chuẩn',
+    description: 'Cảnh báo SOS sau khi resolve, data dùng id làm ID chuẩn',
     type: SosAlertApiResponseDto,
   })
   resolve(
@@ -194,7 +192,7 @@ export class SosController {
     summary: 'Hủy cảnh báo SOS (FAMILY_MANAGER / DEPUTY_MEMBER)',
   })
   @ApiOkResponse({
-    description: 'Cảnh báo SOS sau khi hủy, data dùng sosAlertId làm ID chuẩn',
+    description: 'Cảnh báo SOS sau khi hủy, data dùng id làm ID chuẩn',
     type: SosAlertApiResponseDto,
   })
   cancel(

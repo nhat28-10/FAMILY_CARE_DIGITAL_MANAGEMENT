@@ -65,7 +65,7 @@ export class SendMessageDto {
   content?: string;
 
   @ApiPropertyOptional({
-    description: 'messageId của tin được trả lời (reply/quote)',
+    description: 'id của tin nhắn được trả lời (reply/quote)',
     format: 'uuid',
   })
   @IsOptional()

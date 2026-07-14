@@ -25,8 +25,8 @@ const now = new Date('2026-07-12T00:00:00.000Z');
 
 function member(
   id: string,
-  familyRole = FamilyRole.FAMILY_MEMBER,
-  status = MemberStatus.ACTIVE,
+  familyRole: FamilyRole = FamilyRole.FAMILY_MEMBER,
+  status: MemberStatus = MemberStatus.ACTIVE,
   familyId = 'family-1',
 ) {
   return {
@@ -46,8 +46,8 @@ function member(
 
 function selectedMember(
   id: string,
-  familyRole = FamilyRole.FAMILY_MEMBER,
-  status = MemberStatus.ACTIVE,
+  familyRole: FamilyRole = FamilyRole.FAMILY_MEMBER,
+  status: MemberStatus = MemberStatus.ACTIVE,
 ) {
   return {
     id,
@@ -61,7 +61,7 @@ function selectedMember(
 
 function media(overrides: Record<string, unknown> = {}) {
   return {
-    mediaId: 'media-1',
+    id: 'media-1',
     workspaceId: 'family-1',
     uploadedByMemberId: 'uploader',
     mediaType: AlbumMediaType.PHOTO,
@@ -91,7 +91,7 @@ function media(overrides: Record<string, unknown> = {}) {
 
 function tag(overrides: Record<string, unknown> = {}) {
   return {
-    tagId: 'tag-1',
+    id: 'tag-1',
     mediaId: 'media-1',
     taggedMemberId: 'tagged',
     taggedByMemberId: 'requester',
@@ -216,7 +216,7 @@ describe('AlbumTagsService', () => {
       service.add('family-1', 'media-1', member('uploader'), {
         taggedMemberId: 'uploader',
       }),
-    ).resolves.toMatchObject({ tagId: 'tag-1' });
+    ).resolves.toMatchObject({ id: 'tag-1' });
 
     prisma.familyMember.findFirst.mockResolvedValue(selectedMember('tagged'));
     await expect(
@@ -281,7 +281,7 @@ describe('AlbumTagsService', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.albumMedia.findFirst).toHaveBeenCalledWith({
-      where: { mediaId: 'media-other', workspaceId: 'family-1' },
+      where: { id: 'media-other', workspaceId: 'family-1' },
     });
 
     prisma.albumMedia.findFirst.mockResolvedValueOnce(media());
@@ -349,9 +349,9 @@ describe('AlbumTagsService', () => {
 
     await expect(
       service.remove('family-1', 'media-1', 'tag-1', member(id, role)),
-    ).resolves.toEqual({ tagId: 'tag-1', removed: true });
+    ).resolves.toEqual({ id: 'tag-1', removed: true });
     expect(prisma.albumMediaTag.findFirst).toHaveBeenCalledWith({
-      where: { tagId: 'tag-1', mediaId: 'media-1' },
+      where: { id: 'tag-1', mediaId: 'media-1' },
     });
   });
 

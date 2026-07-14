@@ -9,7 +9,7 @@ const now = new Date('2026-07-12T00:00:00.000Z');
 
 function cleanupJob(overrides: Record<string, unknown> = {}) {
   return {
-    cleanupJobId: 'cleanup-1',
+    id: 'cleanup-1',
     workspaceId: 'family-1',
     mediaId: null,
     storageKey: 'album-media/family-1/orphan.jpg',
@@ -88,7 +88,7 @@ describe('AlbumStorageCleanupService', () => {
       true,
     );
     expect(prisma.storageCleanupJob.update).toHaveBeenLastCalledWith({
-      where: { cleanupJobId: 'cleanup-1' },
+      where: { id: 'cleanup-1' },
       data: {
         status: StorageCleanupStatus.COMPLETED,
         lastError: null,
@@ -106,7 +106,7 @@ describe('AlbumStorageCleanupService', () => {
       }),
     ]);
     prisma.albumMedia.findFirst.mockResolvedValue({
-      mediaId: 'media-1',
+      id: 'media-1',
       storageKey: 'album-media/family-1/file.jpg',
       deletedAt: now,
     });
@@ -114,8 +114,8 @@ describe('AlbumStorageCleanupService', () => {
     await service.processBatch();
 
     expect(prisma.albumMedia.findFirst).toHaveBeenCalledWith({
-      where: { mediaId: 'media-1', workspaceId: 'family-1' },
-      select: { mediaId: true, storageKey: true, deletedAt: true },
+      where: { id: 'media-1', workspaceId: 'family-1' },
+      select: { id: true, storageKey: true, deletedAt: true },
     });
     expect(storage.deleteFileByKey.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.albumMedia.delete.mock.invocationCallOrder[0],
@@ -131,7 +131,7 @@ describe('AlbumStorageCleanupService', () => {
     await service.processBatch();
 
     expect(prisma.storageCleanupJob.update).toHaveBeenLastCalledWith({
-      where: { cleanupJobId: 'cleanup-1' },
+      where: { id: 'cleanup-1' },
       data: expect.objectContaining({
         status: StorageCleanupStatus.PENDING,
         lastError: expect.not.stringContaining('secret-token'),

@@ -648,7 +648,7 @@ export class AdminService {
       workspaceStatus: result.family.status,
       provisioningStatus: result.log.status,
       actionType: result.log.actionType,
-      logId: result.log.provisioningLogId,
+      logId: result.log.id,
       message:
         simulateResult === ProvisioningStatus.SUCCESS
           ? 'Retry provisioning workspace thành công.'
@@ -961,7 +961,7 @@ export class AdminService {
 
   private toProvisioningLogItem(row: ProvisioningLogRow) {
     return {
-      provisioningLogId: row.provisioningLogId,
+      id: row.id,
       familyId: row.workspaceId,
       familyName: row.workspace?.name ?? null,
       actionType: row.actionType,

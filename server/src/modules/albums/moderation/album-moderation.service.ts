@@ -130,14 +130,14 @@ export class AlbumModerationService {
       await this.createAndPushJob(media, false);
     } catch (error) {
       this.logger.warn(
-        `Không thể enqueue moderation job cho media ${media.mediaId}: ${sanitizeModerationError(error)}`,
+        `Không thể enqueue moderation job cho media ${media.id}: ${sanitizeModerationError(error)}`,
       );
     }
   }
 
   async processJob(job: AlbumModerationJob): Promise<ModerationProcessResult> {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId: job.mediaId, workspaceId: job.workspaceId },
+      where: { id: job.mediaId, workspaceId: job.workspaceId },
     });
     if (
       !media ||
@@ -151,7 +151,7 @@ export class AlbumModerationService {
     }
     const duplicate = await this.prisma.mediaModerationCheck.findUnique({
       where: { jobId: job.jobId },
-      select: { moderationId: true },
+      select: { id: true },
     });
     if (duplicate) return { action: 'ACK' };
 
@@ -160,7 +160,7 @@ export class AlbumModerationService {
     );
     const claimed = await this.prisma.albumMedia.updateMany({
       where: {
-        mediaId: job.mediaId,
+        id: job.mediaId,
         workspaceId: job.workspaceId,
         latestModerationJobId: job.jobId,
         deletedAt: null,
@@ -195,7 +195,7 @@ export class AlbumModerationService {
       if (transient && attempt < this.maxAttempts) {
         await this.prisma.albumMedia.updateMany({
           where: {
-            mediaId: media.mediaId,
+            id: media.id,
             workspaceId: media.workspaceId,
             latestModerationJobId: job.jobId,
             deletedAt: null,
@@ -308,13 +308,13 @@ export class AlbumModerationService {
         include: queueInclude,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
-        orderBy: [{ uploadedAt: direction }, { mediaId: direction }],
+        orderBy: [{ uploadedAt: direction }, { id: direction }],
       }),
     ]);
     return {
       items: await Promise.all(
         rows.map(async (media) => ({
-          mediaId: media.mediaId,
+          id: media.id,
           mediaType: media.mediaType,
           caption: media.caption,
           moderationStatus: media.moderationStatus,
@@ -355,9 +355,9 @@ export class AlbumModerationService {
 
   async history(workspaceId: string, mediaId: string, member: FamilyMember) {
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
       select: {
-        mediaId: true,
+        id: true,
         uploadedByMemberId: true,
         moderationStatus: true,
       },
@@ -370,7 +370,7 @@ export class AlbumModerationService {
     const checks = await this.prisma.mediaModerationCheck.findMany({
       where: { mediaId },
       include: historyInclude,
-      orderBy: [{ checkedAt: 'desc' }, { moderationId: 'desc' }],
+      orderBy: [{ checkedAt: 'desc' }, { id: 'desc' }],
     });
     return {
       mediaId,
@@ -403,7 +403,7 @@ export class AlbumModerationService {
   ) {
     this.assertManager(member);
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
     });
     if (!media) throw new NotFoundException('Không tìm thấy media');
     if (media.deletedAt) {
@@ -429,7 +429,7 @@ export class AlbumModerationService {
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.albumMedia.updateMany({
         where: {
-          mediaId,
+          id: mediaId,
           workspaceId,
           deletedAt: null,
           moderationStatus: media.moderationStatus,
@@ -466,7 +466,7 @@ export class AlbumModerationService {
   async retry(workspaceId: string, mediaId: string, member: FamilyMember) {
     this.assertManager(member);
     const media = await this.prisma.albumMedia.findFirst({
-      where: { mediaId, workspaceId },
+      where: { id: mediaId, workspaceId },
     });
     if (!media) throw new NotFoundException('Không tìm thấy media');
     if (media.deletedAt) {
@@ -523,7 +523,7 @@ export class AlbumModerationService {
   ): Promise<void> {
     const media = await this.prisma.albumMedia.findFirst({
       where: {
-        mediaId: job.mediaId,
+        id: job.mediaId,
         workspaceId: job.workspaceId,
         latestModerationJobId: job.jobId,
         deletedAt: null,
@@ -532,7 +532,7 @@ export class AlbumModerationService {
     if (!media) return;
     const duplicate = await this.prisma.mediaModerationCheck.findUnique({
       where: { jobId: job.jobId },
-      select: { moderationId: true },
+      select: { id: true },
     });
     if (duplicate) return;
     await this.completeAsNeedReview(
@@ -560,7 +560,7 @@ export class AlbumModerationService {
       version: MODERATION_JOB_VERSION,
       type: MODERATION_JOB_TYPE,
       jobId,
-      mediaId: media.mediaId,
+      mediaId: media.id,
       workspaceId: media.workspaceId,
       storageKey: media.storageKey,
       mediaType: media.mediaType,
@@ -568,7 +568,7 @@ export class AlbumModerationService {
     };
     const updated = await this.prisma.albumMedia.updateMany({
       where: {
-        mediaId: media.mediaId,
+        id: media.id,
         workspaceId: media.workspaceId,
         deletedAt: null,
       },
@@ -594,7 +594,7 @@ export class AlbumModerationService {
       const message = sanitizeModerationError(error);
       await this.prisma.albumMedia.updateMany({
         where: {
-          mediaId: media.mediaId,
+          id: media.id,
           workspaceId: media.workspaceId,
           latestModerationJobId: jobId,
           deletedAt: null,
@@ -602,7 +602,7 @@ export class AlbumModerationService {
         data: { lastModerationError: message },
       });
       this.logger.warn(
-        `Push moderation job ${jobId} thất bại cho media ${media.mediaId}: ${message}`,
+        `Push moderation job ${jobId} thất bại cho media ${media.id}: ${message}`,
       );
       if (throwOnPushError) {
         throw new ServiceUnavailableException(
@@ -732,7 +732,7 @@ export class AlbumModerationService {
     await this.prisma.$transaction(async (tx) => {
       await tx.mediaModerationCheck.create({
         data: {
-          mediaId: media.mediaId,
+          mediaId: media.id,
           jobId: job.jobId,
           checkType: MediaCheckType.SENSITIVE_CONTENT,
           provider: 'CLOUDFLARE_WORKERS_AI',
@@ -747,7 +747,7 @@ export class AlbumModerationService {
       });
       const updated = await tx.albumMedia.updateMany({
         where: {
-          mediaId: media.mediaId,
+          id: media.id,
           workspaceId: media.workspaceId,
           latestModerationJobId: job.jobId,
           deletedAt: null,
@@ -779,7 +779,7 @@ export class AlbumModerationService {
     await this.prisma.$transaction(async (tx) => {
       await tx.mediaModerationCheck.create({
         data: {
-          mediaId: media.mediaId,
+          mediaId: media.id,
           jobId: job.jobId,
           checkType: MediaCheckType.SENSITIVE_CONTENT,
           provider: 'CLOUDFLARE_WORKERS_AI',
@@ -795,7 +795,7 @@ export class AlbumModerationService {
       });
       const updated = await tx.albumMedia.updateMany({
         where: {
-          mediaId: media.mediaId,
+          id: media.id,
           workspaceId: media.workspaceId,
           latestModerationJobId: job.jobId,
           deletedAt: null,
