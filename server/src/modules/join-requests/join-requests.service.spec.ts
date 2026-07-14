@@ -7,10 +7,19 @@ import {
   FamilyRole,
   JoinRequestStatus,
   MemberStatus,
+  Prisma,
   Relationship,
 } from '@prisma/client';
 
 import { JoinRequestsService } from './join-requests.service';
+
+/** P2025 giả lập race: record không còn khớp where (status đã đổi). */
+function notFoundError(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('not found', {
+    code: 'P2025',
+    clientVersion: 'test',
+  });
+}
 
 describe('JoinRequestsService', () => {
   const familyId = 'family-id';
@@ -137,6 +146,12 @@ describe('JoinRequestsService', () => {
       prisma.joinRequest.findFirst.mockResolvedValue(pendingRequest);
       const result = await service.cancel(userId, requestId);
       expect(result.status).toBe(JoinRequestStatus.CANCELED);
+      expect(prisma.joinRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: requestId, status: JoinRequestStatus.PENDING },
+          data: { status: JoinRequestStatus.CANCELED },
+        }),
+      );
     });
 
     it('404 khi yêu cầu không phải của mình', async () => {
@@ -154,6 +169,14 @@ describe('JoinRequestsService', () => {
       await expect(service.cancel(userId, requestId)).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+
+    it('400 khi bị race: status đổi giữa lúc đọc và update (P2025)', async () => {
+      prisma.joinRequest.findFirst.mockResolvedValue(pendingRequest);
+      prisma.joinRequest.update.mockRejectedValue(notFoundError());
+      await expect(service.cancel(userId, requestId)).rejects.toMatchObject({
+        message: 'Yêu cầu đã được xử lý, không thể hủy',
+      });
     });
   });
 
@@ -183,6 +206,7 @@ describe('JoinRequestsService', () => {
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.joinRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: requestId, status: JoinRequestStatus.PENDING },
           data: expect.objectContaining({
             status: JoinRequestStatus.APPROVED,
             decidedByMemberId: managerMemberId,
@@ -238,6 +262,15 @@ describe('JoinRequestsService', () => {
         service.approve(familyId, managerMemberId, requestId),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('400 khi bị race: status đổi giữa lúc đọc và duyệt (P2025)', async () => {
+      prisma.$transaction.mockRejectedValue(notFoundError());
+      await expect(
+        service.approve(familyId, managerMemberId, requestId),
+      ).rejects.toMatchObject({
+        message: 'Chỉ có thể duyệt yêu cầu đang chờ',
+      });
+    });
   });
 
   describe('reject', () => {
@@ -246,6 +279,11 @@ describe('JoinRequestsService', () => {
       const result = await service.reject(familyId, managerMemberId, requestId);
       expect(result.status).toBe(JoinRequestStatus.REJECTED);
       expect(result.decidedByMemberId).toBe(managerMemberId);
+      expect(prisma.joinRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: requestId, status: JoinRequestStatus.PENDING },
+        }),
+      );
     });
 
     it('400 khi không còn PENDING', async () => {
@@ -256,6 +294,16 @@ describe('JoinRequestsService', () => {
       await expect(
         service.reject(familyId, managerMemberId, requestId),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('400 khi bị race: status đổi giữa lúc đọc và từ chối (P2025)', async () => {
+      prisma.joinRequest.findFirst.mockResolvedValue(pendingRequest);
+      prisma.joinRequest.update.mockRejectedValue(notFoundError());
+      await expect(
+        service.reject(familyId, managerMemberId, requestId),
+      ).rejects.toMatchObject({
+        message: 'Chỉ có thể từ chối yêu cầu đang chờ duyệt',
+      });
     });
   });
 });

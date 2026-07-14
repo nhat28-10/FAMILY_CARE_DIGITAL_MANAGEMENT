@@ -10,6 +10,7 @@ import {
   JoinRequest,
   JoinRequestStatus,
   MemberStatus,
+  Prisma,
   Relationship,
 } from '@prisma/client';
 
@@ -95,10 +96,17 @@ export class JoinRequestsService {
     if (request.status !== JoinRequestStatus.PENDING) {
       throw new BadRequestException('Yêu cầu đã được xử lý, không thể hủy');
     }
-    return this.prisma.joinRequest.update({
-      where: { id },
-      data: { status: JoinRequestStatus.CANCELED },
-    });
+    try {
+      return await this.prisma.joinRequest.update({
+        where: { id, status: JoinRequestStatus.PENDING },
+        data: { status: JoinRequestStatus.CANCELED },
+      });
+    } catch (error) {
+      if (this.isRecordNotFound(error)) {
+        throw new BadRequestException('Yêu cầu đã được xử lý, không thể hủy');
+      }
+      throw error;
+    }
   }
 
   /** Danh sách yêu cầu của family cho manager (lọc status optional). */
@@ -152,18 +160,25 @@ export class JoinRequestsService {
           data: { familyId, userId: request.userId, familyRole, relationship },
         });
 
-    const [member] = await this.prisma.$transaction([
-      memberWrite,
-      this.prisma.joinRequest.update({
-        where: { id: request.id },
-        data: {
-          status: JoinRequestStatus.APPROVED,
-          decidedByMemberId: approverMemberId,
-          decidedAt: new Date(),
-        },
-      }),
-    ]);
-    return member;
+    try {
+      const [member] = await this.prisma.$transaction([
+        memberWrite,
+        this.prisma.joinRequest.update({
+          where: { id: request.id, status: JoinRequestStatus.PENDING },
+          data: {
+            status: JoinRequestStatus.APPROVED,
+            decidedByMemberId: approverMemberId,
+            decidedAt: new Date(),
+          },
+        }),
+      ]);
+      return member;
+    } catch (error) {
+      if (this.isRecordNotFound(error)) {
+        throw new BadRequestException('Chỉ có thể duyệt yêu cầu đang chờ');
+      }
+      throw error;
+    }
   }
 
   /** Manager từ chối yêu cầu đang chờ. */
@@ -177,14 +192,23 @@ export class JoinRequestsService {
       id,
       'Chỉ có thể từ chối yêu cầu đang chờ duyệt',
     );
-    return this.prisma.joinRequest.update({
-      where: { id: request.id },
-      data: {
-        status: JoinRequestStatus.REJECTED,
-        decidedByMemberId: deciderMemberId,
-        decidedAt: new Date(),
-      },
-    });
+    try {
+      return await this.prisma.joinRequest.update({
+        where: { id: request.id, status: JoinRequestStatus.PENDING },
+        data: {
+          status: JoinRequestStatus.REJECTED,
+          decidedByMemberId: deciderMemberId,
+          decidedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (this.isRecordNotFound(error)) {
+        throw new BadRequestException(
+          'Chỉ có thể từ chối yêu cầu đang chờ duyệt',
+        );
+      }
+      throw error;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -205,6 +229,14 @@ export class JoinRequestsService {
       throw new NotFoundException('Mã mời không tồn tại');
     }
     return family;
+  }
+
+  /** true khi update/transaction thất bại vì record không còn khớp where (đã bị race). */
+  private isRecordNotFound(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2025'
+    );
   }
 
   private async findPendingInFamilyOrThrow(
