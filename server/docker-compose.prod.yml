@@ -27,7 +27,12 @@ services:
   api:
     build: .
     container_name: familycare_api
+    user: root
     env_file: .env.production
+    environment:
+      ADMIN_DOCKER_ENABLED: 'true'
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+      BACKUP_POSTGRES_CONTAINER: familycare_db
     ports:
       - '127.0.0.1:3000:3000'
     volumes:

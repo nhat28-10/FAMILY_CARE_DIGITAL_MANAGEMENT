@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { Writable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 
 import {
   BadRequestException,
@@ -10,6 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Docker from 'dockerode';
 
 import {
   buildPaginated,
@@ -43,7 +47,7 @@ type BackupJob = {
   startedAt: string | null;
   finishedAt: string | null;
   note?: string;
-  errorMessage?: string;
+  errorMessage: string | null;
 };
 
 type BackupView = BackupJob & {
@@ -74,8 +78,16 @@ type BackupExecutionResult = {
   fileName: string | null;
   filePath: string | null;
   fileSizeBytes: number | null;
-  errorMessage?: string;
+  errorMessage: string | null;
 };
+
+type PgDumpResult =
+  | { success: true }
+  | {
+      success: false;
+      errorMessage: string;
+      retryWithDbContainer?: boolean;
+    };
 
 type PgDumpConnection = {
   host: string;
@@ -89,6 +101,10 @@ type PgDumpConnection = {
 const STORAGE_RELATIVE_DIR = path.join('storage', 'backups');
 const BACKUP_JOBS_FILE = 'backup-jobs.json';
 const RESTORE_JOBS_FILE = 'restore-jobs.json';
+const DOCKER_SOCKET_PATH = '/var/run/docker.sock';
+const DEFAULT_POSTGRES_CONTAINER = 'familycare_db';
+const DEFAULT_PG_DUMP_TIMEOUT_MS = 600_000;
+const MAX_ERROR_DETAIL_LENGTH = 1_000;
 const CONFIRM_RESTORE_TEXT = 'CONFIRM_RESTORE';
 const DATABASE_BACKUP_UNAVAILABLE_MESSAGE =
   'Không thể tạo backup database vì pg_dump chưa khả dụng trong container.';
@@ -104,6 +120,7 @@ const UUID_PATTERN =
 @Injectable()
 export class AdminBackupRestoreService {
   private storageQueue: Promise<void> = Promise.resolve();
+  private readonly docker = new Docker({ socketPath: DOCKER_SOCKET_PATH });
 
   constructor(private readonly config: ConfigService) {}
 
@@ -125,6 +142,7 @@ export class AdminBackupRestoreService {
       startedAt: now,
       finishedAt: null,
       note: dto.note,
+      errorMessage: null,
     };
 
     return this.withStorageLock(async () => {
@@ -332,6 +350,19 @@ export class AdminBackupRestoreService {
     );
     const filePath = this.toRelativeStoragePath(fileName);
     const absoluteFilePath = this.absolutePath(filePath);
+
+    const storageWriteError =
+      await this.validateBackupFileWritable(absoluteFilePath);
+    if (storageWriteError) {
+      return {
+        status: 'FAILED',
+        fileName: null,
+        filePath: null,
+        fileSizeBytes: null,
+        errorMessage: storageWriteError,
+      };
+    }
+
     const result = await this.runPgDump(connection, absoluteFilePath);
 
     if (!result.success) {
@@ -350,6 +381,7 @@ export class AdminBackupRestoreService {
       fileName,
       filePath,
       fileSizeBytes: await this.getFileSize(filePath),
+      errorMessage: null,
     };
   }
 
@@ -390,34 +422,50 @@ export class AdminBackupRestoreService {
       fileName,
       filePath,
       fileSizeBytes: await this.getFileSize(filePath),
+      errorMessage: null,
     };
   }
 
-  private runPgDump(
+  private async runPgDump(
     connection: PgDumpConnection,
     absoluteFilePath: string,
-  ): Promise<{ success: true } | { success: false; errorMessage: string }> {
+  ): Promise<PgDumpResult> {
+    const localResult = await this.runLocalPgDump(connection, absoluteFilePath);
+    if (localResult.success || !localResult.retryWithDbContainer) {
+      return localResult;
+    }
+
+    await fs.rm(absoluteFilePath, { force: true });
+    const containerResult = await this.runPgDumpInDbContainer(
+      connection,
+      absoluteFilePath,
+    );
+    if (containerResult.success) {
+      return containerResult;
+    }
+
+    return {
+      success: false,
+      errorMessage: `${localResult.errorMessage} Fallback pg_dump trong DB container cũng thất bại: ${containerResult.errorMessage}`,
+    };
+  }
+
+  private runLocalPgDump(
+    connection: PgDumpConnection,
+    absoluteFilePath: string,
+  ): Promise<PgDumpResult> {
     return new Promise((resolve) => {
       const args = [
-        '-h',
-        connection.host,
-        '-p',
-        connection.port,
-        '-U',
-        connection.username,
-        '-d',
-        connection.database,
+        ...this.buildPgDumpArgs(connection),
         '--no-owner',
         '--no-privileges',
         '-f',
         absoluteFilePath,
       ];
-      if (connection.schema) {
-        args.push('-n', connection.schema);
-      }
 
       let settled = false;
       let timedOut = false;
+      const stderrChunks: Buffer[] = [];
       const pathEnv = process.env.PATH ?? process.env.Path;
       const childEnv: NodeJS.ProcessEnv = {};
       if (pathEnv) {
@@ -430,14 +478,12 @@ export class AdminBackupRestoreService {
 
       const child = spawn('pg_dump', args, {
         env: childEnv,
-        stdio: ['ignore', 'ignore', 'ignore'],
+        stdio: ['ignore', 'ignore', 'pipe'],
         shell: false,
         windowsHide: true,
       });
 
-      const finish = (
-        result: { success: true } | { success: false; errorMessage: string },
-      ) => {
+      const finish = (result: PgDumpResult) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
@@ -447,20 +493,28 @@ export class AdminBackupRestoreService {
       const timeout = setTimeout(() => {
         timedOut = true;
         child.kill('SIGTERM');
-      }, 120_000);
+      }, this.pgDumpTimeoutMs());
+
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderrChunks.push(chunk);
+      });
 
       child.on('error', (error: NodeJS.ErrnoException) => {
         if (error.code === 'ENOENT') {
           finish({
             success: false,
             errorMessage: DATABASE_BACKUP_UNAVAILABLE_MESSAGE,
+            retryWithDbContainer: true,
           });
           return;
         }
 
         finish({
           success: false,
-          errorMessage: 'Không thể khởi chạy tiến trình backup database.',
+          errorMessage: this.pgDumpFailureMessage(
+            'Không thể khởi chạy tiến trình backup database.',
+            error.message,
+          ),
         });
       });
 
@@ -481,10 +535,181 @@ export class AdminBackupRestoreService {
 
         finish({
           success: false,
-          errorMessage: 'Không thể tạo backup database bằng pg_dump.',
+          errorMessage: this.pgDumpFailureMessage(
+            `Không thể tạo backup database bằng pg_dump local (exit code ${code ?? 'unknown'}).`,
+            Buffer.concat(stderrChunks).toString('utf8'),
+          ),
+          retryWithDbContainer: this.shouldRetryWithDbContainer(
+            Buffer.concat(stderrChunks).toString('utf8'),
+          ),
         });
       });
     });
+  }
+
+  private async runPgDumpInDbContainer(
+    connection: PgDumpConnection,
+    absoluteFilePath: string,
+  ): Promise<PgDumpResult> {
+    const containerName =
+      process.env.BACKUP_POSTGRES_CONTAINER || DEFAULT_POSTGRES_CONTAINER;
+    const output = createWriteStream(absoluteFilePath, { flags: 'w' });
+    const stderrChunks: Buffer[] = [];
+    const stderr = new Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        stderrChunks.push(Buffer.from(chunk));
+        callback();
+      },
+    });
+    const outputFinished = finished(output);
+    const stderrFinished = finished(stderr);
+
+    try {
+      const container = this.docker.getContainer(containerName);
+      await container.inspect();
+      const exec = await container.exec({
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: false,
+        Env: connection.password ? [`PGPASSWORD=${connection.password}`] : [],
+        Cmd: [
+          'pg_dump',
+          ...this.buildPgDumpArgs(connection, '127.0.0.1'),
+          '--no-owner',
+          '--no-privileges',
+        ],
+      });
+      const stream = await exec.start({ hijack: true, stdin: false });
+      this.docker.modem.demuxStream(stream, output, stderr);
+      await this.waitForDockerExecStream(stream);
+      output.end();
+      stderr.end();
+      await Promise.all([outputFinished, stderrFinished]);
+
+      const inspect = await exec.inspect();
+      if (inspect.ExitCode === 0) {
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        errorMessage: this.pgDumpFailureMessage(
+          `pg_dump trong DB container ${containerName} thất bại (exit code ${inspect.ExitCode ?? 'unknown'}).`,
+          Buffer.concat(stderrChunks).toString('utf8'),
+        ),
+      };
+    } catch (error) {
+      output.destroy();
+      stderr.destroy();
+      await Promise.allSettled([outputFinished, stderrFinished]);
+      return {
+        success: false,
+        errorMessage: this.pgDumpFailureMessage(
+          `Không thể chạy pg_dump trong DB container ${containerName}.`,
+          error instanceof Error ? error.message : String(error),
+        ),
+      };
+    }
+  }
+
+  private buildPgDumpArgs(
+    connection: PgDumpConnection,
+    hostOverride?: string,
+  ): string[] {
+    const args = [
+      '-h',
+      hostOverride ?? connection.host,
+      '-p',
+      connection.port,
+      '-U',
+      connection.username,
+      '-d',
+      connection.database,
+    ];
+    if (connection.schema) {
+      args.push('-n', connection.schema);
+    }
+    return args;
+  }
+
+  private async waitForDockerExecStream(
+    stream: NodeJS.ReadableStream,
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
+      stream.once('end', done);
+      stream.once('close', done);
+      stream.once('error', fail);
+    });
+  }
+
+  private async validateBackupFileWritable(
+    absoluteFilePath: string,
+  ): Promise<string | null> {
+    try {
+      const handle = await fs.open(absoluteFilePath, 'w');
+      await handle.close();
+      await fs.rm(absoluteFilePath, { force: true });
+      return null;
+    } catch (error) {
+      return this.pgDumpFailureMessage(
+        'Không thể ghi file backup vào thư mục storage/backups.',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  private pgDumpTimeoutMs(): number {
+    const raw = process.env.BACKUP_PG_DUMP_TIMEOUT_MS;
+    const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_PG_DUMP_TIMEOUT_MS;
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_PG_DUMP_TIMEOUT_MS;
+  }
+
+  private shouldRetryWithDbContainer(stderr: string): boolean {
+    const normalized = stderr.toLowerCase();
+    return (
+      normalized.includes('server version') ||
+      normalized.includes('pg_dump version') ||
+      normalized.includes('aborting because of server version mismatch')
+    );
+  }
+
+  private pgDumpFailureMessage(message: string, detail?: string): string {
+    const safeDetail = this.sanitizeErrorDetail(detail);
+    return safeDetail ? `${message} Chi tiết: ${safeDetail}` : message;
+  }
+
+  private sanitizeErrorDetail(detail?: string): string | null {
+    const normalized = detail?.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+
+    const databaseUrl =
+      this.config.get<string>('database.url') ?? process.env.DATABASE_URL;
+    const password = this.getPgDumpConnection()?.password;
+    let sanitized = normalized;
+    if (databaseUrl) {
+      sanitized = sanitized.split(databaseUrl).join('[DATABASE_URL]');
+    }
+    if (password) {
+      sanitized = sanitized.split(password).join('[DB_PASSWORD]');
+    }
+
+    return sanitized.length > MAX_ERROR_DETAIL_LENGTH
+      ? `${sanitized.slice(0, MAX_ERROR_DETAIL_LENGTH)}...`
+      : sanitized;
   }
 
   private getPgDumpConnection(): PgDumpConnection | null {
@@ -540,6 +765,7 @@ export class AdminBackupRestoreService {
     return {
       id: job.backupId,
       ...job,
+      errorMessage: job.errorMessage ?? null,
     };
   }
 

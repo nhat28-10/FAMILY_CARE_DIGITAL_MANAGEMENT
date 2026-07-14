@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -13,7 +14,11 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AdminService } from '../admin.service';
-import { AdminRevenueMonthlyQueryDto } from '../dto/admin-revenue-monthly-query.dto';
+import { AdminRevenueSummaryResponseDto } from '../dto/admin-response.dto';
+import {
+  AdminMonthlyRevenueItemDto,
+  AdminRevenueMonthlyQueryDto,
+} from '../dto/admin-revenue-monthly-query.dto';
 
 @ApiTags('Admin - Revenue')
 @ApiBearerAuth()
@@ -26,6 +31,7 @@ export class AdminRevenueController {
   @Get('summary')
   @ResponseMessage('Lấy tổng quan doanh thu thành công')
   @ApiOperation({ summary: 'Get subscription revenue summary' })
+  @ApiOkResponse({ type: AdminRevenueSummaryResponseDto })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   summary() {
     return this.admin.getRevenueSummary();
@@ -51,6 +57,12 @@ export class AdminRevenueController {
     required: false,
     type: String,
     example: 'YEARLY',
+  })
+  @ApiOkResponse({
+    description:
+      'Monthly paid subscription revenue. Revenue fields are amount sums from payment_transactions.amount; paidCount is the transaction count.',
+    type: AdminMonthlyRevenueItemDto,
+    isArray: true,
   })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   monthly(@Query() query: AdminRevenueMonthlyQueryDto) {

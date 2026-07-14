@@ -1,8 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
 } from 'class-validator';
@@ -24,4 +26,19 @@ export class AdminPaymentQueryDto extends PaginationQueryDto {
   @MaxLength(50)
   @Matches(/^[A-Z][A-Z0-9_]*$/)
   planCode?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  familyId?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-01' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ example: '2026-12-31' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

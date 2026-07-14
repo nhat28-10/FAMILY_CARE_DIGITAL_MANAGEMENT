@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -17,6 +18,7 @@ import {
   ADMIN_PAYMENT_STATUSES,
   AdminPaymentQueryDto,
 } from '../dto/admin-payment-query.dto';
+import { AdminPaymentsListResponseDto } from '../dto/admin-response.dto';
 
 @ApiTags('Admin - Payments')
 @ApiBearerAuth()
@@ -38,6 +40,28 @@ export class AdminPaymentsController {
     type: String,
     example: 'MONTHLY',
   })
+  @ApiQuery({
+    name: 'familyId',
+    required: false,
+    type: String,
+    description: 'Filter payments by family id',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    example: '2026-01-01',
+    description: 'Filter payments created at or after this date/time',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    example: '2026-12-31',
+    description:
+      'Filter payments created at or before this date/time. YYYY-MM-DD is inclusive for the whole day.',
+  })
+  @ApiOkResponse({ type: AdminPaymentsListResponseDto })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   list(@Query() query: AdminPaymentQueryDto) {
     return this.admin.listPayments(query);

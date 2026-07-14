@@ -22,7 +22,10 @@ services:
       - pgdata_dev:/var/lib/postgresql/data
     healthcheck:
       test:
-        ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-family_care_dev}']
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-family_care_dev}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,10 +35,14 @@ services:
   api:
     profiles: ['full']
     build: .
+    user: root
     env_file: .env
     environment:
       # Inside the Docker network the DB host is the service name `db`.
       DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_DATABASE:-family_care_dev}?schema=public
+      ADMIN_DOCKER_ENABLED: 'true'
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+      BACKUP_POSTGRES_CONTAINER: familycare_db_dev
       CHOKIDAR_USEPOLLING: 'true'
       FACE_AI_BASE_URL: http://face-ai-service:8000
     ports:
