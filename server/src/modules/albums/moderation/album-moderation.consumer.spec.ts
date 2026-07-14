@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { AlbumModerationConsumer } from './album-moderation.consumer';
 import { AlbumModerationService } from './album-moderation.service';
+import { AlbumFaceSuggestionsService } from '../album-face-suggestions.service';
 import { CloudflareQueueService } from './cloudflare-queue.service';
 
 function config() {
@@ -28,9 +29,11 @@ describe('AlbumModerationConsumer', () => {
       retryMessages: jest.fn().mockResolvedValue(undefined),
     };
     const moderation = { parseJob: jest.fn().mockReturnValue(null) };
+    const faceSuggestions = { parseJob: jest.fn().mockReturnValue(null) };
     const consumer = new AlbumModerationConsumer(
       queue as unknown as CloudflareQueueService,
       moderation as unknown as AlbumModerationService,
+      faceSuggestions as unknown as AlbumFaceSuggestionsService,
       config(),
     );
     await consumer.poll();
@@ -51,6 +54,7 @@ describe('AlbumModerationConsumer', () => {
     const consumer = new AlbumModerationConsumer(
       queue as unknown as CloudflareQueueService,
       { parseJob: jest.fn() } as unknown as AlbumModerationService,
+      { parseJob: jest.fn() } as unknown as AlbumFaceSuggestionsService,
       config(),
     );
     const first = consumer.poll();
@@ -76,9 +80,11 @@ describe('AlbumModerationConsumer', () => {
       processJob: jest.fn().mockRejectedValue(new Error('unexpected token=x')),
       completePoisonedJob: jest.fn().mockResolvedValue(undefined),
     };
+    const faceSuggestions = { parseJob: jest.fn().mockReturnValue(null) };
     const consumer = new AlbumModerationConsumer(
       queue as unknown as CloudflareQueueService,
       moderation as unknown as AlbumModerationService,
+      faceSuggestions as unknown as AlbumFaceSuggestionsService,
       config(),
     );
 

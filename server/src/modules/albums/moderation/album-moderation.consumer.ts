@@ -2,9 +2,22 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 
+import { AlbumFaceSuggestionsService } from '../album-face-suggestions.service';
 import { AlbumModerationService } from './album-moderation.service';
 import { CloudflareQueueService } from './cloudflare-queue.service';
 import { sanitizeModerationError } from './moderation.types';
+
+type RoutedQueueJob =
+  | {
+      kind: 'moderation';
+      id: string;
+      job: NonNullable<ReturnType<AlbumModerationService['parseJob']>>;
+    }
+  | {
+      kind: 'faceScan';
+      id: string;
+      job: NonNullable<ReturnType<AlbumFaceSuggestionsService['parseJob']>>;
+    };
 
 @Injectable()
 export class AlbumModerationConsumer {
@@ -19,12 +32,12 @@ export class AlbumModerationConsumer {
   constructor(
     private readonly queue: CloudflareQueueService,
     private readonly moderation: AlbumModerationService,
+    private readonly faceSuggestions: AlbumFaceSuggestionsService,
     config: ConfigService,
   ) {
-    this.enabled = config.get<boolean>(
-      'albumModeration.consumerEnabled',
-      false,
-    );
+    this.enabled =
+      config.get<boolean>('albumModeration.consumerEnabled', false) ||
+      config.get<boolean>('faceScan.consumerEnabled', false);
     this.pollIntervalMs = Math.max(
       1000,
       config.get<number>('albumModeration.pollIntervalMs', 5000),
@@ -35,7 +48,10 @@ export class AlbumModerationConsumer {
     );
     this.maxDeliveryAttempts = Math.max(
       1,
-      config.get<number>('albumModeration.maxAttempts', 3),
+      Math.max(
+        config.get<number>('albumModeration.maxAttempts', 3),
+        config.get<number>('faceScan.maxAttempts', 3),
+      ),
     );
   }
 
@@ -57,14 +73,17 @@ export class AlbumModerationConsumer {
       const acks: string[] = [];
       const retries: Array<{ leaseId: string; delaySeconds: number }> = [];
       for (const message of messages) {
-        const job = this.moderation.parseJob(message.body);
-        if (!job) {
-          this.logger.warn('Đã ack moderation message không hợp lệ');
+        const routed = this.routeMessage(message.body);
+        if (!routed) {
+          this.logger.warn('Acked invalid album queue message');
           acks.push(message.leaseId);
           continue;
         }
         try {
-          const result = await this.moderation.processJob(job);
+          const result =
+            routed.kind === 'moderation'
+              ? await this.moderation.processJob(routed.job)
+              : await this.faceSuggestions.processJob(routed.job);
           if (result.action === 'ACK') acks.push(message.leaseId);
           else {
             retries.push({
@@ -74,10 +93,14 @@ export class AlbumModerationConsumer {
           }
         } catch (error) {
           this.logger.error(
-            `Moderation job ${job.jobId} lỗi ngoài dự kiến: ${sanitizeModerationError(error)}`,
+            `Album queue job ${routed.id} failed unexpectedly: ${sanitizeModerationError(error)}`,
           );
           if (message.attempts >= this.maxDeliveryAttempts) {
-            await this.moderation.completePoisonedJob(job, error);
+            if (routed.kind === 'moderation') {
+              await this.moderation.completePoisonedJob(routed.job, error);
+            } else {
+              await this.faceSuggestions.completePoisonedJob(routed.job, error);
+            }
             acks.push(message.leaseId);
           } else {
             retries.push({
@@ -91,10 +114,30 @@ export class AlbumModerationConsumer {
       await this.queue.retryMessages(retries);
     } catch (error) {
       this.logger.warn(
-        `Moderation consumer tạm dừng batch: ${sanitizeModerationError(error)}`,
+        `Album queue consumer paused batch: ${sanitizeModerationError(error)}`,
       );
     } finally {
       this.polling = false;
     }
+  }
+
+  private routeMessage(body: unknown): RoutedQueueJob | null {
+    const moderationJob = this.moderation.parseJob(body);
+    if (moderationJob) {
+      return {
+        kind: 'moderation',
+        id: moderationJob.jobId,
+        job: moderationJob,
+      };
+    }
+    const faceScanJob = this.faceSuggestions.parseJob(body);
+    if (faceScanJob) {
+      return {
+        kind: 'faceScan',
+        id: faceScanJob.scanJobId,
+        job: faceScanJob,
+      };
+    }
+    return null;
   }
 }

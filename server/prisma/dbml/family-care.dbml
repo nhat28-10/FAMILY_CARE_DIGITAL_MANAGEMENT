@@ -118,6 +118,10 @@ Table families {
   calendarEvents calendar_events [not null]
   albumMedia album_media [not null]
   storageCleanupJobs storage_cleanup_jobs [not null]
+  memberFaceProfiles member_face_profiles [not null]
+  faceScanJobs face_scan_jobs [not null]
+  albumFaceDetections album_face_detections [not null]
+  albumTagSuggestions album_tag_suggestions [not null]
   aiConversations ai_conversations [not null]
 }
 
@@ -176,6 +180,12 @@ Table family_members {
   reviewedModerationChecks media_moderation_checks [not null]
   taggedAlbumMediaTags album_media_tags [not null]
   createdAlbumMediaTags album_media_tags [not null]
+  faceProfiles member_face_profiles [not null]
+  consentedFaceProfiles member_face_profiles [not null]
+  requestedFaceScanJobs face_scan_jobs [not null]
+  suggestedAlbumTagSuggestions album_tag_suggestions [not null]
+  confirmedAlbumTagSuggestions album_tag_suggestions [not null]
+  rejectedAlbumTagSuggestions album_tag_suggestions [not null]
   aiConversations ai_conversations [not null]
   goalContributionPlans goal_contribution_plans [not null]
   reviewedGoalContributionPlans goal_contribution_plans [not null]
@@ -1064,6 +1074,9 @@ Table album_media {
   tags album_media_tags [not null]
   moderationChecks media_moderation_checks [not null]
   cleanupJobs storage_cleanup_jobs [not null]
+  faceScanJobs face_scan_jobs [not null]
+  faceDetections album_face_detections [not null]
+  tagSuggestions album_tag_suggestions [not null]
 
   Note: 'Ảnh/video trong album gia đình.'
 }
@@ -1084,6 +1097,81 @@ Table album_media_tags {
   }
 
   Note: 'Tag gắn thành viên vào một media (manual tagging cho MVP).'
+}
+
+Table face_scan_jobs {
+  scanJobId String [pk]
+  workspaceId String [not null]
+  mediaId String [not null]
+  requestedByMemberId String [not null]
+  status FaceScanJobStatus [not null, default: 'PENDING']
+  attemptCount Int [not null, default: 0]
+  lastError String
+  startedAt DateTime
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  media album_media [not null]
+  requestedByMember family_members [not null]
+  detections album_face_detections [not null]
+
+  Note: 'Async scan record for album face detection and workspace-scoped matching.'
+}
+
+Table album_face_detections {
+  detectionId String [pk]
+  workspaceId String [not null]
+  scanJobId String [not null]
+  mediaId String [not null]
+  faceIndex Int [not null]
+  boundingBox Json [not null]
+  detectionScore Decimal
+  qualityScore Decimal
+  modelName String [not null]
+  modelVersion String [not null]
+  status AlbumFaceDetectionStatus [not null, default: 'UNMATCHED']
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  scanJob face_scan_jobs [not null]
+  media album_media [not null]
+  suggestions album_tag_suggestions [not null]
+
+  indexes {
+    (scanJobId, faceIndex) [unique]
+  }
+
+  Note: 'Face detected in an album photo. No plaintext biometric embedding is stored.'
+}
+
+Table album_tag_suggestions {
+  suggestionId String [pk]
+  workspaceId String [not null]
+  detectionId String [not null]
+  mediaId String [not null]
+  suggestedMemberId String [not null]
+  similarityScore Decimal [not null]
+  secondBestScore Decimal
+  scoreMargin Decimal
+  status AlbumTagSuggestionStatus [not null, default: 'PENDING']
+  confirmedByMemberId String
+  confirmedAt DateTime
+  rejectedByMemberId String
+  rejectedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  detection album_face_detections [not null]
+  media album_media [not null]
+  suggestedMember family_members [not null]
+  confirmedByMember family_members
+  rejectedByMember family_members
+
+  indexes {
+    (detectionId, suggestedMemberId) [unique]
+  }
+
+  Note: 'Human-confirmed candidate tag proposed from a face detection.'
 }
 
 Table storage_cleanup_jobs {
@@ -1127,6 +1215,48 @@ Table media_moderation_checks {
   reviewedByMember family_members
 
   Note: 'Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).'
+}
+
+Table member_face_profiles {
+  profileId String [pk]
+  workspaceId String [not null]
+  memberId String [not null]
+  status FaceProfileStatus [not null, default: 'ACTIVE']
+  consentedAt DateTime [not null]
+  consentedByMemberId String [not null]
+  modelName String [not null]
+  modelVersion String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  workspace families [not null]
+  member family_members [not null]
+  consentedByMember family_members [not null]
+  embeddings member_face_embeddings [not null]
+
+  indexes {
+    (workspaceId, memberId) [unique]
+  }
+
+  Note: 'Consent-backed face profile for a family member. Stores metadata only; biometric vectors live encrypted in MemberFaceEmbedding.'
+}
+
+Table member_face_embeddings {
+  embeddingId String [pk]
+  profileId String [not null]
+  encryptedEmbedding Bytes [not null]
+  encryptionIv Bytes [not null]
+  encryptionAuthTag Bytes [not null]
+  embeddingDimension Int [not null]
+  detectionScore Decimal
+  qualityScore Decimal
+  modelName String [not null]
+  modelVersion String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  revokedAt DateTime
+  profile member_face_profiles [not null]
+
+  Note: 'Encrypted face embedding sample. Plaintext embedding values are never stored.'
 }
 
 Table ai_conversations {
@@ -1583,6 +1713,32 @@ Enum StorageCleanupReason {
   PERMANENT_DELETE_DB_FAILED
 }
 
+Enum FaceProfileStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+Enum FaceScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum AlbumFaceDetectionStatus {
+  MATCHED
+  UNMATCHED
+  SUPERSEDED
+}
+
+Enum AlbumTagSuggestionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
 Enum AiSenderType {
   USER
   AI
@@ -1838,6 +1994,30 @@ Ref: album_media_tags.taggedMemberId > family_members.id [delete: Cascade]
 
 Ref: album_media_tags.taggedByMemberId > family_members.id [delete: Cascade]
 
+Ref: face_scan_jobs.workspaceId > families.id [delete: Cascade]
+
+Ref: face_scan_jobs.mediaId > album_media.mediaId [delete: Cascade]
+
+Ref: face_scan_jobs.requestedByMemberId > family_members.id [delete: Restrict]
+
+Ref: album_face_detections.workspaceId > families.id [delete: Cascade]
+
+Ref: album_face_detections.scanJobId > face_scan_jobs.scanJobId [delete: Cascade]
+
+Ref: album_face_detections.mediaId > album_media.mediaId [delete: Cascade]
+
+Ref: album_tag_suggestions.workspaceId > families.id [delete: Cascade]
+
+Ref: album_tag_suggestions.detectionId > album_face_detections.detectionId [delete: Cascade]
+
+Ref: album_tag_suggestions.mediaId > album_media.mediaId [delete: Cascade]
+
+Ref: album_tag_suggestions.suggestedMemberId > family_members.id [delete: Restrict]
+
+Ref: album_tag_suggestions.confirmedByMemberId > family_members.id [delete: Restrict]
+
+Ref: album_tag_suggestions.rejectedByMemberId > family_members.id [delete: Restrict]
+
 Ref: storage_cleanup_jobs.workspaceId > families.id [delete: Set Null]
 
 Ref: storage_cleanup_jobs.mediaId > album_media.mediaId [delete: Set Null]
@@ -1845,6 +2025,14 @@ Ref: storage_cleanup_jobs.mediaId > album_media.mediaId [delete: Set Null]
 Ref: media_moderation_checks.mediaId > album_media.mediaId [delete: Cascade]
 
 Ref: media_moderation_checks.reviewedByMemberId > family_members.id [delete: Set Null]
+
+Ref: member_face_profiles.workspaceId > families.id [delete: Cascade]
+
+Ref: member_face_profiles.memberId > family_members.id [delete: Cascade]
+
+Ref: member_face_profiles.consentedByMemberId > family_members.id [delete: Cascade]
+
+Ref: member_face_embeddings.profileId > member_face_profiles.profileId [delete: Cascade]
 
 Ref: ai_conversations.workspaceId > families.id [delete: Cascade]
 

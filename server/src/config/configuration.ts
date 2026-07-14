@@ -164,4 +164,19 @@ export default () => ({
       10,
     ),
   },
+  faceAi: {
+    baseUrl: process.env.FACE_AI_BASE_URL || 'http://face-ai-service:8000',
+    timeoutMs: parseInt(process.env.FACE_AI_TIMEOUT_MS || '30000', 10),
+  },
+  faceEmbedding: {
+    encryptionKey: process.env.FACE_EMBEDDING_ENCRYPTION_KEY || '',
+  },
+  faceScan: {
+    maxFaces: parseInt(process.env.FACE_SCAN_MAX_FACES || '20', 10),
+    minSimilarity: parseFloat(process.env.FACE_MATCH_MIN_SIMILARITY || '0.55'),
+    minMargin: parseFloat(process.env.FACE_MATCH_MIN_MARGIN || '0.08'),
+    maxAttempts: parseInt(process.env.FACE_SCAN_MAX_ATTEMPTS || '3', 10),
+    staleMinutes: parseInt(process.env.FACE_SCAN_STALE_MINUTES || '10', 10),
+    consumerEnabled: process.env.FACE_SCAN_CONSUMER_ENABLED === 'true',
+  },
 });
