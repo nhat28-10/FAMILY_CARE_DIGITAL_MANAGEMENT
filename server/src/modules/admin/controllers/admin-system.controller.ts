@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -12,6 +13,10 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AdminSystemService } from '../admin-system.service';
+import {
+  AdminSystemHealthResponseDto,
+  AdminSystemRuntimeResponseDto,
+} from '../dto/admin-response.dto';
 
 @ApiTags('Admin - System')
 @ApiBearerAuth()
@@ -24,6 +29,7 @@ export class AdminSystemController {
   @Get('health')
   @ResponseMessage('Lấy trạng thái hệ thống thành công')
   @ApiOperation({ summary: 'Get backend and database health' })
+  @ApiOkResponse({ type: AdminSystemHealthResponseDto })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   health() {
     return this.system.getHealth();
@@ -32,6 +38,7 @@ export class AdminSystemController {
   @Get('runtime')
   @ResponseMessage('Lấy thông tin runtime thành công')
   @ApiOperation({ summary: 'Get Node.js runtime information' })
+  @ApiOkResponse({ type: AdminSystemRuntimeResponseDto })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   runtime() {
     return this.system.getRuntime();
