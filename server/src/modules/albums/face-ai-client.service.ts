@@ -152,9 +152,10 @@ export class FaceAiClientService {
     return form;
   }
 
-  private async parseJson(response: Response) {
+  private async parseJson(response: Response): Promise<unknown> {
     try {
-      return await response.json();
+      const body: unknown = await response.json();
+      return body;
     } catch {
       throw new ServiceUnavailableException('Face AI returned invalid JSON');
     }
@@ -167,8 +168,7 @@ export class FaceAiClientService {
     const embedding = value.embedding;
     if (
       typeof value.faceCount !== 'number' ||
-      !Array.isArray(embedding) ||
-      embedding.some((item) => typeof item !== 'number') ||
+      !this.isNumberArray(embedding) ||
       typeof value.embeddingDimension !== 'number' ||
       typeof value.detectionScore !== 'number' ||
       typeof value.modelName !== 'string' ||
@@ -189,7 +189,11 @@ export class FaceAiClientService {
   }
 
   private parseDetectionResponse(value: unknown): FaceDetectionResponse {
-    if (!this.isRecord(value) || !Array.isArray(value.faces)) {
+    if (!this.isRecord(value)) {
+      throw new ServiceUnavailableException('Face AI response is invalid');
+    }
+    const facesValue = value.faces;
+    if (!Array.isArray(facesValue)) {
       throw new ServiceUnavailableException('Face AI response is invalid');
     }
     if (
@@ -198,7 +202,7 @@ export class FaceAiClientService {
     ) {
       throw new ServiceUnavailableException('Face AI response is invalid');
     }
-    const faces = value.faces.map((face) => this.parseDetection(face));
+    const faces = facesValue.map((face: unknown) => this.parseDetection(face));
     return {
       faces,
       modelName: value.modelName,
@@ -207,26 +211,15 @@ export class FaceAiClientService {
   }
 
   private parseDetection(value: unknown): FaceDetectionResult {
-    if (!this.isRecord(value) || !this.isRecord(value.boundingBox)) {
+    if (!this.isRecord(value)) {
       throw new ServiceUnavailableException('Face AI response is invalid');
     }
     const embedding = value.embedding;
     const box = value.boundingBox;
-    const validBox =
-      typeof box.x === 'number' &&
-      typeof box.y === 'number' &&
-      typeof box.width === 'number' &&
-      typeof box.height === 'number' &&
-      [box.x, box.y, box.width, box.height].every(
-        (item) => Number.isFinite(item) && item >= 0 && item <= 1,
-      ) &&
-      box.x + box.width <= 1.000001 &&
-      box.y + box.height <= 1.000001;
     if (
       typeof value.faceIndex !== 'number' ||
-      !validBox ||
-      !Array.isArray(embedding) ||
-      embedding.some((item) => typeof item !== 'number') ||
+      !this.isNormalizedBox(box) ||
+      !this.isNumberArray(embedding) ||
       typeof value.embeddingDimension !== 'number' ||
       embedding.length !== value.embeddingDimension ||
       typeof value.detectionScore !== 'number'
@@ -236,10 +229,10 @@ export class FaceAiClientService {
     return {
       faceIndex: value.faceIndex,
       boundingBox: {
-        x: Number(box.x),
-        y: Number(box.y),
-        width: Number(box.width),
-        height: Number(box.height),
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
       },
       embedding,
       embeddingDimension: value.embeddingDimension,
@@ -251,5 +244,28 @@ export class FaceAiClientService {
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private isNumberArray(value: unknown): value is number[] {
+    return (
+      Array.isArray(value) &&
+      value.every((item) => typeof item === 'number' && Number.isFinite(item))
+    );
+  }
+
+  private isNormalizedBox(value: unknown): value is FaceDetectionBoundingBox {
+    if (!this.isRecord(value)) return false;
+    const { x, y, width, height } = value;
+    return (
+      typeof x === 'number' &&
+      typeof y === 'number' &&
+      typeof width === 'number' &&
+      typeof height === 'number' &&
+      [x, y, width, height].every(
+        (item) => Number.isFinite(item) && item >= 0 && item <= 1,
+      ) &&
+      x + width <= 1.000001 &&
+      y + height <= 1.000001
+    );
   }
 }
