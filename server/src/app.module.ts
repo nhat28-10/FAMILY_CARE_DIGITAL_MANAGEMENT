@@ -13,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { FamiliesModule } from './modules/families/families.module';
 import { FamilyMembersModule } from './modules/family-members/family-members.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { JoinRequestsModule } from './modules/join-requests/join-requests.module';
 import { RolesPermissionsModule } from './modules/roles-permissions/roles-permissions.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -59,6 +60,7 @@ import { AdminModule } from './modules/admin/admin.module';
     FamiliesModule,
     FamilyMembersModule,
     FinanceModule,
+    JoinRequestsModule,
     RolesPermissionsModule,
     SubscriptionPlansModule,
     SubscriptionsModule,
