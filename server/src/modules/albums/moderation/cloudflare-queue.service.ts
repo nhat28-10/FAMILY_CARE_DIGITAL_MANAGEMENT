@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import {
+  AlbumFaceScanQueueJob,
   AlbumModerationJob,
   ModerationProviderError,
   PulledQueueMessage,
@@ -49,6 +50,13 @@ export class CloudflareQueueService {
   }
 
   async pushModerationJob(job: AlbumModerationJob): Promise<void> {
+    await this.request('/messages', {
+      body: job,
+      content_type: 'json',
+    });
+  }
+
+  async pushFaceScanJob(job: AlbumFaceScanQueueJob): Promise<void> {
     await this.request('/messages', {
       body: job,
       content_type: 'json',

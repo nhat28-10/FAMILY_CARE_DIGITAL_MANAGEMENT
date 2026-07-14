@@ -451,6 +451,10 @@ model Family {
   calendarEvents          CalendarEvent[]
   albumMedia              AlbumMedia[]
   storageCleanupJobs      StorageCleanupJob[]
+  memberFaceProfiles      MemberFaceProfile[]
+  faceScanJobs            FaceScanJob[]
+  albumFaceDetections     AlbumFaceDetection[]
+  albumTagSuggestions     AlbumTagSuggestion[]
   aiConversations         AIConversation[]
 
   @@map("families")
@@ -517,6 +521,12 @@ model FamilyMember {
   reviewedModerationChecks         MediaModerationCheck[]     @relation("ReviewedModerationChecks")
   taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
   createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
+  faceProfiles                     MemberFaceProfile[]        @relation("MemberFaceProfiles")
+  consentedFaceProfiles            MemberFaceProfile[]        @relation("ConsentedFaceProfiles")
+  requestedFaceScanJobs            FaceScanJob[]              @relation("RequestedFaceScanJobs")
+  suggestedAlbumTagSuggestions     AlbumTagSuggestion[]       @relation("SuggestedAlbumTagSuggestions")
+  confirmedAlbumTagSuggestions     AlbumTagSuggestion[]       @relation("ConfirmedAlbumTagSuggestions")
+  rejectedAlbumTagSuggestions      AlbumTagSuggestion[]       @relation("RejectedAlbumTagSuggestions")
   aiConversations                  AIConversation[]           @relation("MemberAIConversations")
   goalContributionPlans            GoalContributionPlan[]     @relation("GoalContributionPlans")
   reviewedGoalContributionPlans    GoalContributionPlan[]     @relation("ReviewedGoalContributionPlans")
@@ -1607,6 +1617,32 @@ enum StorageCleanupReason {
   PERMANENT_DELETE_DB_FAILED
 }
 
+enum FaceProfileStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+enum FaceScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AlbumFaceDetectionStatus {
+  MATCHED
+  UNMATCHED
+  SUPERSEDED
+}
+
+enum AlbumTagSuggestionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
 enum AiSenderType {
   USER
   AI
@@ -1847,6 +1883,9 @@ model AlbumMedia {
   tags             AlbumMediaTag[]
   moderationChecks MediaModerationCheck[]
   cleanupJobs      StorageCleanupJob[]    @relation("MediaCleanupJobs")
+  faceScanJobs     FaceScanJob[]
+  faceDetections   AlbumFaceDetection[]
+  tagSuggestions   AlbumTagSuggestion[]
 
   @@index([workspaceId])
   @@index([uploadedByMemberId])
@@ -1878,6 +1917,92 @@ model AlbumMediaTag {
   @@index([taggedMemberId])
   @@index([taggedByMemberId])
   @@map("album_media_tags")
+}
+
+/// Async scan record for album face detection and workspace-scoped matching.
+model FaceScanJob {
+  scanJobId           String            @id @default(dbgenerated("gen_random_uuid()")) @map("scan_job_id") @db.Uuid
+  workspaceId         String            @map("workspace_id")
+  mediaId             String            @map("media_id") @db.Uuid
+  requestedByMemberId String            @map("requested_by_member_id")
+  status              FaceScanJobStatus @default(PENDING) @map("status")
+  attemptCount        Int               @default(0) @map("attempt_count")
+  lastError           String?           @map("last_error")
+  startedAt           DateTime?         @map("started_at") @db.Timestamptz
+  completedAt         DateTime?         @map("completed_at") @db.Timestamptz
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  media             AlbumMedia           @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  requestedByMember FamilyMember         @relation("RequestedFaceScanJobs", fields: [requestedByMemberId], references: [id], onDelete: Restrict)
+  detections        AlbumFaceDetection[]
+
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId, createdAt])
+  @@index([status, startedAt])
+  @@map("face_scan_jobs")
+}
+
+/// Face detected in an album photo. No plaintext biometric embedding is stored.
+model AlbumFaceDetection {
+  detectionId    String                   @id @default(dbgenerated("gen_random_uuid()")) @map("detection_id") @db.Uuid
+  workspaceId    String                   @map("workspace_id")
+  scanJobId      String                   @map("scan_job_id") @db.Uuid
+  mediaId        String                   @map("media_id") @db.Uuid
+  faceIndex      Int                      @map("face_index")
+  boundingBox    Json                     @map("bounding_box")
+  detectionScore Decimal?                 @map("detection_score") @db.Decimal(5, 4)
+  qualityScore   Decimal?                 @map("quality_score") @db.Decimal(5, 4)
+  modelName      String                   @map("model_name")
+  modelVersion   String                   @map("model_version")
+  status         AlbumFaceDetectionStatus @default(UNMATCHED) @map("status")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace   Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scanJob     FaceScanJob          @relation(fields: [scanJobId], references: [scanJobId], onDelete: Cascade)
+  media       AlbumMedia           @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  suggestions AlbumTagSuggestion[]
+
+  @@unique([scanJobId, faceIndex])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId])
+  @@map("album_face_detections")
+}
+
+/// Human-confirmed candidate tag proposed from a face detection.
+model AlbumTagSuggestion {
+  suggestionId        String                   @id @default(dbgenerated("gen_random_uuid()")) @map("suggestion_id") @db.Uuid
+  workspaceId         String                   @map("workspace_id")
+  detectionId         String                   @map("detection_id") @db.Uuid
+  mediaId             String                   @map("media_id") @db.Uuid
+  suggestedMemberId   String                   @map("suggested_member_id")
+  similarityScore     Decimal                  @map("similarity_score") @db.Decimal(5, 4)
+  secondBestScore     Decimal?                 @map("second_best_score") @db.Decimal(5, 4)
+  scoreMargin         Decimal?                 @map("score_margin") @db.Decimal(5, 4)
+  status              AlbumTagSuggestionStatus @default(PENDING) @map("status")
+  confirmedByMemberId String?                  @map("confirmed_by_member_id")
+  confirmedAt         DateTime?                @map("confirmed_at") @db.Timestamptz
+  rejectedByMemberId  String?                  @map("rejected_by_member_id")
+  rejectedAt          DateTime?                @map("rejected_at") @db.Timestamptz
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  detection         AlbumFaceDetection @relation(fields: [detectionId], references: [detectionId], onDelete: Cascade)
+  media             AlbumMedia         @relation(fields: [mediaId], references: [mediaId], onDelete: Cascade)
+  suggestedMember   FamilyMember       @relation("SuggestedAlbumTagSuggestions", fields: [suggestedMemberId], references: [id], onDelete: Restrict)
+  confirmedByMember FamilyMember?      @relation("ConfirmedAlbumTagSuggestions", fields: [confirmedByMemberId], references: [id], onDelete: SetNull)
+  rejectedByMember  FamilyMember?      @relation("RejectedAlbumTagSuggestions", fields: [rejectedByMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([detectionId, suggestedMemberId])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId])
+  @@index([suggestedMemberId, status])
+  @@map("album_tag_suggestions")
 }
 
 /// Durable retry record for R2/database cleanup; never stores signed URLs or credentials.
@@ -1932,6 +2057,55 @@ model MediaModerationCheck {
   @@index([checkType])
   @@index([reviewedByMemberId])
   @@map("media_moderation_checks")
+}
+
+/// Consent-backed face profile for a family member. Stores metadata only; biometric vectors live encrypted in MemberFaceEmbedding.
+model MemberFaceProfile {
+  profileId           String            @id @default(dbgenerated("gen_random_uuid()")) @map("profile_id") @db.Uuid
+  workspaceId         String            @map("workspace_id")
+  memberId            String            @map("member_id")
+  status              FaceProfileStatus @default(ACTIVE) @map("status")
+  consentedAt         DateTime          @map("consented_at") @db.Timestamptz
+  consentedByMemberId String            @map("consented_by_member_id")
+  modelName           String            @map("model_name")
+  modelVersion        String            @map("model_version")
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime?         @map("deleted_at") @db.Timestamptz
+
+  workspace         Family                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member            FamilyMember          @relation("MemberFaceProfiles", fields: [memberId], references: [id], onDelete: Cascade)
+  consentedByMember FamilyMember          @relation("ConsentedFaceProfiles", fields: [consentedByMemberId], references: [id], onDelete: Restrict)
+  embeddings        MemberFaceEmbedding[]
+
+  @@unique([workspaceId, memberId])
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([consentedByMemberId])
+  @@index([status])
+  @@map("member_face_profiles")
+}
+
+/// Encrypted face embedding sample. Plaintext embedding values are never stored.
+model MemberFaceEmbedding {
+  embeddingId        String    @id @default(dbgenerated("gen_random_uuid()")) @map("embedding_id") @db.Uuid
+  profileId          String    @map("profile_id") @db.Uuid
+  encryptedEmbedding Bytes     @map("encrypted_embedding")
+  encryptionIv       Bytes     @map("encryption_iv")
+  encryptionAuthTag  Bytes     @map("encryption_auth_tag")
+  embeddingDimension Int       @map("embedding_dimension")
+  detectionScore     Decimal?  @map("detection_score") @db.Decimal(5, 4)
+  qualityScore       Decimal?  @map("quality_score") @db.Decimal(5, 4)
+  modelName          String    @map("model_name")
+  modelVersion       String    @map("model_version")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz
+
+  profile MemberFaceProfile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([profileId, revokedAt])
+  @@map("member_face_embeddings")
 }
 
 /// Phiên hội thoại với AI assistant (theo từng member trong workspace).
