@@ -12,7 +12,6 @@ import { DevicesModule } from '../modules/devices/devices.module';
 import { FamiliesModule } from '../modules/families/families.module';
 import { FamilyMembersModule } from '../modules/family-members/family-members.module';
 import { FinanceModule } from '../modules/finance/finance.module';
-import { InvitationsModule } from '../modules/invitations/invitations.module';
 import { LocationsModule } from '../modules/locations/locations.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { RewardsModule } from '../modules/rewards/rewards.module';
@@ -48,7 +47,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
   {
     key: 'family',
     name: 'Family',
-    modules: [FamiliesModule, FamilyMembersModule, InvitationsModule],
+    modules: [FamiliesModule, FamilyMembersModule],
   },
   {
     key: 'finance',

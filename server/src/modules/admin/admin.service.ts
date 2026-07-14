@@ -26,7 +26,6 @@ import { SubscriptionLifecycleService } from '../billing/subscription-lifecycle.
 import { FREE_PLAN_CODE } from '../subscription-plans/subscription-plans.constants';
 import { sanitizeUser, SafeUser } from '../users/users.types';
 import { AdminUpdateFamilyDto } from './dto/update-family.dto';
-import { AdminUpdateInvitationDto } from './dto/update-invitation.dto';
 import { AdminUpdateMemberDto } from './dto/update-member.dto';
 import { AdminUpdateUserDto } from './dto/update-user.dto';
 import {
@@ -35,7 +34,6 @@ import {
 } from './dto/admin-payment-query.dto';
 import { AdminRevenueMonthlyQueryDto } from './dto/admin-revenue-monthly-query.dto';
 import { ListFamiliesQueryDto } from './dto/list-families-query.dto';
-import { ListInvitationsQueryDto } from './dto/list-invitations-query.dto';
 import { ListMembersQueryDto } from './dto/list-members-query.dto';
 import { ListProvisioningLogsQueryDto } from './dto/list-provisioning-logs-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
@@ -118,7 +116,7 @@ export interface AdminPaymentListItem {
 
 /**
  * System-admin data access for the basic entities. All queries go straight to
- * Prisma; user records are sanitized and invitation token hashes are stripped.
+ * Prisma; user records are sanitized.
  */
 @Injectable()
 export class AdminService {
@@ -741,53 +739,6 @@ export class AdminService {
   async deleteFamily(id: string): Promise<null> {
     await this.getFamily(id);
     await this.prisma.family.delete({ where: { id } });
-    return null;
-  }
-
-  // --------------------------------------------------------------------------
-  // Invitations (tokenHash never returned)
-  // --------------------------------------------------------------------------
-
-  async listInvitations(q: ListInvitationsQueryDto) {
-    const where: Prisma.InvitationWhereInput = {};
-    if (q.status) where.status = q.status;
-    if (q.familyId) where.familyId = q.familyId;
-
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.invitation.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: skipFor(q.page, q.limit),
-        take: q.limit,
-        omit: { tokenHash: true },
-      }),
-      this.prisma.invitation.count({ where }),
-    ]);
-
-    return buildPaginated(items, total, q.page, q.limit);
-  }
-
-  async getInvitation(id: string) {
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { id },
-      omit: { tokenHash: true },
-    });
-    if (!invitation) throw new NotFoundException('Không tìm thấy lời mời');
-    return invitation;
-  }
-
-  async updateInvitation(id: string, dto: AdminUpdateInvitationDto) {
-    await this.getInvitation(id);
-    return this.prisma.invitation.update({
-      where: { id },
-      data: { status: dto.status },
-      omit: { tokenHash: true },
-    });
-  }
-
-  async deleteInvitation(id: string): Promise<null> {
-    await this.getInvitation(id);
-    await this.prisma.invitation.delete({ where: { id } });
     return null;
   }
 
