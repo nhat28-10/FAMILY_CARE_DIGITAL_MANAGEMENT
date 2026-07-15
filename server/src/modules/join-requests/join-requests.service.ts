@@ -10,12 +10,15 @@ import {
   JoinRequest,
   JoinRequestStatus,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
   Relationship,
 } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Thông tin family công khai cho màn nhập mã. */
 const familyPreviewSelect = {
@@ -37,6 +40,7 @@ export class JoinRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly familyMembersService: FamilyMembersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /** Tra family theo mã mời (đã normalize) — màn nhập mã, public. */
@@ -70,10 +74,38 @@ export class JoinRequestsService {
       );
     }
 
-    return this.prisma.joinRequest.create({
+    const request = await this.prisma.joinRequest.create({
       data: { familyId: family.id, userId, message: dto.message ?? null },
       include: { family: { select: familyPreviewSelect } },
     });
+
+    const requester = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, email: true },
+    });
+    const approvers = await this.prisma.familyMember.findMany({
+      where: {
+        familyId: family.id,
+        status: MemberStatus.ACTIVE,
+        familyRole: {
+          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+        },
+      },
+      select: { id: true },
+    });
+    await this.notificationsService.notify(
+      family.id,
+      approvers.map((m) => m.id),
+      {
+        type: NotificationType.JOIN_REQUEST,
+        priority: NotificationPriority.HIGH,
+        title: 'Yêu cầu tham gia mới',
+        body: `${requester?.fullName ?? requester?.email ?? 'Một người dùng'} muốn tham gia gia đình ${family.name}.`,
+        referenceType: 'JOIN_REQUEST',
+        referenceId: request.id,
+      },
+    );
+    return request;
   }
 
   /** Các yêu cầu của tôi (mọi trạng thái) — màn theo dõi. */
@@ -172,6 +204,43 @@ export class JoinRequestsService {
           },
         }),
       ]);
+
+      const familyRecord = await this.prisma.family.findUnique({
+        where: { id: familyId },
+        select: { name: true },
+      });
+      await this.notificationsService.notify(familyId, [member.id], {
+        type: NotificationType.JOIN_REQUEST,
+        priority: NotificationPriority.NORMAL,
+        title: 'Yêu cầu tham gia được duyệt',
+        body: `Bạn đã trở thành thành viên của gia đình ${familyRecord?.name ?? ''}.`,
+        referenceType: 'FAMILY',
+        referenceId: familyId,
+      });
+      const others = await this.prisma.familyMember.findMany({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          id: { not: member.id },
+        },
+        select: { id: true },
+      });
+      const newMemberUser = await this.prisma.user.findUnique({
+        where: { id: request.userId },
+        select: { fullName: true, email: true },
+      });
+      await this.notificationsService.notify(
+        familyId,
+        others.map((m) => m.id),
+        {
+          type: NotificationType.MEMBER,
+          priority: NotificationPriority.LOW,
+          title: 'Thành viên mới',
+          body: `${newMemberUser?.fullName ?? newMemberUser?.email ?? 'Một thành viên mới'} vừa tham gia gia đình.`,
+          referenceType: 'FAMILY_MEMBER',
+          referenceId: member.id,
+        },
+      );
       return member;
     } catch (error) {
       if (this.isLostRace(error)) {
@@ -193,7 +262,7 @@ export class JoinRequestsService {
       'Chỉ có thể từ chối yêu cầu đang chờ duyệt',
     );
     try {
-      return await this.prisma.joinRequest.update({
+      const updated = await this.prisma.joinRequest.update({
         where: { id: request.id, status: JoinRequestStatus.PENDING },
         data: {
           status: JoinRequestStatus.REJECTED,
@@ -201,6 +270,16 @@ export class JoinRequestsService {
           decidedAt: new Date(),
         },
       });
+      await this.notificationsService.notifyUsersEphemeral([request.userId], {
+        familyId: null,
+        type: NotificationType.JOIN_REQUEST,
+        priority: NotificationPriority.NORMAL,
+        title: 'Yêu cầu tham gia bị từ chối',
+        body: 'Yêu cầu tham gia gia đình của bạn đã bị từ chối.',
+        referenceType: 'JOIN_REQUEST',
+        referenceId: updated.id,
+      });
+      return updated;
     } catch (error) {
       if (this.isRecordNotFound(error)) {
         throw new BadRequestException(
