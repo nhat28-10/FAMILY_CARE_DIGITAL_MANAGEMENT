@@ -34,13 +34,14 @@ export async function authenticateSocket(
   return user.id;
 }
 
-function extractToken(client: Socket): string | null {
-  const fromAuth = (client.handshake.auth as { token?: string } | undefined)
-    ?.token;
-  const fromHeader = client.handshake.headers.authorization;
-  const raw = fromAuth ?? fromHeader;
-  if (!raw) {
-    return null;
+function extractToken(client: Socket): string | undefined {
+  const authToken = client.handshake.auth?.token as string | undefined;
+  if (authToken) {
+    return authToken.replace(/^Bearer\s+/i, '');
   }
-  return raw.startsWith('Bearer ') ? raw.slice('Bearer '.length) : raw;
+  const header = client.handshake.headers?.authorization;
+  if (typeof header === 'string' && header.startsWith('Bearer ')) {
+    return header.slice(7);
+  }
+  return undefined;
 }
