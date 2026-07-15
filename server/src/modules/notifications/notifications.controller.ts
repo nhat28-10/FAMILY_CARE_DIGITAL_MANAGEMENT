@@ -48,6 +48,13 @@ export class NotificationsController {
     return this.notificationsService.markAllRead(memberId);
   }
 
+  @Get('unread-count')
+  @ResponseMessage('Lấy số thông báo chưa đọc thành công')
+  @ApiOperation({ summary: 'Số thông báo chưa đọc của thành viên hiện tại' })
+  unreadCount(@CurrentFamilyMember('id') memberId: string) {
+    return this.notificationsService.unreadCount(memberId);
+  }
+
   @Patch(':notificationId/read')
   @ResponseMessage('Đã đánh dấu thông báo là đã đọc')
   @ApiOperation({ summary: 'Đánh dấu một thông báo là đã đọc' })
