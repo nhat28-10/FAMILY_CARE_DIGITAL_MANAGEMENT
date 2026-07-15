@@ -3956,11 +3956,11 @@ export class FinanceService {
       select: { id: true },
     });
 
-    await this.notificationsService.createForMembers(
+    await this.notificationsService.notify(
       familyId,
       recipients.map((recipient) => recipient.id),
       {
-        type: NotificationType.GENERAL,
+        type: NotificationType.FINANCE,
         priority: NotificationPriority.HIGH,
         title: 'Quỹ mục tiêu còn thiếu đóng góp',
         body: `${goalName} tháng ${periodMonth}/${periodYear} còn thiếu ${totalShortageAmount}.`,

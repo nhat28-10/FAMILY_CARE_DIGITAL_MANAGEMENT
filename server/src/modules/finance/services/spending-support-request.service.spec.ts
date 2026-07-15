@@ -24,7 +24,7 @@ describe('FinanceService spending support requests', () => {
   const requestId = 'request-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let service: FinanceService;
 
   const activeMember = {
@@ -78,7 +78,8 @@ describe('FinanceService spending support requests', () => {
       memberMonthlyFinance: { findUnique: jest.fn() },
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     service = new FinanceService(
       prisma as unknown as PrismaService,

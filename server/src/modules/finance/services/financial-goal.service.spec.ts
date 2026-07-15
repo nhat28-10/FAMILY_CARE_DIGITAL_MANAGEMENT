@@ -26,7 +26,7 @@ describe('FinanceService financial goals', () => {
   const goalId = 'goal-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let service: FinanceService;
 
   beforeAll(() => {
@@ -92,7 +92,8 @@ describe('FinanceService financial goals', () => {
       goalAllocation: { aggregate: jest.fn() },
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     service = new FinanceService(
       prisma as unknown as PrismaService,
@@ -697,11 +698,11 @@ describe('FinanceService financial goals', () => {
       }),
     );
     expect(result.members[0].actualAmount).toBe(1500000);
-    expect(notifications.createForMembers).toHaveBeenCalledWith(
+    expect(notifications.notify).toHaveBeenCalledWith(
       familyId,
       [memberId, 'deputy-id'],
       expect.objectContaining({
-        type: NotificationType.GENERAL,
+        type: NotificationType.FINANCE,
         priority: NotificationPriority.HIGH,
         referenceType: 'FINANCIAL_GOAL',
         referenceId: goalId,
@@ -780,7 +781,7 @@ describe('FinanceService financial goals', () => {
       shortageAmount: 0,
       status: GoalContributionPlanStatus.PAID,
     });
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('prevents a normal member from approving contribution plans', async () => {
@@ -801,7 +802,7 @@ describe('FinanceService financial goals', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('rejects a pending contribution without creating ledger entries', async () => {

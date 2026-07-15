@@ -40,7 +40,7 @@ describe('SosService location tracking', () => {
     emitNewAlert: jest.Mock;
     emitToUser: jest.Mock;
   };
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let familyMembers: { listByFamily: jest.Mock };
   let service: SosService;
 
@@ -60,7 +60,8 @@ describe('SosService location tracking', () => {
       emitToUser: jest.fn(),
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     familyMembers = { listByFamily: jest.fn().mockResolvedValue([]) };
     service = new SosService(
@@ -204,7 +205,7 @@ describe('SosService location tracking', () => {
       expect.objectContaining({ alertId, workspaceId }),
     );
     // Only the *other* member gets the SOS notification, not the trigger.
-    expect(notifications.createForMembers).toHaveBeenCalledWith(
+    expect(notifications.notify).toHaveBeenCalledWith(
       workspaceId,
       [otherMemberId],
       expect.objectContaining({ referenceId: alertId }),

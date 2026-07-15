@@ -116,7 +116,7 @@ describe('AlbumTagsService', () => {
     };
     $transaction: jest.Mock;
   };
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -133,7 +133,8 @@ describe('AlbumTagsService', () => {
       ),
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 1 }),
+      notify: jest.fn().mockResolvedValue({ ids: ['notif-1'] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     service = new AlbumTagsService(
       prisma as unknown as PrismaService,
@@ -159,7 +160,7 @@ describe('AlbumTagsService', () => {
         data: expect.objectContaining({ tagNote: 'note' }),
       }),
     );
-    expect(notifications.createForMembers).toHaveBeenCalledWith(
+    expect(notifications.notify).toHaveBeenCalledWith(
       'family-1',
       ['tagged'],
       {
@@ -170,8 +171,9 @@ describe('AlbumTagsService', () => {
         referenceType: 'ALBUM_MEDIA',
         referenceId: 'media-1',
       },
-      prisma,
+      { tx: prisma },
     );
+    expect(notifications.dispatch).toHaveBeenCalledWith(['notif-1']);
     expect(result.taggedMember.memberStatus).toBe(MemberStatus.ACTIVE);
   });
 
@@ -195,7 +197,7 @@ describe('AlbumTagsService', () => {
     expect(
       prisma.albumMediaTag.create.mock.calls[0][0].data.tagNote,
     ).toBeNull();
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('allows PRIVATE only for uploader self-tag', async () => {
@@ -308,7 +310,7 @@ describe('AlbumTagsService', () => {
         taggedMemberId: 'tagged',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('lists member status and compact remove permission', async () => {

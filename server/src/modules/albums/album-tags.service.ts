@@ -85,6 +85,7 @@ export class AlbumTagsService {
       throw new ForbiddenException('Không thể tạo tag cho media này');
     }
 
+    let notificationIds: string[] = [];
     try {
       const tag = await this.prisma.$transaction(async (tx) => {
         const created = await tx.albumMediaTag.create({
@@ -98,7 +99,7 @@ export class AlbumTagsService {
         });
 
         if (taggedMember.id !== requester.id) {
-          await this.notifications.createForMembers(
+          const { ids } = await this.notifications.notify(
             workspaceId,
             [taggedMember.id],
             {
@@ -109,12 +110,15 @@ export class AlbumTagsService {
               referenceType: 'ALBUM_MEDIA',
               referenceId: mediaId,
             },
-            tx,
+            { tx },
           );
+          notificationIds = ids;
         }
 
         return created;
       });
+
+      await this.notifications.dispatch(notificationIds);
 
       return this.mapTag(tag, media, requester);
     } catch (error) {

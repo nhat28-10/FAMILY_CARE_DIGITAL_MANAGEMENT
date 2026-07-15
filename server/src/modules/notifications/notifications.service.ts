@@ -26,7 +26,7 @@ export interface CreateNotificationInput {
 }
 
 /**
- * Shared in-app notifications. Other modules (SOS, ...) call `createForMembers`
+ * Shared in-app notifications. Other modules (SOS, ...) call `notify`
  * to fan out a notification to a set of family members; recipients read/ack
  * their own notifications through the controller.
  */
@@ -135,31 +135,6 @@ export class NotificationsService {
         `Không thể đẩy unread-count: ${(err as Error).message}`,
       );
     }
-  }
-
-  /** Fan-out: one notification per recipient member (e.g. the whole workspace). */
-  createForMembers(
-    familyId: string,
-    recipientMemberIds: string[],
-    input: CreateNotificationInput,
-    client: Prisma.TransactionClient | PrismaService = this.prisma,
-  ) {
-    if (recipientMemberIds.length === 0) {
-      return Promise.resolve({ count: 0 });
-    }
-
-    return client.notification.createMany({
-      data: recipientMemberIds.map((recipientMemberId) => ({
-        familyId,
-        recipientMemberId,
-        type: input.type,
-        priority: input.priority ?? NotificationPriority.NORMAL,
-        title: input.title,
-        body: input.body,
-        referenceType: input.referenceType ?? null,
-        referenceId: input.referenceId ?? null,
-      })),
-    });
   }
 
   listForMember(memberId: string, unreadOnly = false) {

@@ -25,7 +25,7 @@ describe('FinanceService budget planning', () => {
   const lineId = 'line-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let service: FinanceService;
 
   beforeEach(() => {
@@ -55,7 +55,8 @@ describe('FinanceService budget planning', () => {
       ledgerEntry: { findMany: jest.fn(), count: jest.fn() },
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     service = new FinanceService(
       prisma as unknown as PrismaService,

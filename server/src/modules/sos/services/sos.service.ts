@@ -97,18 +97,14 @@ export class SosService {
       alert.triggeredByMember.displayName ??
       alert.triggeredByMember.user.fullName ??
       'Một thành viên';
-    await this.notificationsService.createForMembers(
-      workspaceId,
-      recipientIds,
-      {
-        type: NotificationType.SOS,
-        priority: NotificationPriority.CRITICAL,
-        title: 'Cảnh báo SOS',
-        body: `${triggeredByName} đã kích hoạt SOS`,
-        referenceType: 'SOS_ALERT',
-        referenceId: alert.id,
-      },
-    );
+    await this.notificationsService.notify(workspaceId, recipientIds, {
+      type: NotificationType.SOS,
+      priority: NotificationPriority.CRITICAL,
+      title: 'Cảnh báo SOS',
+      body: `${triggeredByName} đã kích hoạt SOS`,
+      referenceType: 'SOS_ALERT',
+      referenceId: alert.id,
+    });
 
     this.sosGateway.emitNewAlert(workspaceId, alert);
 
