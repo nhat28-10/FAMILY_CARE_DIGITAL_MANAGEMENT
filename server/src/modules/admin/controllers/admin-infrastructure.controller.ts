@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { UserType } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -18,6 +19,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import type { SafeUser } from '../../users/users.types';
 import { AdminAuditLogsService } from '../admin-audit-logs.service';
 import { AdminInfrastructureService } from '../admin-infrastructure.service';
+import { AdminInfrastructureHostResponseDto } from '../dto/admin-response.dto';
 import { DockerContainerLogsQueryDto } from '../dto/docker-container-logs-query.dto';
 
 @ApiTags('Admin - Infrastructure')
@@ -34,6 +36,7 @@ export class AdminInfrastructureController {
   @Get('host')
   @ResponseMessage('Lấy thông tin tài nguyên host thành công')
   @ApiOperation({ summary: 'Get host/container runtime resources' })
+  @ApiOkResponse({ type: AdminInfrastructureHostResponseDto })
   @ApiResponse({ status: 403, description: 'Requires SYSTEM_ADMIN' })
   host() {
     return this.infrastructure.getHost();

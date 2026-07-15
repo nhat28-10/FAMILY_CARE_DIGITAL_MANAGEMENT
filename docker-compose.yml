@@ -30,11 +30,40 @@ services:
       APP_PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
+      FACE_AI_BASE_URL: http://face-ai-service:8000
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      face-ai-service:
+        condition: service_healthy
+    networks:
+      - family-care-network
+
+  face-ai-service:
+    build:
+      context: ./face-ai-service
+      dockerfile: Dockerfile
+    image: family-care-face-ai-service:latest
+    container_name: family-care-face-ai-service
+    restart: unless-stopped
+    environment:
+      FACE_AI_MODEL_NAME: ${FACE_AI_MODEL_NAME:-buffalo_l}
+      FACE_AI_DETECTION_SIZE: ${FACE_AI_DETECTION_SIZE:-640}
+      FACE_AI_DEVICE: ${FACE_AI_DEVICE:-cpu}
+      FACE_SCAN_MAX_FACES: ${FACE_SCAN_MAX_FACES:-20}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
     networks:
       - family-care-network
 

@@ -40,6 +40,18 @@ function response(decision: string) {
   );
 }
 
+function textResponse(text: string) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      result: { response: text },
+      errors: [],
+      messages: [],
+    }),
+    { status: 200 },
+  );
+}
+
 describe('CloudflareWorkersAiService', () => {
   let service: CloudflareWorkersAiService;
   let fetchMock: jest.Mock;
@@ -139,5 +151,51 @@ describe('CloudflareWorkersAiService', () => {
         transient: false,
       },
     );
+  });
+
+  it('parses fenced JSON returned as text', async () => {
+    fetchMock.mockResolvedValue(
+      textResponse(`Here is the result:
+\`\`\`json
+{
+  "decision": "SAFE",
+  "riskScore": 0.1,
+  "categories": [],
+  "reasonCode": "SAFE_CONTENT",
+  "summary": "No meaningful content-safety risk detected."
+}
+\`\`\``),
+    );
+
+    await expect(
+      service.moderateImage(png, 'image/png'),
+    ).resolves.toMatchObject({
+      decision: MediaCheckResult.SAFE,
+      riskScore: 0.1,
+      categories: [],
+    });
+  });
+
+  it('parses Cloudflare markdown label output', async () => {
+    fetchMock.mockResolvedValue(
+      textResponse(`**Content Safety Risk Classification**
+
+**Decision:** High Risk
+**Risk Score:** 8.4
+**Categories:** Explicit Content, Nudity
+**Reason Code:** 1.1, 1.2
+**Summary:** The image contains sensitive visual content.`),
+    );
+
+    await expect(
+      service.moderateImage(png, 'image/png'),
+    ).resolves.toMatchObject({
+      decision: MediaCheckResult.FLAGGED,
+      riskScore: 0.84,
+      categories: [
+        { code: 'SEXUAL_EXPLICIT', score: 0.84 },
+        { code: 'NUDITY', score: 0.84 },
+      ],
+    });
   });
 });

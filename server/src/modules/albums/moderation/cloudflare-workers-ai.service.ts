@@ -7,6 +7,7 @@ import {
   AiModerationResult,
   MODERATION_CATEGORY_CODES,
   ModerationCategory,
+  ModerationCategoryCode,
   ModerationProviderError,
 } from './moderation.types';
 
@@ -38,6 +39,19 @@ const RESPONSE_SCHEMA = {
   },
   required: ['decision', 'riskScore', 'categories', 'reasonCode', 'summary'],
 } as const;
+
+const TEXT_CATEGORY_MAP: Array<{
+  pattern: RegExp;
+  code: ModerationCategoryCode;
+}> = [
+  { pattern: /sexual|explicit/i, code: 'SEXUAL_EXPLICIT' },
+  { pattern: /nudity|nude/i, code: 'NUDITY' },
+  { pattern: /violence|graphic/i, code: 'GRAPHIC_VIOLENCE' },
+  { pattern: /weapon|gun|knife/i, code: 'WEAPON' },
+  { pattern: /drug|substance/i, code: 'DRUGS' },
+  { pattern: /self[-\s]?harm|suicide/i, code: 'SELF_HARM' },
+  { pattern: /hate|extrem/i, code: 'HATE_EXTREMISM' },
+];
 
 @Injectable()
 export class CloudflareWorkersAiService {
@@ -148,15 +162,24 @@ export class CloudflareWorkersAiService {
               {
                 role: 'system',
                 content:
-                  'Classify only content-safety risks in the image. Do not infer identity, age, gender, name, or personal attributes. Scores are heuristic severity signals.',
+                  'Classify only content-safety risks in the image. Do not infer identity, age, gender, name, or personal attributes. Return only valid compact JSON, no Markdown.',
               },
               {
                 role: 'user',
-                content:
-                  'Return the requested structured moderation result. Keep summary brief and non-graphic.',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Return exactly this JSON shape: {"decision":"SAFE|NEED_REVIEW|FLAGGED","riskScore":0.0,"categories":[{"code":"SEXUAL_EXPLICIT|NUDITY|GRAPHIC_VIOLENCE|WEAPON|DRUGS|SELF_HARM|HATE_EXTREMISM|OTHER_SENSITIVE","score":0.0}],"reasonCode":"UPPER_SNAKE_CASE","summary":"brief non-graphic summary"}. Scores must be numbers from 0 to 1.',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimeType};base64,${image.toString('base64')}`,
+                    },
+                  },
+                ],
               },
             ],
-            image: `data:${mimeType};base64,${image.toString('base64')}`,
             response_format: {
               type: 'json_schema',
               json_schema: RESPONSE_SCHEMA,
@@ -220,12 +243,109 @@ export class CloudflareWorkersAiService {
     }
     let value: unknown = result.response;
     if (typeof value === 'string') {
+      value = this.parseModelText(value);
+    }
+    return this.parseResultObject(value);
+  }
+
+  private parseModelText(text: string): unknown {
+    const trimmed = text.trim();
+    const jsonCandidate = this.extractJsonCandidate(trimmed);
+    if (jsonCandidate) {
       try {
-        value = JSON.parse(value);
+        return JSON.parse(jsonCandidate);
       } catch {
-        throw this.invalidResponse();
+        // Fall through to best-effort label parsing below.
       }
     }
+    const labelResult = this.parseLabelResponse(trimmed);
+    if (labelResult) return labelResult;
+    throw this.invalidResponse();
+  }
+
+  private extractJsonCandidate(text: string) {
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced?.[1]) return fenced[1].trim();
+    if (text.startsWith('{') && text.endsWith('}')) return text;
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    return start >= 0 && end > start ? text.slice(start, end + 1) : null;
+  }
+
+  private parseLabelResponse(text: string): AiModerationResult | null {
+    const decisionText =
+      this.matchField(text, 'decision') ?? this.matchField(text, 'result');
+    const decision = this.parseDecision(decisionText ?? text);
+    if (!decision) return null;
+
+    const scoreText = this.matchField(text, 'risk\\s*score|score');
+    const riskScore = this.normalizeScore(
+      scoreText ? Number(scoreText.match(/\d+(?:\.\d+)?/)?.[0]) : NaN,
+      decision,
+    );
+    const categoriesText = this.matchField(text, 'categories?') ?? '';
+    const categories = this.parseTextCategories(categoriesText, riskScore);
+    const reasonCode =
+      this.matchField(text, 'reason\\s*code') ??
+      categories[0]?.code ??
+      (decision === MediaCheckResult.SAFE ? 'SAFE' : 'OTHER_SENSITIVE');
+    const summary =
+      this.matchField(text, 'summary') ??
+      text.replace(/\s+/g, ' ').trim().slice(0, 500);
+
+    return {
+      decision,
+      riskScore,
+      categories,
+      reasonCode,
+      summary,
+    };
+  }
+
+  private matchField(text: string, label: string) {
+    const match = text.match(
+      new RegExp(
+        `(?:^|\\n)\\s*(?:\\*\\*)?(?:${label})(?:\\*\\*)?\\s*:\\s*([^\\n]+)`,
+        'i',
+      ),
+    );
+    return match?.[1]?.replace(/\*\*/g, '').trim();
+  }
+
+  private parseDecision(value: string) {
+    if (/flagged|unsafe|high\s*risk/i.test(value)) {
+      return MediaCheckResult.FLAGGED;
+    }
+    if (/need[_\s-]?review|review|medium|moderate/i.test(value)) {
+      return MediaCheckResult.NEED_REVIEW;
+    }
+    if (/\bsafe\b|low\s*risk/i.test(value)) {
+      return MediaCheckResult.SAFE;
+    }
+    return null;
+  }
+
+  private normalizeScore(value: number, decision: MediaCheckResult) {
+    if (Number.isFinite(value)) {
+      const normalized = value > 1 && value <= 10 ? value / 10 : value;
+      return Math.round(Math.min(1, Math.max(0, normalized)) * 10000) / 10000;
+    }
+    if (decision === MediaCheckResult.FLAGGED) return 0.9;
+    if (decision === MediaCheckResult.NEED_REVIEW) return 0.5;
+    return 0;
+  }
+
+  private parseTextCategories(text: string, riskScore: number) {
+    const categories = TEXT_CATEGORY_MAP.filter((item) =>
+      item.pattern.test(text),
+    ).map((item) => ({ code: item.code, score: riskScore }));
+    if (categories.length > 0) return categories;
+    return riskScore > 0
+      ? [{ code: 'OTHER_SENSITIVE' as const, score: riskScore }]
+      : [];
+  }
+
+  private parseResultObject(value: unknown): AiModerationResult {
     if (!this.isRecord(value)) throw this.invalidResponse();
     const decisions = [
       MediaCheckResult.SAFE,

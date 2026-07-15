@@ -84,6 +84,18 @@ export class FamiliesService {
         },
       });
 
+      await tx.workspaceProvisioningLog.create({
+        data: {
+          workspaceId: created.id,
+          actionType: ProvisioningActionType.ACTIVATE,
+          status: ProvisioningStatus.SUCCESS,
+          message: 'Family workspace activated successfully.',
+          startedAt: now,
+          finishedAt: now,
+          createdByUserId: userId,
+        },
+      });
+
       return tx.family.findUniqueOrThrow({
         where: { id: created.id },
         include: memberInclude,

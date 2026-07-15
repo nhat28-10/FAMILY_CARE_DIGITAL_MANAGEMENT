@@ -2,6 +2,8 @@ import { AlbumMediaType, MediaCheckResult } from '@prisma/client';
 
 export const MODERATION_JOB_TYPE = 'ALBUM_MEDIA_MODERATION' as const;
 export const MODERATION_JOB_VERSION = 1 as const;
+export const FACE_SCAN_JOB_TYPE = 'ALBUM_FACE_SCAN' as const;
+export const FACE_SCAN_JOB_VERSION = 1 as const;
 
 export interface AlbumModerationJob {
   version: typeof MODERATION_JOB_VERSION;
@@ -11,6 +13,15 @@ export interface AlbumModerationJob {
   workspaceId: string;
   storageKey: string;
   mediaType: AlbumMediaType;
+  requestedAt: string;
+}
+
+export interface AlbumFaceScanQueueJob {
+  version: typeof FACE_SCAN_JOB_VERSION;
+  type: typeof FACE_SCAN_JOB_TYPE;
+  scanJobId: string;
+  mediaId: string;
+  workspaceId: string;
   requestedAt: string;
 }
 

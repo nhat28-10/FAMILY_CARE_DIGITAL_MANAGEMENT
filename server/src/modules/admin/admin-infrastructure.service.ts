@@ -48,12 +48,16 @@ const SENSITIVE_LOG_KEYWORDS = [
 export interface DockerUnavailableResponse {
   dockerAvailable: false;
   status: 'UNAVAILABLE';
+  reason: 'DISABLED' | 'SOCKET_MISSING' | 'SOCKET_PERMISSION' | 'PING_FAILED';
+  socketPath: string;
   message: string;
 }
 
 @Injectable()
 export class AdminInfrastructureService {
-  private readonly docker = new Docker({ socketPath: DOCKER_SOCKET_PATH });
+  private readonly dockerSocketPath =
+    process.env.DOCKER_SOCKET_PATH || DOCKER_SOCKET_PATH;
+  private readonly docker = new Docker({ socketPath: this.dockerSocketPath });
 
   getHost() {
     const cpus = os.cpus();
@@ -323,22 +327,39 @@ export class AdminInfrastructureService {
   private async getDockerAvailability(): Promise<
     { dockerAvailable: true } | DockerUnavailableResponse
   > {
-    if (!fs.existsSync(DOCKER_SOCKET_PATH)) {
-      return this.dockerUnavailable();
+    if (process.env.ADMIN_DOCKER_ENABLED === 'false') {
+      return this.dockerUnavailable('DISABLED');
+    }
+
+    if (!fs.existsSync(this.dockerSocketPath)) {
+      return this.dockerUnavailable('SOCKET_MISSING');
+    }
+
+    try {
+      fs.accessSync(
+        this.dockerSocketPath,
+        fs.constants.R_OK | fs.constants.W_OK,
+      );
+    } catch {
+      return this.dockerUnavailable('SOCKET_PERMISSION');
     }
 
     try {
       await this.docker.ping();
       return { dockerAvailable: true };
     } catch {
-      return this.dockerUnavailable();
+      return this.dockerUnavailable('PING_FAILED');
     }
   }
 
-  private dockerUnavailable(): DockerUnavailableResponse {
+  private dockerUnavailable(
+    reason: DockerUnavailableResponse['reason'] = 'PING_FAILED',
+  ): DockerUnavailableResponse {
     return {
       dockerAvailable: false,
       status: 'UNAVAILABLE',
+      reason,
+      socketPath: this.dockerSocketPath,
       message:
         'Docker socket không khả dụng hoặc server không có quyền truy cập Docker.',
     };

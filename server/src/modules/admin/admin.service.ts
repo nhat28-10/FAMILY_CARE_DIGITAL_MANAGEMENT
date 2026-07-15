@@ -107,6 +107,10 @@ export interface AdminPaymentListItem {
   paymentId: string;
   familyId: string;
   familyName: string | null;
+  family: {
+    id: string;
+    name: string | null;
+  };
   planCode: string | null;
   amount: number;
   currency: string;
@@ -114,6 +118,15 @@ export interface AdminPaymentListItem {
   paidAt: Date | null;
   createdAt: Date;
 }
+
+type AdminMonthlyRevenueRawRow = {
+  month: string;
+  totalRevenue: Prisma.Decimal | string | number | null;
+  monthlyRevenue: Prisma.Decimal | string | number | null;
+  yearlyRevenue: Prisma.Decimal | string | number | null;
+  paidCount: bigint | number | string;
+  currency: string | null;
+};
 
 /**
  * System-admin data access for the basic entities. All queries go straight to
@@ -275,56 +288,81 @@ export class AdminService {
   }
 
   async getMonthlyRevenue(q: AdminRevenueMonthlyQueryDto) {
-    await this.hydrateStripePriceIdCache();
-    const rows = await this.getAdminPaymentRows({
-      where: {
-        ...this.paymentStatusWhere('PAID'),
-        ...this.createdAtRange(q.from, q.to),
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-    const buckets = new Map<
-      string,
-      {
-        month: string;
-        totalRevenue: number;
-        monthlyRevenue: number;
-        yearlyRevenue: number;
-        paidCount: number;
+    const whereConditions: Prisma.Sql[] = [
+      Prisma.sql`(pt."type" = 'invoice.paid' OR UPPER(pt."status") = 'PAID')`,
+    ];
+    if (q.from) {
+      whereConditions.push(Prisma.sql`pt."createdAt" >= ${new Date(q.from)}`);
+    }
+    if (q.to) {
+      const end = new Date(q.to);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) {
+        end.setUTCDate(end.getUTCDate() + 1);
+        whereConditions.push(Prisma.sql`pt."createdAt" < ${end}`);
+      } else {
+        whereConditions.push(Prisma.sql`pt."createdAt" <= ${end}`);
       }
-    >();
-
-    for (const payment of rows) {
-      const planCode = this.resolvePlanCode(payment);
-      if (q.planCode && planCode !== q.planCode) continue;
-
-      const month = this.monthKey(payment.createdAt);
-      const amount = this.decimalToNumber(payment.amount);
-      const bucket = buckets.get(month) ?? {
-        month,
-        totalRevenue: 0,
-        monthlyRevenue: 0,
-        yearlyRevenue: 0,
-        paidCount: 0,
-      };
-
-      bucket.totalRevenue += amount;
-      if (planCode === MONTHLY_PLAN_CODE) bucket.monthlyRevenue += amount;
-      if (planCode === YEARLY_PLAN_CODE) bucket.yearlyRevenue += amount;
-      bucket.paidCount += 1;
-      buckets.set(month, bucket);
     }
 
-    return Array.from(buckets.values()).sort((a, b) =>
-      a.month.localeCompare(b.month),
+    const stripePriceIdSql = Prisma.sql`COALESCE(
+      pt."rawPayload"->>'stripePriceId',
+      pt."rawPayload"#>>'{data,object,lines,data,0,price,id}',
+      pt."rawPayload"#>>'{data,object,lines,data,0,pricing,price_details,price}',
+      pt."rawPayload"#>>'{data,object,items,data,0,price,id}',
+      pt."rawPayload"#>>'{data,object,price,id}',
+      pt."rawPayload"#>>'{lines,data,0,price,id}',
+      pt."rawPayload"#>>'{lines,data,0,pricing,price_details,price}',
+      pt."rawPayload"#>>'{items,data,0,price,id}',
+      pt."rawPayload"#>>'{price,id}'
+    )`;
+    const planCodeSql = Prisma.sql`COALESCE(
+      pt."rawPayload"->>'planCode',
+      price_plan."planCode",
+      current_plan."planCode"
+    )`;
+
+    if (q.planCode) {
+      whereConditions.push(Prisma.sql`${planCodeSql} = ${q.planCode}`);
+    }
+
+    const rows = await this.prisma.$queryRaw<AdminMonthlyRevenueRawRow[]>(
+      Prisma.sql`
+        SELECT
+          to_char(date_trunc('month', pt."createdAt" AT TIME ZONE 'UTC'), 'YYYY-MM') AS "month",
+          COALESCE(SUM(pt."amount"), 0)::text AS "totalRevenue",
+          COALESCE(SUM(CASE WHEN ${planCodeSql} = ${MONTHLY_PLAN_CODE} THEN pt."amount" ELSE 0 END), 0)::text AS "monthlyRevenue",
+          COALESCE(SUM(CASE WHEN ${planCodeSql} = ${YEARLY_PLAN_CODE} THEN pt."amount" ELSE 0 END), 0)::text AS "yearlyRevenue",
+          COUNT(*)::int AS "paidCount",
+          COALESCE(MIN(pt."currency"), ${DEFAULT_CURRENCY}) AS "currency"
+        FROM "payment_transactions" pt
+        LEFT JOIN "family_subscriptions" fs ON fs."familyId" = pt."familyId"
+        LEFT JOIN "subscription_plans" current_plan ON current_plan."id" = fs."planId"
+        LEFT JOIN "subscription_plans" price_plan ON price_plan."stripePriceId" = ${stripePriceIdSql}
+        WHERE ${Prisma.join(whereConditions, ' AND ')}
+        GROUP BY date_trunc('month', pt."createdAt" AT TIME ZONE 'UTC')
+        ORDER BY "month" ASC
+      `,
     );
+
+    return rows.map((row) => ({
+      month: row.month,
+      totalRevenue: this.rawDecimalToNumber(row.totalRevenue),
+      monthlyRevenue: this.rawDecimalToNumber(row.monthlyRevenue),
+      yearlyRevenue: this.rawDecimalToNumber(row.yearlyRevenue),
+      paidCount: Number(row.paidCount),
+      currency: row.currency ?? DEFAULT_CURRENCY,
+    }));
   }
 
   async listPayments(
     q: AdminPaymentQueryDto,
   ): Promise<PaginatedResult<AdminPaymentListItem>> {
     await this.hydrateStripePriceIdCache();
-    const where = q.status ? this.paymentStatusWhere(q.status) : {};
+    const where: Prisma.PaymentTransactionWhereInput = {
+      ...(q.status ? this.paymentStatusWhere(q.status) : {}),
+      ...(q.familyId ? { familyId: q.familyId } : {}),
+      ...this.createdAtRange(q.from, q.to),
+    };
     const rows = await this.getAdminPaymentRows({
       where,
       orderBy: { createdAt: 'desc' },
@@ -531,6 +569,7 @@ export class AdminService {
   }
 
   async listProvisioningLogs(q: ListProvisioningLogsQueryDto) {
+    await this.backfillMissingProvisioningLogs(q.familyId);
     const where = this.provisioningLogWhere(q);
 
     const [items, total] = await this.prisma.$transaction([
@@ -557,6 +596,7 @@ export class AdminService {
     q: ListProvisioningLogsQueryDto,
   ) {
     await this.findFamilyWorkspaceOrThrow(familyId);
+    await this.backfillMissingProvisioningLogs(familyId);
     const where = this.provisioningLogWhere({ ...q, familyId });
 
     const [items, total] = await this.prisma.$transaction([
@@ -911,6 +951,10 @@ export class AdminService {
       paymentId: row.id,
       familyId: row.familyId,
       familyName: row.family?.name ?? null,
+      family: {
+        id: row.familyId,
+        name: row.family?.name ?? null,
+      },
       planCode: this.resolvePlanCode(row),
       amount: this.decimalToNumber(row.amount),
       currency: row.currency ?? DEFAULT_CURRENCY,
@@ -945,6 +989,71 @@ export class AdminService {
       throw new NotFoundException('Không tìm thấy family workspace.');
     }
     return family;
+  }
+
+  private async backfillMissingProvisioningLogs(
+    familyId?: string,
+  ): Promise<void> {
+    const familyScope: Prisma.FamilyWhereInput = familyId
+      ? { id: familyId }
+      : {};
+    const [missingCreate, missingActivate] = await this.prisma.$transaction([
+      this.prisma.family.findMany({
+        where: {
+          ...familyScope,
+          provisioningLogs: {
+            none: { actionType: ProvisioningActionType.CREATE },
+          },
+        },
+        select: { id: true, createdById: true, createdAt: true },
+      }),
+      this.prisma.family.findMany({
+        where: {
+          ...familyScope,
+          status: WorkspaceStatus.ACTIVE,
+          activationStatus: ActivationStatus.ACTIVE,
+          provisioningLogs: {
+            none: { actionType: ProvisioningActionType.ACTIVATE },
+          },
+        },
+        select: {
+          id: true,
+          createdById: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const createRows: Prisma.WorkspaceProvisioningLogCreateManyInput[] =
+      missingCreate.map((family) => ({
+        workspaceId: family.id,
+        actionType: ProvisioningActionType.CREATE,
+        status: ProvisioningStatus.SUCCESS,
+        message: 'Backfilled family workspace creation log.',
+        startedAt: family.createdAt,
+        finishedAt: family.createdAt,
+        createdByUserId: family.createdById,
+        createdAt: family.createdAt,
+      }));
+    const activateRows: Prisma.WorkspaceProvisioningLogCreateManyInput[] =
+      missingActivate.map((family) => ({
+        workspaceId: family.id,
+        actionType: ProvisioningActionType.ACTIVATE,
+        status: ProvisioningStatus.SUCCESS,
+        message: 'Backfilled family workspace activation log.',
+        startedAt: family.createdAt,
+        finishedAt: family.updatedAt,
+        createdByUserId: family.createdById,
+        createdAt: family.updatedAt,
+      }));
+
+    const rows = [...createRows, ...activateRows];
+    if (!rows.length) return;
+
+    await this.prisma.workspaceProvisioningLog.createMany({
+      data: rows,
+    });
   }
 
   private provisioningLogWhere(
@@ -1170,6 +1279,15 @@ export class AdminService {
 
   private decimalToNumber(value: Prisma.Decimal | null | undefined): number {
     return value ? value.toNumber() : 0;
+  }
+
+  private rawDecimalToNumber(
+    value: Prisma.Decimal | string | number | null | undefined,
+  ): number {
+    if (value instanceof Prisma.Decimal) return value.toNumber();
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return Number(value);
+    return 0;
   }
 
   private monthKey(date: Date): string {

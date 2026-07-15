@@ -22,7 +22,10 @@ services:
       - pgdata_dev:/var/lib/postgresql/data
     healthcheck:
       test:
-        ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-family_care_dev}']
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-family_care_dev}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,11 +35,16 @@ services:
   api:
     profiles: ['full']
     build: .
+    user: root
     env_file: .env
     environment:
       # Inside the Docker network the DB host is the service name `db`.
       DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_DATABASE:-family_care_dev}?schema=public
+      ADMIN_DOCKER_ENABLED: 'true'
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+      BACKUP_POSTGRES_CONTAINER: familycare_db_dev
       CHOKIDAR_USEPOLLING: 'true'
+      FACE_AI_BASE_URL: http://face-ai-service:8000
     ports:
       - '3000:3000'
     volumes:
@@ -47,6 +55,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      face-ai-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  face-ai-service:
+    profiles: ['full']
+    build:
+      context: ../face-ai-service
+      dockerfile: Dockerfile
+    environment:
+      FACE_AI_MODEL_NAME: ${FACE_AI_MODEL_NAME:-buffalo_l}
+      FACE_AI_DETECTION_SIZE: ${FACE_AI_DETECTION_SIZE:-640}
+      FACE_AI_DEVICE: ${FACE_AI_DEVICE:-cpu}
+      FACE_SCAN_MAX_FACES: ${FACE_SCAN_MAX_FACES:-20}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
     restart: unless-stopped
 
 volumes:
