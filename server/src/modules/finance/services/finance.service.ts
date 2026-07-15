@@ -2148,11 +2148,15 @@ export class FinanceService {
         if (goal.status === FinancialGoalStatus.ACHIEVED) {
           throw new ConflictException('Mục tiêu tài chính đã hoàn thành');
         }
-        const entry = await this.requireFamilyLedgerEntry(
-          tx,
-          familyId,
-          dto.ledgerEntryId,
-        );
+        const entry = dto.ledgerEntryId
+          ? await this.requireFamilyLedgerEntry(tx, familyId, dto.ledgerEntryId)
+          : await this.createGoalContributionLedgerEntry(
+              tx,
+              familyId,
+              memberId,
+              goal,
+              dto.amount,
+            );
         this.assertCanAllocateToGoal(member.familyRole, memberId, goal, entry);
         await this.assertAllocationAmountAvailable(
           tx,
@@ -3631,6 +3635,39 @@ export class FinanceService {
       );
     }
     return entry;
+  }
+
+  private async createGoalContributionLedgerEntry(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    memberId: string,
+    goal: FinancialGoalWithJar,
+    amount: number,
+  ) {
+    const ledger = await tx.financeLedger.upsert({
+      where: { familyId },
+      create: {
+        familyId,
+        ledgerName: 'Shared Family Ledger',
+        status: FinanceLedgerStatus.ACTIVE,
+      },
+      update: {},
+    });
+
+    return tx.ledgerEntry.create({
+      data: {
+        ledgerId: ledger.id,
+        jarId: goal.relatedJarId,
+        createdByMemberId: memberId,
+        entryType: LedgerEntryType.CONTRIBUTION,
+        amount: new Prisma.Decimal(amount),
+        description: `Goal contribution: ${goal.goalName}`,
+        entryDate: new Date(),
+        sourceType: 'GOAL_QUICK_CONTRIBUTION',
+        sourceId: goal.id,
+        status: LedgerEntryStatus.ACTIVE,
+      },
+    });
   }
 
   private async requireGoalAllocation(

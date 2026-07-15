@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   FinanceLedgerStatus,
@@ -37,6 +38,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { StorageService } from '../../storage/storage.service';
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { CreateTaskCategoryDto } from '../dto/create-task-category.dto';
 import { CreateRecurringTaskDto } from '../dto/create-recurring-task.dto';
@@ -618,7 +620,10 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly storage?: StorageService,
+  ) {}
 
   async uploadTaskProofFile(
     familyId: string,
@@ -2375,7 +2380,7 @@ export class TasksService {
       });
     });
 
-    return this.mapSubmissionResponse(submission);
+    return this.mapSubmissionResponseWithFreshProofUrls(submission);
   }
 
   async updateTaskProof(
@@ -2474,14 +2479,13 @@ export class TasksService {
       this.prisma.taskSubmission.count({ where }),
     ]);
 
-    return buildPaginated(
+    const items = await Promise.all(
       submissions.map((submission) =>
-        this.mapSubmissionListItemResponse(submission),
+        this.mapSubmissionListItemResponseWithFreshProofUrls(submission),
       ),
-      total,
-      query.page,
-      query.limit,
     );
+
+    return buildPaginated(items, total, query.page, query.limit);
   }
 
   async getTaskSubmission(
@@ -2500,7 +2504,7 @@ export class TasksService {
       );
     }
     this.assertCanViewSubmission(submission, memberId, familyRole);
-    return this.mapSubmissionResponse(submission);
+    return this.mapSubmissionResponseWithFreshProofUrls(submission);
   }
 
   async reviewTaskSubmission(
@@ -2623,7 +2627,7 @@ export class TasksService {
       dto.decision === ReviewTaskSubmissionDecision.APPROVED
         ? 'Duyệt hoàn thành công việc thành công'
         : 'Từ chối hoàn thành công việc thành công',
-      this.mapSubmissionResponse(result),
+      await this.mapSubmissionResponseWithFreshProofUrls(result),
     );
   }
 
@@ -2836,7 +2840,6 @@ export class TasksService {
         id: memberId,
         familyId,
         status: MemberStatus.ACTIVE,
-        familyRole: FamilyRole.FAMILY_MEMBER,
       },
     });
     if (!member) {
@@ -3744,6 +3747,20 @@ export class TasksService {
     };
   }
 
+  private async mapSubmissionResponseWithFreshProofUrls(
+    submission: SubmissionResponsePayload,
+  ) {
+    const response = this.mapSubmissionResponse(submission);
+    return {
+      ...response,
+      proofs: await Promise.all(
+        submission.proofs.map((proof) =>
+          this.mapProofResponseWithFreshFileUrls(proof),
+        ),
+      ),
+    };
+  }
+
   private mapSubmissionListItemResponse(submission: SubmissionListItemPayload) {
     return {
       id: submission.id,
@@ -3765,6 +3782,20 @@ export class TasksService {
     };
   }
 
+  private async mapSubmissionListItemResponseWithFreshProofUrls(
+    submission: SubmissionListItemPayload,
+  ) {
+    const response = this.mapSubmissionListItemResponse(submission);
+    return {
+      ...response,
+      proofs: await Promise.all(
+        submission.proofs.map((proof) =>
+          this.mapProofResponseWithFreshFileUrls(proof),
+        ),
+      ),
+    };
+  }
+
   private mapProofResponse(proof: ProofResponsePayload) {
     return {
       id: proof.id,
@@ -3777,6 +3808,25 @@ export class TasksService {
       createdAt: proof.createdAt,
       updatedAt: proof.updatedAt,
     };
+  }
+
+  private async mapProofResponseWithFreshFileUrls(proof: ProofResponsePayload) {
+    const response = this.mapProofResponse(proof);
+    return {
+      ...response,
+      fileUrl: await this.refreshProofFileUrl(response.fileUrl),
+      thumbnailUrl: await this.refreshProofFileUrl(response.thumbnailUrl),
+    };
+  }
+
+  private async refreshProofFileUrl(fileUrl: string | null) {
+    if (!this.storage || !fileUrl) {
+      return fileUrl;
+    }
+
+    return (
+      (await this.storage.createSignedReadUrlFromStoredUrl(fileUrl)) ?? fileUrl
+    );
   }
 
   private isAssignmentOverdue(assignment: {
