@@ -6,7 +6,12 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -34,6 +39,7 @@ export class DevicesController {
   @Delete('tokens/:token')
   @ResponseMessage('Hủy đăng ký thiết bị thành công')
   @ApiOperation({ summary: 'Hủy FCM token (gọi khi logout)' })
+  @ApiParam({ name: 'token', description: 'FCM token cần hủy' })
   remove(@CurrentUser('id') userId: string, @Param('token') token: string) {
     return this.devicesService.remove(userId, token);
   }
