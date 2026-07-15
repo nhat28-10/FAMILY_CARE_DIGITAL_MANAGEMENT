@@ -174,7 +174,7 @@ export class JoinRequestsService {
       ]);
       return member;
     } catch (error) {
-      if (this.isRecordNotFound(error)) {
+      if (this.isLostRace(error)) {
         throw new BadRequestException('Chỉ có thể duyệt yêu cầu đang chờ');
       }
       throw error;
@@ -236,6 +236,15 @@ export class JoinRequestsService {
     return (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
+    );
+  }
+
+  /** Lost-race signals from the guarded transaction: P2025 (request no longer
+   *  PENDING) hoặc P2002 (member vừa được tạo bởi lượt duyệt song song). */
+  private isLostRace(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2025' || error.code === 'P2002')
     );
   }
 

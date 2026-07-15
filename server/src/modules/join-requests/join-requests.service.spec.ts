@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,14 @@ import { JoinRequestsService } from './join-requests.service';
 function notFoundError(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('not found', {
     code: 'P2025',
+    clientVersion: 'test',
+  });
+}
+
+/** P2002 giả lập race: member vừa được tạo bởi lượt duyệt song song khác. */
+function duplicateError(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('duplicate', {
+    code: 'P2002',
     clientVersion: 'test',
   });
 }
@@ -239,11 +248,11 @@ describe('JoinRequestsService', () => {
 
     it('chặn khi vượt trần thành viên của gói', async () => {
       familyMembers.assertCanAddMember.mockRejectedValue(
-        new BadRequestException('Đã đạt số thành viên tối đa của gói hiện tại'),
+        new ForbiddenException('Đã đạt số thành viên tối đa của gói hiện tại'),
       );
       await expect(
         service.approve(familyId, managerMemberId, requestId),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('400 khi yêu cầu không còn PENDING', async () => {
@@ -265,6 +274,15 @@ describe('JoinRequestsService', () => {
 
     it('400 khi bị race: status đổi giữa lúc đọc và duyệt (P2025)', async () => {
       prisma.$transaction.mockRejectedValue(notFoundError());
+      await expect(
+        service.approve(familyId, managerMemberId, requestId),
+      ).rejects.toMatchObject({
+        message: 'Chỉ có thể duyệt yêu cầu đang chờ',
+      });
+    });
+
+    it('400 khi 2 manager duyệt song song cùng lúc, member vừa được tạo (P2002)', async () => {
+      prisma.$transaction.mockRejectedValue(duplicateError());
       await expect(
         service.approve(familyId, managerMemberId, requestId),
       ).rejects.toMatchObject({
