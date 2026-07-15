@@ -45,6 +45,8 @@ import { AdminModule } from './modules/admin/admin.module';
         connection: {
           host: config.get<string>('redis.host'),
           port: config.get<number>('redis.port'),
+          // BullMQ Worker yêu cầu null (nếu không sẽ throw khi khởi tạo).
+          maxRetriesPerRequest: null,
         },
       }),
     }),
