@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
+  FinanceLedgerStatus,
   FinanceVisibility,
   FinancialGoalStatus,
   GoalContributionPlanStatus,
@@ -236,6 +237,72 @@ describe('FinanceService financial goals', () => {
 
     expect(result.goal.status).toBe(FinancialGoalStatus.ACHIEVED);
     expect(result.progress.isAchieved).toBe(true);
+  });
+
+  it('creates a contribution ledger entry for quick goal allocations without a ledger entry id', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.create.mockResolvedValue({
+      id: 'generated-entry-id',
+      createdByMemberId: memberId,
+      status: LedgerEntryStatus.ACTIVE,
+      entryType: LedgerEntryType.CONTRIBUTION,
+      amount: new Prisma.Decimal(25),
+    });
+    tx.goalAllocation.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } })
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(25) } });
+    tx.goalAllocation.create.mockResolvedValue({
+      id: 'allocation-id',
+      ledgerEntryId: 'generated-entry-id',
+    });
+    tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
+
+    const result = await service.createGoalAllocation(
+      familyId,
+      memberId,
+      goalId,
+      { amount: 25 },
+    );
+
+    expect(tx.financeLedger.upsert).toHaveBeenCalledWith({
+      where: { familyId },
+      create: {
+        familyId,
+        ledgerName: 'Shared Family Ledger',
+        status: FinanceLedgerStatus.ACTIVE,
+      },
+      update: {},
+    });
+    expect(tx.ledgerEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ledgerId: 'ledger-id',
+        jarId: null,
+        createdByMemberId: memberId,
+        entryType: LedgerEntryType.CONTRIBUTION,
+        amount: new Prisma.Decimal(25),
+        description: 'Goal contribution: Emergency fund',
+        sourceType: 'GOAL_QUICK_CONTRIBUTION',
+        sourceId: goalId,
+        status: LedgerEntryStatus.ACTIVE,
+      }),
+    });
+    expect(tx.goalAllocation.create).toHaveBeenCalledWith({
+      data: {
+        goalId,
+        ledgerEntryId: 'generated-entry-id',
+        amount: new Prisma.Decimal(25),
+        allocatedByMemberId: memberId,
+      },
+      include: { ledgerEntry: true },
+    });
+    expect(result.progress.currentAmount.equals(25)).toBe(true);
   });
 
   it('suggests monthly goal contributions proportionally after shared contributions and handles null monthly finance values', async () => {

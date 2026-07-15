@@ -212,6 +212,52 @@ export class StorageService {
     }
   }
 
+  async createSignedReadUrlFromStoredUrl(
+    fileUrl: string | null | undefined,
+    expiresInSeconds = this.signedUrlTtlSeconds,
+  ): Promise<string | null> {
+    const storageKey = this.extractStorageKeyFromUrl(fileUrl);
+    return storageKey
+      ? this.createSignedReadUrl(storageKey, expiresInSeconds)
+      : null;
+  }
+
+  extractStorageKeyFromUrl(fileUrl: string | null | undefined): string | null {
+    if (!fileUrl || fileUrl.startsWith('/')) {
+      return null;
+    }
+
+    if (this.publicUrl && fileUrl.startsWith(`${this.publicUrl}/`)) {
+      return this.stripQuery(fileUrl.slice(this.publicUrl.length + 1));
+    }
+
+    try {
+      const url = new URL(fileUrl);
+      const isSignedUrl =
+        url.searchParams.has('X-Amz-Signature') ||
+        url.searchParams.has('X-Amz-Credential') ||
+        url.searchParams.has('X-Amz-Algorithm');
+      if (!isSignedUrl) {
+        return null;
+      }
+
+      const path = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+      if (!path) {
+        return null;
+      }
+
+      return this.bucket && path.startsWith(`${this.bucket}/`)
+        ? path.slice(this.bucket.length + 1)
+        : path;
+    } catch {
+      return null;
+    }
+  }
+
+  private stripQuery(value: string): string {
+    return value.split('?')[0];
+  }
+
   /** Delete directly by storage key, optionally propagating R2 failures. */
   async deleteFileByKey(
     storageKey: string,
