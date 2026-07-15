@@ -38,7 +38,7 @@ Nền tảng **quản lý tài chính & chăm sóc gia đình số**. Đây là 
 src/
 ├── main.ts                  # Bootstrap: global prefix, ValidationPipe, interceptor, filter, Swagger
 ├── app.module.ts            # Root module (ConfigModule global + PrismaModule + 21 feature module)
-├── config/configuration.ts  # Đọc ENV → object config (app/database/jwt/bcrypt/invitation)
+├── config/configuration.ts  # Đọc ENV → object config (app/database/jwt/bcrypt/mail...)
 ├── prisma/                  # PrismaModule (@Global) + PrismaService
 ├── common/                  # Dùng chung: interceptors / filters / decorators
 └── modules/<feature>/       # 21 feature module
@@ -55,19 +55,19 @@ src/
 - Hạ tầng: `prisma`, `common`.
 - Auth/định danh: `auth`, `users`.
 - Gia đình: `families`, `family-members` (gồm `FamilyPermissionGuard` + `@FamilyRoles`),
-  `invitations`.
+  `join-requests` (mã mời family kiểu Zalo + yêu cầu tham gia có duyệt).
 - `finance` — **module lớn, đầy đủ**: ledger gia đình + ledger entry, `FinanceModel`/`FinanceJar`,
   `FinanceCategory`, `MemberMonthlyFinance`, **budget plan/line, financial goal + goal allocation,
   budget alert, spending support request** (controller trong `finance/controllers/`, service trong
   `finance/services/`). Route workspace-scoped dưới `families/:familyId/finance/...`.
-- `admin` — **CRUD hệ thống** (SYSTEM_ADMIN) cho users / families / invitations / family-members
+- `admin` — **CRUD hệ thống** (SYSTEM_ADMIN) cho users / families / join-requests / family-members
   (controller tách trong `admin/controllers/`).
 - `subscription-plans` — **CRUD gói** (SYSTEM_ADMIN quản lý qua `admin/subscription-plans`; user đã
   đăng nhập xem gói active qua `subscription-plans`). Export `SubscriptionPlansService` cho module
   `subscriptions` dùng sau.
 
 **Bảng DB đã có** (xem `prisma/schema.prisma`): `users`, `password_reset_tokens`, `refresh_tokens`,
-`families`, `family_members`, `invitations`, `member_monthly_finances`, `finance_ledgers`,
+`families`, `family_members`, `join_requests`, `member_monthly_finances`, `finance_ledgers`,
 `finance_categories`, `finance_models`, `finance_jars`, `ledger_entries`, `subscription_plans`,
 `spending_support_requests`, `budget_plans`, `budget_lines`, `financial_goals`, `goal_allocations`,
 `budget_alerts`.
@@ -112,13 +112,21 @@ locations, messages, notifications, rewards, roles-permissions, sos, subscriptio
 - **TUYỆT ĐỐI không trả `passwordHash`** ra client. Luôn dùng `sanitizeUser()` và type
   `SafeUser = Omit<User,'passwordHash'>` trong `modules/users/users.types.ts`.
 - Hash password & refresh token bằng **bcrypt**; refresh token **rotate** mỗi lần refresh
-  (revoke row cũ, tạo row mới trong `refresh_tokens`). Invitation token là chuỗi opaque,
-  lưu **sha256** (`modules/invitations`) — raw token chỉ trả 1 lần.
+  (revoke row cũ, tạo row mới trong `refresh_tokens`). Mã mời gia đình (`Family.inviteCode`,
+  `modules/join-requests`) là chuỗi ngắn 8 ký tự lưu **plaintext** (không phải token bí mật
+  dùng 1 lần) — bảo vệ bằng bước manager duyệt join request, không phải bằng độ khó đoán mã;
+  đổi/thu hồi mã qua endpoint regenerate (mã cũ vô hiệu ngay).
 - Secret/khoá đọc từ ENV qua `ConfigService` — **không hardcode**.
 
 ### 5.4 Data access
 - Dùng **Prisma**: inject `PrismaService` (đã `@Global`, không cần import PrismaModule).
 - Không tự mở kết nối DB; không thêm ORM khác.
+- **Đặt tên ID (chuẩn hóa 2026-07)**: PK của **mọi model** là field `id` trong Prisma
+  (cột DB vẫn snake_case qua `@map`, vd `sos_alert_id` — đổi tên field KHÔNG cần migration).
+  Foreign key giữ dạng `<entity>Id` (`conversationId` trên `Message`, `sosAlertId` trên
+  `SosLocationPoint`...). Response API cũng trả `id` cho chính resource. Model mới
+  TUYỆT ĐỐI không đặt PK kiểu `<entity>Id`. Ngoại lệ: payload WebSocket SOS/chat vẫn dùng
+  key ngữ cảnh (`{ sosAlertId, point }`) — đó là tham chiếu, không phải PK của payload.
 
 ### 5.5 Validation
 - Mỗi input có **DTO + class-validator**. `ValidationPipe` global đã bật
