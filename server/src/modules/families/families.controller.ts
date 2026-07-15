@@ -62,6 +62,28 @@ export class FamiliesController {
     return this.familiesService.getById(familyId);
   }
 
+  @Get(':familyId/invite-code')
+  @UseGuards(FamilyPermissionGuard)
+  @ResponseMessage('Lấy mã mời thành công')
+  @ApiOperation({ summary: 'Get the family invite code (any active member)' })
+  @ApiResponse({ status: 403, description: 'Not a member of this family' })
+  getInviteCode(@Param('familyId') familyId: string) {
+    return this.familiesService.getInviteCode(familyId);
+  }
+
+  @Post(':familyId/invite-code/regenerate')
+  @UseGuards(FamilyPermissionGuard, VerifiedGuard)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Tạo mã mời thành công')
+  @ApiOperation({
+    summary: 'Create or rotate the family invite code (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  regenerateInviteCode(@Param('familyId') familyId: string) {
+    return this.familiesService.regenerateInviteCode(familyId);
+  }
+
   @Patch(':familyId')
   @UseGuards(FamilyPermissionGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)

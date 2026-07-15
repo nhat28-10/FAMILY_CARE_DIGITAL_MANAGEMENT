@@ -10,9 +10,9 @@ import { AdminAuditLogsController } from './controllers/admin-audit-logs.control
 import { AdminBackupRestoreController } from './controllers/admin-backup-restore.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 import { AdminFamiliesController } from './controllers/admin-families.controller';
+import { AdminJoinRequestsController } from './controllers/admin-join-requests.controller';
 import { AdminFamilyMembersController } from './controllers/admin-family-members.controller';
 import { AdminInfrastructureController } from './controllers/admin-infrastructure.controller';
-import { AdminInvitationsController } from './controllers/admin-invitations.controller';
 import { AdminPaymentsController } from './controllers/admin-payments.controller';
 import { AdminProvisioningLogsController } from './controllers/admin-provisioning-logs.controller';
 import { AdminRevenueController } from './controllers/admin-revenue.controller';
@@ -21,7 +21,7 @@ import { AdminUsersController } from './controllers/admin-users.controller';
 
 /**
  * System-admin (SYSTEM_ADMIN) management APIs for the basic entities:
- * users, families, invitations and family members. Every route is guarded by
+ * users, families, join requests and family members. Every route is guarded by
  * JwtAuthGuard + RolesGuard with @Roles(UserType.SYSTEM_ADMIN).
  */
 @Module({
@@ -37,7 +37,7 @@ import { AdminUsersController } from './controllers/admin-users.controller';
     AdminInfrastructureController,
     AdminUsersController,
     AdminFamiliesController,
-    AdminInvitationsController,
+    AdminJoinRequestsController,
     AdminFamilyMembersController,
   ],
   providers: [

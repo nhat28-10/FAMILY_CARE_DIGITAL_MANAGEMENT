@@ -24,7 +24,7 @@ Table users {
   refreshTokens refresh_tokens [not null]
   passwordResetTokens password_reset_tokens [not null]
   emailVerificationTokens email_verification_tokens [not null]
-  claimedInvitations invitations [not null]
+  joinRequests join_requests [not null]
   provisioningLogs workspace_provisioning_logs [not null]
   purchasedSubscriptions family_subscriptions [not null]
 }
@@ -90,11 +90,12 @@ Table families {
   avatarUrl String [note: 'ERD: avatar_url.']
   status WorkspaceStatus [not null, default: 'ACTIVE', note: 'ERD: workspace_status.']
   activationStatus ActivationStatus [not null, default: 'ACTIVE', note: 'ERD: activation_status.']
+  inviteCode String [unique, note: 'Mã mời ngắn của gia đình (kiểu Zalo). Null = manager chưa tạo mã.']
   createdById String [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   members family_members [not null]
-  invitations invitations [not null]
+  joinRequests join_requests [not null]
   financeLedger finance_ledgers
   financeCategories finance_categories [not null]
   financeModels finance_models [not null]
@@ -139,8 +140,7 @@ Table family_members {
   updatedAt DateTime [default: `now()`, not null]
   family families [not null]
   user users [not null]
-  createdInvitations invitations [not null]
-  approvedInvitations invitations [not null]
+  decidedJoinRequests join_requests [not null]
   monthlyFinances member_monthly_finances [not null]
   createdLedgerEntries ledger_entries [not null]
   createdBudgetPlans budget_plans [not null]
@@ -195,26 +195,20 @@ Table family_members {
   }
 }
 
-Table invitations {
+Table join_requests {
   id String [pk]
   familyId String [not null]
-  email String [not null]
-  invitedPhone String [note: 'ERD: invited_phone — optional alternative contact.']
-  tokenHash String [unique, not null, note: 'sha256 hash of the opaque invitation token (raw token returned once).']
-  familyRole FamilyRole [not null, default: 'FAMILY_MEMBER']
-  relationship Relationship [not null, default: 'OTHER']
-  status InvitationStatus [not null, default: 'PENDING']
-  createdByMemberId String [not null, note: 'ERD: created_by_member_id — the family member who issued the invite.']
-  claimedById String [note: 'ERD: claimed_by_user_id — the user who sent the join request.']
-  claimedAt DateTime [note: 'ERD: claimed_at — when the join request was sent.']
-  approvedByMemberId String [note: 'ERD: approved_by_member_id — the manager who approved the claim.']
-  approvedAt DateTime [note: 'ERD: approved_at — when the claim was approved.']
-  expiresAt DateTime [not null]
+  userId String [not null]
+  status JoinRequestStatus [not null, default: 'PENDING']
+  message String [note: 'Lời nhắn của người xin vào (vd "Con là út của bố").']
+  decidedByMemberId String [note: 'Thành viên (manager) đã duyệt/từ chối yêu cầu.']
+  decidedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   family families [not null]
-  createdByMember family_members [not null]
-  claimedBy users
-  approvedByMember family_members
+  user users [not null]
+  decidedByMember family_members
+
+  Note: 'Yêu cầu tham gia gia đình: user nhập mã mời của family và chờ manager duyệt.'
 }
 
 Table member_monthly_finances {
@@ -1313,16 +1307,6 @@ Enum Relationship {
   OTHER
 }
 
-Enum InvitationStatus {
-  PENDING
-  CLAIMED
-  APPROVED
-  REJECTED
-  ACCEPTED
-  EXPIRED
-  CANCELED
-}
-
 Enum VerificationStatus {
   UNVERIFIED
   VERIFIED
@@ -1541,6 +1525,13 @@ Enum TaskProofType {
   VIDEO
   NOTE
   FILE
+}
+
+Enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
 }
 
 Enum FamilySubscriptionStatus {
@@ -1762,13 +1753,11 @@ Ref: family_members.familyId > families.id [delete: Cascade]
 
 Ref: family_members.userId > users.id [delete: Cascade]
 
-Ref: invitations.familyId > families.id [delete: Cascade]
+Ref: join_requests.familyId > families.id [delete: Cascade]
 
-Ref: invitations.createdByMemberId > family_members.id [delete: Cascade]
+Ref: join_requests.userId > users.id [delete: Cascade]
 
-Ref: invitations.claimedById > users.id [delete: Set Null]
-
-Ref: invitations.approvedByMemberId > family_members.id [delete: Cascade]
+Ref: join_requests.decidedByMemberId > family_members.id [delete: Set Null]
 
 Ref: member_monthly_finances.memberId > family_members.id [delete: Cascade]
 

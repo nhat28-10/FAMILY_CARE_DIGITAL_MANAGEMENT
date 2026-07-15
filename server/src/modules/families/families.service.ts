@@ -8,6 +8,7 @@ import {
   MemberStatus,
   ProvisioningActionType,
   ProvisioningStatus,
+  Prisma,
   Relationship,
 } from '@prisma/client';
 
@@ -17,6 +18,7 @@ import { SosGateway } from '../sos/sos.gateway';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { generateInviteCode } from './invite-code.util';
 
 const memberInclude = {
   members: {
@@ -158,5 +160,45 @@ export class FamiliesService {
     // Evict the removed member from the workspace's realtime SOS room.
     this.sosGateway.kickMemberFromWorkspace(targetUserId, familyId);
     return null;
+  }
+
+  /** Mã mời hiện tại của family — null nếu manager chưa tạo. */
+  async getInviteCode(
+    familyId: string,
+  ): Promise<{ inviteCode: string | null }> {
+    const family = await this.prisma.family.findUnique({
+      where: { id: familyId },
+      select: { inviteCode: true },
+    });
+    if (!family) {
+      throw new NotFoundException('Không tìm thấy gia đình');
+    }
+    return { inviteCode: family.inviteCode };
+  }
+
+  /**
+   * Tạo mã lần đầu hoặc đổi mã (mã cũ vô hiệu ngay). Retry khi đụng unique
+   * (xác suất cực thấp với không gian 32^8).
+   */
+  async regenerateInviteCode(
+    familyId: string,
+  ): Promise<{ inviteCode: string }> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const inviteCode = generateInviteCode();
+      try {
+        const family = await this.prisma.family.update({
+          where: { id: familyId },
+          data: { inviteCode },
+          select: { inviteCode: true },
+        });
+        return { inviteCode: family.inviteCode! };
+      } catch (error) {
+        const isDuplicate =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002';
+        if (!isDuplicate) throw error;
+      }
+    }
+    throw new BadRequestException('Không thể tạo mã mời, vui lòng thử lại');
   }
 }

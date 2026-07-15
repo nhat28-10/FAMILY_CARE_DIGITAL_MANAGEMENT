@@ -1,14 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { InvitationStatus } from '@prisma/client';
+import { JoinRequestStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class ListInvitationsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: InvitationStatus })
+export class ListJoinRequestsQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ enum: JoinRequestStatus })
   @IsOptional()
-  @IsEnum(InvitationStatus)
-  status?: InvitationStatus;
+  @IsEnum(JoinRequestStatus)
+  status?: JoinRequestStatus;
 
   @ApiPropertyOptional({ description: 'Filter by family id' })
   @IsOptional()

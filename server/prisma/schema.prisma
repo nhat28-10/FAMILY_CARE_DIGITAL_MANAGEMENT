@@ -54,21 +54,6 @@ enum Relationship {
   OTHER
 }
 
-/// Lifecycle status of a family invitation.
-enum InvitationStatus {
-  PENDING
-  /// Invitee has sent a join request (awaiting manager approval).
-  CLAIMED
-  /// Manager approved the claim → family member created.
-  APPROVED
-  /// Manager rejected the claim.
-  REJECTED
-  /// @deprecated Legacy single-step accept; kept for back-compat, no longer set.
-  ACCEPTED
-  EXPIRED
-  CANCELED
-}
-
 /// Email/phone verification status of a user account (ERD: verification_status).
 enum VerificationStatus {
   UNVERIFIED
@@ -332,7 +317,7 @@ model User {
   refreshTokens           RefreshToken[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
-  claimedInvitations      Invitation[]               @relation("ClaimedBy")
+  joinRequests            JoinRequest[]
   provisioningLogs        WorkspaceProvisioningLog[] @relation("CreatedProvisioningLogs")
   purchasedSubscriptions  FamilySubscription[]       @relation("PurchasedSubscriptions")
 
@@ -421,13 +406,15 @@ model Family {
   status           WorkspaceStatus  @default(ACTIVE)
   /// ERD: activation_status.
   activationStatus ActivationStatus @default(ACTIVE)
+  /// Mã mời ngắn của gia đình (kiểu Zalo). Null = manager chưa tạo mã.
+  inviteCode       String?          @unique @map("invite_code")
   createdById      String
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
   // Relations
   members                 FamilyMember[]
-  invitations             Invitation[]
+  joinRequests            JoinRequest[]
   financeLedger           FinanceLedger?
   financeCategories       FinanceCategory[]
   financeModels           FinanceModel[]
@@ -479,9 +466,7 @@ model FamilyMember {
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Invitations created by this member (ERD: created_by_member_id).
-  createdInvitations               Invitation[]               @relation("CreatedByMember")
-  approvedInvitations              Invitation[]               @relation("ApprovedByInvitations")
+  decidedJoinRequests              JoinRequest[]              @relation("DecidedJoinRequests")
   monthlyFinances                  MemberMonthlyFinance[]
   createdLedgerEntries             LedgerEntry[]              @relation("CreatedLedgerEntries")
   createdBudgetPlans               BudgetPlan[]               @relation("CreatedBudgetPlans")
@@ -536,37 +521,34 @@ model FamilyMember {
   @@map("family_members")
 }
 
-model Invitation {
-  id                 String           @id @default(uuid())
-  familyId           String
-  email              String
-  /// ERD: invited_phone — optional alternative contact.
-  invitedPhone       String?
-  /// sha256 hash of the opaque invitation token (raw token returned once).
-  tokenHash          String           @unique
-  familyRole         FamilyRole       @default(FAMILY_MEMBER)
-  relationship       Relationship     @default(OTHER)
-  status             InvitationStatus @default(PENDING)
-  /// ERD: created_by_member_id — the family member who issued the invite.
-  createdByMemberId  String
-  /// ERD: claimed_by_user_id — the user who sent the join request.
-  claimedById        String?
-  /// ERD: claimed_at — when the join request was sent.
-  claimedAt          DateTime?
-  /// ERD: approved_by_member_id — the manager who approved the claim.
-  approvedByMemberId String?
-  /// ERD: approved_at — when the claim was approved.
-  approvedAt         DateTime?
-  expiresAt          DateTime
-  createdAt          DateTime         @default(now())
+/// Trạng thái yêu cầu tham gia gia đình bằng mã mời.
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
 
-  family           Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  createdByMember  FamilyMember  @relation("CreatedByMember", fields: [createdByMemberId], references: [id], onDelete: Cascade)
-  claimedBy        User?         @relation("ClaimedBy", fields: [claimedById], references: [id], onDelete: SetNull)
-  approvedByMember FamilyMember? @relation("ApprovedByInvitations", fields: [approvedByMemberId], references: [id], onDelete: SetNull)
+/// Yêu cầu tham gia gia đình: user nhập mã mời của family và chờ manager duyệt.
+model JoinRequest {
+  id                String            @id @default(uuid())
+  familyId          String
+  userId            String
+  status            JoinRequestStatus @default(PENDING)
+  /// Lời nhắn của người xin vào (vd "Con là út của bố").
+  message           String?
+  /// Thành viên (manager) đã duyệt/từ chối yêu cầu.
+  decidedByMemberId String?
+  decidedAt         DateTime?
+  createdAt         DateTime          @default(now())
 
-  @@index([familyId])
-  @@map("invitations")
+  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decidedByMember FamilyMember? @relation("DecidedJoinRequests", fields: [decidedByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([familyId, status])
+  @@index([userId])
+  @@map("join_requests")
 }
 
 /// Monthly personal income and expense summary for a family member. This is a summary only; personal ledger entries are intentionally not modeled.

@@ -26,7 +26,6 @@ import { SubscriptionLifecycleService } from '../billing/subscription-lifecycle.
 import { FREE_PLAN_CODE } from '../subscription-plans/subscription-plans.constants';
 import { sanitizeUser, SafeUser } from '../users/users.types';
 import { AdminUpdateFamilyDto } from './dto/update-family.dto';
-import { AdminUpdateInvitationDto } from './dto/update-invitation.dto';
 import { AdminUpdateMemberDto } from './dto/update-member.dto';
 import { AdminUpdateUserDto } from './dto/update-user.dto';
 import {
@@ -35,10 +34,10 @@ import {
 } from './dto/admin-payment-query.dto';
 import { AdminRevenueMonthlyQueryDto } from './dto/admin-revenue-monthly-query.dto';
 import { ListFamiliesQueryDto } from './dto/list-families-query.dto';
-import { ListInvitationsQueryDto } from './dto/list-invitations-query.dto';
 import { ListMembersQueryDto } from './dto/list-members-query.dto';
 import { ListProvisioningLogsQueryDto } from './dto/list-provisioning-logs-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
+import { ListJoinRequestsQueryDto } from './dto/list-join-requests-query.dto';
 import { ManualRenewSubscriptionDto } from './dto/manual-renew-subscription.dto';
 import { RetryProvisioningDto } from './dto/retry-provisioning.dto';
 import { UpdateSubscriptionStatusDto } from './dto/update-subscription-status.dto';
@@ -131,7 +130,7 @@ type AdminMonthlyRevenueRawRow = {
 
 /**
  * System-admin data access for the basic entities. All queries go straight to
- * Prisma; user records are sanitized and invitation token hashes are stripped.
+ * Prisma; user records are sanitized.
  */
 @Injectable()
 export class AdminService {
@@ -785,49 +784,48 @@ export class AdminService {
   }
 
   // --------------------------------------------------------------------------
-  // Invitations (tokenHash never returned)
+  // Join requests (đọc/xóa — duyệt là nghiệp vụ của FAMILY_MANAGER)
   // --------------------------------------------------------------------------
 
-  async listInvitations(q: ListInvitationsQueryDto) {
-    const where: Prisma.InvitationWhereInput = {};
+  async listJoinRequests(q: ListJoinRequestsQueryDto) {
+    const where: Prisma.JoinRequestWhereInput = {};
     if (q.status) where.status = q.status;
     if (q.familyId) where.familyId = q.familyId;
 
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.invitation.findMany({
+      this.prisma.joinRequest.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: skipFor(q.page, q.limit),
         take: q.limit,
-        omit: { tokenHash: true },
+        include: {
+          user: { select: memberUserSelect },
+          family: { select: { id: true, name: true } },
+        },
       }),
-      this.prisma.invitation.count({ where }),
+      this.prisma.joinRequest.count({ where }),
     ]);
 
     return buildPaginated(items, total, q.page, q.limit);
   }
 
-  async getInvitation(id: string) {
-    const invitation = await this.prisma.invitation.findUnique({
+  async getJoinRequest(id: string) {
+    const request = await this.prisma.joinRequest.findUnique({
       where: { id },
-      omit: { tokenHash: true },
+      include: {
+        user: { select: memberUserSelect },
+        family: { select: { id: true, name: true } },
+      },
     });
-    if (!invitation) throw new NotFoundException('Không tìm thấy lời mời');
-    return invitation;
+    if (!request) {
+      throw new NotFoundException('Không tìm thấy yêu cầu tham gia');
+    }
+    return request;
   }
 
-  async updateInvitation(id: string, dto: AdminUpdateInvitationDto) {
-    await this.getInvitation(id);
-    return this.prisma.invitation.update({
-      where: { id },
-      data: { status: dto.status },
-      omit: { tokenHash: true },
-    });
-  }
-
-  async deleteInvitation(id: string): Promise<null> {
-    await this.getInvitation(id);
-    await this.prisma.invitation.delete({ where: { id } });
+  async deleteJoinRequest(id: string): Promise<null> {
+    await this.getJoinRequest(id);
+    await this.prisma.joinRequest.delete({ where: { id } });
     return null;
   }
 
