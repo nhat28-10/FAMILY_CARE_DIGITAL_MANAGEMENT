@@ -7,6 +7,9 @@ import { UsersModule } from '../users/users.module';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { FcmNotificationChannel } from './dispatcher/fcm-notification.channel';
+import { NotificationDispatcher } from './dispatcher/notification-dispatcher';
+import { WsNotificationChannel } from './dispatcher/ws-notification.channel';
 import { NOTIFICATIONS_QUEUE } from './notifications.types';
 
 @Module({
@@ -25,7 +28,13 @@ import { NOTIFICATIONS_QUEUE } from './notifications.types';
     }),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsGateway],
+  providers: [
+    NotificationsService,
+    NotificationsGateway,
+    WsNotificationChannel,
+    FcmNotificationChannel,
+    NotificationDispatcher,
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}
