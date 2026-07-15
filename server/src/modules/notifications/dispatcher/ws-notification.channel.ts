@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications.gateway';
@@ -8,6 +8,7 @@ import type { NotificationDelivery } from '../notifications.types';
 @Injectable()
 export class WsNotificationChannel implements NotificationChannel {
   readonly name = 'ws';
+  private readonly logger = new Logger(WsNotificationChannel.name);
 
   constructor(
     private readonly gateway: NotificationsGateway,
@@ -23,15 +24,25 @@ export class WsNotificationChannel implements NotificationChannel {
       );
     }
     // Badge mới cho các notification đã persist (push-only không đổi badge).
-    const persisted = deliveries.filter((d) => d.memberId !== null);
+    const persisted = deliveries.filter(
+      (d): d is NotificationDelivery & { memberId: string } =>
+        d.memberId !== null,
+    );
     for (const delivery of persisted) {
-      const count = await this.prisma.notification.count({
-        where: { recipientMemberId: delivery.memberId!, isRead: false },
-      });
-      this.gateway.emitToUsers([delivery.userId], 'notification:unread-count', {
-        familyId: delivery.notification.familyId,
-        count,
-      });
+      try {
+        const count = await this.prisma.notification.count({
+          where: { recipientMemberId: delivery.memberId, isRead: false },
+        });
+        this.gateway.emitToUsers(
+          [delivery.userId],
+          'notification:unread-count',
+          { familyId: delivery.notification.familyId, count },
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Không thể đẩy unread-count cho member ${delivery.memberId}: ${(err as Error).message}`,
+        );
+      }
     }
   }
 }
