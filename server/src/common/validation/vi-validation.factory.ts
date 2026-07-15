@@ -79,6 +79,11 @@ const FIELD_LABELS: Record<string, string> = {
   deviceId: 'Mã thiết bị',
   alertId: 'Mã cảnh báo',
   unreadOnly: 'Chỉ chưa đọc',
+
+  // Devices
+  token: 'Token thiết bị',
+  platform: 'Nền tảng',
+  deviceName: 'Tên thiết bị',
 };
 
 const PASSWORD_RULE =
