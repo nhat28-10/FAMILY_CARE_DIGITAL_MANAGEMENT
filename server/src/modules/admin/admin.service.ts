@@ -37,6 +37,7 @@ import { ListFamiliesQueryDto } from './dto/list-families-query.dto';
 import { ListMembersQueryDto } from './dto/list-members-query.dto';
 import { ListProvisioningLogsQueryDto } from './dto/list-provisioning-logs-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
+import { ListJoinRequestsQueryDto } from './dto/list-join-requests-query.dto';
 import { ManualRenewSubscriptionDto } from './dto/manual-renew-subscription.dto';
 import { RetryProvisioningDto } from './dto/retry-provisioning.dto';
 import { UpdateSubscriptionStatusDto } from './dto/update-subscription-status.dto';
@@ -739,6 +740,52 @@ export class AdminService {
   async deleteFamily(id: string): Promise<null> {
     await this.getFamily(id);
     await this.prisma.family.delete({ where: { id } });
+    return null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Join requests (đọc/xóa — duyệt là nghiệp vụ của FAMILY_MANAGER)
+  // --------------------------------------------------------------------------
+
+  async listJoinRequests(q: ListJoinRequestsQueryDto) {
+    const where: Prisma.JoinRequestWhereInput = {};
+    if (q.status) where.status = q.status;
+    if (q.familyId) where.familyId = q.familyId;
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.joinRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: skipFor(q.page, q.limit),
+        take: q.limit,
+        include: {
+          user: { select: memberUserSelect },
+          family: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.joinRequest.count({ where }),
+    ]);
+
+    return buildPaginated(items, total, q.page, q.limit);
+  }
+
+  async getJoinRequest(id: string) {
+    const request = await this.prisma.joinRequest.findUnique({
+      where: { id },
+      include: {
+        user: { select: memberUserSelect },
+        family: { select: { id: true, name: true } },
+      },
+    });
+    if (!request) {
+      throw new NotFoundException('Không tìm thấy yêu cầu tham gia');
+    }
+    return request;
+  }
+
+  async deleteJoinRequest(id: string): Promise<null> {
+    await this.getJoinRequest(id);
+    await this.prisma.joinRequest.delete({ where: { id } });
     return null;
   }
 

@@ -10,6 +10,7 @@ import { AdminAuditLogsController } from './controllers/admin-audit-logs.control
 import { AdminBackupRestoreController } from './controllers/admin-backup-restore.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 import { AdminFamiliesController } from './controllers/admin-families.controller';
+import { AdminJoinRequestsController } from './controllers/admin-join-requests.controller';
 import { AdminFamilyMembersController } from './controllers/admin-family-members.controller';
 import { AdminInfrastructureController } from './controllers/admin-infrastructure.controller';
 import { AdminPaymentsController } from './controllers/admin-payments.controller';
@@ -36,6 +37,7 @@ import { AdminUsersController } from './controllers/admin-users.controller';
     AdminInfrastructureController,
     AdminUsersController,
     AdminFamiliesController,
+    AdminJoinRequestsController,
     AdminFamilyMembersController,
   ],
   providers: [
