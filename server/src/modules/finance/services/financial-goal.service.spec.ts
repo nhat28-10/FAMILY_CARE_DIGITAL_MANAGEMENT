@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import {
   FamilyRole,
   FinanceLedgerStatus,
@@ -15,20 +19,16 @@ import {
 
 import { NotificationsService } from '../../notifications/notifications.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { FinanceService } from './finance.service';
+import { FinancialGoalService } from './financial-goal.service';
 
-type ContributionPlanView = Awaited<
-  ReturnType<FinanceService['listGoalContributionPlans']>
->;
-
-describe('FinanceService financial goals', () => {
+describe('FinancialGoalService financial goals', () => {
   const familyId = 'family-id';
   const memberId = 'member-id';
   const goalId = 'goal-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
   let notifications: { createForMembers: jest.Mock };
-  let service: FinanceService;
+  let financialGoalService: FinancialGoalService;
 
   beforeAll(() => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-16T00:00:00.000Z'));
@@ -78,6 +78,7 @@ describe('FinanceService financial goals', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         upsert: jest.fn(),
       },
     };
@@ -95,7 +96,7 @@ describe('FinanceService financial goals', () => {
     notifications = {
       createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
     };
-    service = new FinanceService(
+    financialGoalService = new FinancialGoalService(
       prisma as unknown as PrismaService,
       notifications as unknown as NotificationsService,
     );
@@ -119,7 +120,7 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.getFinancialGoal(familyId, memberId, goalId),
+      financialGoalService.getFinancialGoal(familyId, memberId, goalId),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -141,7 +142,11 @@ describe('FinanceService financial goals', () => {
       _sum: { amount: new Prisma.Decimal(25) },
     });
 
-    const result = await service.getFinancialGoal(familyId, memberId, goalId);
+    const result = await financialGoalService.getFinancialGoal(
+      familyId,
+      memberId,
+      goalId,
+    );
 
     expect(result.goal.id).toBe(goalId);
     expect(result.goal.targetAmount).toBe(goal.targetAmount);
@@ -169,7 +174,7 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.createGoalAllocation(familyId, memberId, goalId, {
+      financialGoalService.createGoalAllocation(familyId, memberId, goalId, {
         ledgerEntryId: 'entry-id',
         amount: 10,
       }),
@@ -196,7 +201,7 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.createGoalAllocation(familyId, memberId, goalId, {
+      financialGoalService.createGoalAllocation(familyId, memberId, goalId, {
         ledgerEntryId: 'entry-id',
         amount: 21,
       }),
@@ -228,7 +233,7 @@ describe('FinanceService financial goals', () => {
       status: FinancialGoalStatus.ACHIEVED,
     });
 
-    const result = await service.createGoalAllocation(
+    const result = await financialGoalService.createGoalAllocation(
       familyId,
       memberId,
       goalId,
@@ -264,7 +269,7 @@ describe('FinanceService financial goals', () => {
     });
     tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
 
-    const result = await service.createGoalAllocation(
+    const result = await financialGoalService.createGoalAllocation(
       familyId,
       memberId,
       goalId,
@@ -367,7 +372,7 @@ describe('FinanceService financial goals', () => {
       },
     ]);
 
-    const result = await service.getGoalContributionSuggestions(
+    const result = await financialGoalService.getGoalContributionSuggestions(
       familyId,
       memberId,
       goalId,
@@ -438,7 +443,7 @@ describe('FinanceService financial goals', () => {
     ]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.confirmGoalContributionPlans(
+    const result = await financialGoalService.confirmGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -478,12 +483,17 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.confirmGoalContributionPlans(familyId, memberId, goalId, {
-        periodMonth: 6,
-        periodYear: 2026,
-        dueDate: '2099-06-30',
-        members: [{ memberId, plannedAmount: 100 }],
-      }),
+      financialGoalService.confirmGoalContributionPlans(
+        familyId,
+        memberId,
+        goalId,
+        {
+          periodMonth: 6,
+          periodYear: 2026,
+          dueDate: '2099-06-30',
+          members: [{ memberId, plannedAmount: 100 }],
+        },
+      ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -522,7 +532,7 @@ describe('FinanceService financial goals', () => {
     tx.goalContributionPlan.update.mockResolvedValue({});
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.listGoalContributionPlans(
+    const result = await financialGoalService.listGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -605,7 +615,7 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.submitGoalContributionPlan(
+    const result = await financialGoalService.submitGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -653,7 +663,7 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.submitGoalContributionPlan(
+      financialGoalService.submitGoalContributionPlan(
         familyId,
         memberId,
         goalId,
@@ -723,7 +733,7 @@ describe('FinanceService financial goals', () => {
       [{ id: memberId }, { id: 'deputy-id' }],
     );
 
-    const result = await service.approveGoalContributionPlan(
+    const result = await financialGoalService.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -834,7 +844,7 @@ describe('FinanceService financial goals', () => {
     ]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.approveGoalContributionPlan(
+    const result = await financialGoalService.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -850,6 +860,46 @@ describe('FinanceService financial goals', () => {
     expect(notifications.createForMembers).not.toHaveBeenCalled();
   });
 
+  it('does not create ledger entries when a pending contribution was already claimed', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.goalContributionPlan.findFirst.mockResolvedValue({
+      id: 'plan-id',
+      familyId,
+      goalId,
+      memberId: 'contributor-id',
+      periodMonth: 6,
+      periodYear: 2026,
+      plannedAmount: new Prisma.Decimal(2000000),
+      pendingAmount: new Prisma.Decimal(1500000),
+      dueDate: new Date('2026-06-30T00:00:00.000Z'),
+      status: GoalContributionPlanStatus.PENDING_CONFIRMATION,
+      submittedAt: new Date('2026-06-15T00:00:00.000Z'),
+      submittedNote: 'Da chuyen khoan',
+    });
+    tx.goalContributionPlan.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      financialGoalService.approveGoalContributionPlan(
+        familyId,
+        memberId,
+        goalId,
+        'plan-id',
+        { note: 'ok' },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(tx.financeLedger.upsert).not.toHaveBeenCalled();
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.goalAllocation.create).not.toHaveBeenCalled();
+    expect(notifications.createForMembers).not.toHaveBeenCalled();
+  });
+
   it('prevents a normal member from approving contribution plans', async () => {
     tx.familyMember.findFirst.mockResolvedValue({
       id: memberId,
@@ -859,7 +909,7 @@ describe('FinanceService financial goals', () => {
     });
 
     await expect(
-      service.approveGoalContributionPlan(
+      financialGoalService.approveGoalContributionPlan(
         familyId,
         memberId,
         goalId,
@@ -918,7 +968,7 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.rejectGoalContributionPlan(
+    const result = await financialGoalService.rejectGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -977,7 +1027,7 @@ describe('FinanceService financial goals', () => {
     tx.goalAllocation.findMany.mockResolvedValue([]);
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.listGoalContributionPlans(
+    const result = await financialGoalService.listGoalContributionPlans(
       familyId,
       memberId,
       goalId,
