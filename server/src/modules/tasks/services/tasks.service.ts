@@ -12,6 +12,8 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
   RewardDisputeStatus,
   RewardSettlementStatus,
@@ -37,6 +39,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { CreateTaskCategoryDto } from '../dto/create-task-category.dto';
 import { CreateRecurringTaskDto } from '../dto/create-recurring-task.dto';
@@ -618,7 +621,10 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async uploadTaskProofFile(
     familyId: string,
@@ -1137,6 +1143,16 @@ export class TasksService {
         where: { id: assignment.id },
         select: assignmentResponseSelect,
       });
+
+    await this.notificationsService.notify(familyId, [dto.assignedToMemberId], {
+      type: NotificationType.TASK,
+      priority: NotificationPriority.NORMAL,
+      title: 'Bạn được giao công việc mới',
+      body: `Bạn được giao công việc "${task.title}".`,
+      referenceType: 'TASK_ASSIGNMENT',
+      referenceId: assignment.id,
+    });
+
     return this.mapAssignmentResponse(createdAssignment);
   }
 
@@ -1326,6 +1342,16 @@ export class TasksService {
       },
       select: assignmentResponseSelect,
     });
+
+    await this.notificationsService.notify(familyId, [dto.assignedToMemberId], {
+      type: NotificationType.TASK,
+      priority: NotificationPriority.NORMAL,
+      title: 'Bạn được giao công việc mới',
+      body: `Bạn được giao công việc "${assignment.task.title}".`,
+      referenceType: 'TASK_ASSIGNMENT',
+      referenceId: updatedAssignment.id,
+    });
+
     return this.mapAssignmentResponse(updatedAssignment);
   }
 
@@ -2509,6 +2535,7 @@ export class TasksService {
     reviewerMemberId: string,
     dto: ReviewTaskSubmissionDto,
   ) {
+    let notificationIds: string[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
       const submission = await tx.taskSubmission.findFirst({
         where: {
@@ -2527,6 +2554,7 @@ export class TasksService {
               assignedToMemberId: true,
               task: {
                 select: {
+                  title: true,
                   taskType: true,
                   rewardSetting: {
                     select: {
@@ -2583,6 +2611,21 @@ export class TasksService {
       });
 
       if (dto.decision === ReviewTaskSubmissionDecision.APPROVED) {
+        const { ids } = await this.notificationsService.notify(
+          familyId,
+          [submission.assignment.assignedToMemberId],
+          {
+            type: NotificationType.TASK,
+            priority: NotificationPriority.LOW,
+            title: 'Công việc được nghiệm thu',
+            body: `Công việc "${submission.assignment.task.title}" của bạn đã được duyệt hoàn thành.`,
+            referenceType: 'TASK_ASSIGNMENT',
+            referenceId: submission.assignmentId,
+          },
+          { tx },
+        );
+        notificationIds = ids;
+
         await this.createRewardSettlementAfterApproval(tx, submission);
 
         if (submission.assignment.task.taskType === TaskType.AD_HOC) {
@@ -2618,6 +2661,8 @@ export class TasksService {
         select: submissionResponseSelect,
       });
     });
+
+    await this.notificationsService.dispatch(notificationIds);
 
     return withResponseMessage(
       dto.decision === ReviewTaskSubmissionDecision.APPROVED
