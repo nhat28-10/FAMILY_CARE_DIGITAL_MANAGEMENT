@@ -2993,6 +2993,23 @@ export class FinanceService {
       }));
   }
 
+  private async findAlertRecipientIds(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+  ) {
+    const recipients = await tx.familyMember.findMany({
+      where: {
+        familyId,
+        status: MemberStatus.ACTIVE,
+        familyRole: {
+          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+        },
+      },
+      select: { id: true },
+    });
+    return recipients.map((member) => member.id);
+  }
+
   private async syncAlertCandidates(
     tx: Prisma.TransactionClient,
     familyId: string,
@@ -3001,6 +3018,7 @@ export class FinanceService {
     pendingNotificationIds: string[] = [],
   ) {
     const activeKeys = candidates.map((candidate) => candidate.sourceKey);
+    let alertRecipientIds: string[] | null = null;
     for (const candidate of candidates) {
       const existing = await tx.budgetAlert.findFirst({
         where: {
@@ -3032,19 +3050,10 @@ export class FinanceService {
             ...data,
           },
         });
-        const alertRecipients = await tx.familyMember.findMany({
-          where: {
-            familyId,
-            status: MemberStatus.ACTIVE,
-            familyRole: {
-              in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
-            },
-          },
-          select: { id: true },
-        });
+        alertRecipientIds ??= await this.findAlertRecipientIds(tx, familyId);
         const { ids } = await this.notificationsService.notify(
           familyId,
-          alertRecipients.map((m) => m.id),
+          alertRecipientIds,
           {
             type: NotificationType.FINANCE,
             priority: NotificationPriority.HIGH,
@@ -3990,6 +3999,7 @@ export class FinanceService {
         row.status === GoalContributionPlanStatus.MISSED,
     );
     const activeKeys = activeRows.map((row) => `${prefix}${row.memberId}`);
+    let alertRecipientIds: string[] | null = null;
     for (const row of activeRows) {
       const sourceKey = `${prefix}${row.memberId}`;
       const data = {
@@ -4023,19 +4033,10 @@ export class FinanceService {
             ...data,
           },
         });
-        const alertRecipients = await tx.familyMember.findMany({
-          where: {
-            familyId,
-            status: MemberStatus.ACTIVE,
-            familyRole: {
-              in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
-            },
-          },
-          select: { id: true },
-        });
+        alertRecipientIds ??= await this.findAlertRecipientIds(tx, familyId);
         const { ids } = await this.notificationsService.notify(
           familyId,
-          alertRecipients.map((m) => m.id),
+          alertRecipientIds,
           {
             type: NotificationType.FINANCE,
             priority: NotificationPriority.HIGH,

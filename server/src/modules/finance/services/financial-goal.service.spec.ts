@@ -650,6 +650,74 @@ describe('FinanceService financial goals', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('notifies managers with { tx } and dispatches after commit when listing plans creates a new shortage alert', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.familyMember.findMany.mockResolvedValue([
+      { id: memberId },
+      { id: 'deputy-id' },
+    ]);
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.goalContributionPlan.findMany.mockResolvedValue([
+      {
+        id: 'plan-id',
+        familyId,
+        goalId,
+        memberId: 'contributor-id',
+        periodMonth: 6,
+        periodYear: 2026,
+        plannedAmount: new Prisma.Decimal(2000000),
+        pendingAmount: null,
+        dueDate: new Date('2026-06-10T00:00:00.000Z'), // past due (system time 2026-06-16)
+        status: GoalContributionPlanStatus.PLANNED,
+        submittedAt: null,
+        submittedNote: null,
+        reviewedAt: null,
+        reviewNote: null,
+        member: {
+          id: 'contributor-id',
+          displayName: 'Member A',
+          user: { fullName: 'User A' },
+        },
+      },
+    ]);
+    tx.goalContributionPlan.update.mockResolvedValue({});
+    tx.goalAllocation.findMany.mockResolvedValue([]);
+    tx.budgetAlert.findFirst.mockResolvedValue(null);
+    tx.budgetAlert.create.mockResolvedValue({ id: 'shortage-alert-id' });
+    tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+    notifications.notify.mockResolvedValue({ ids: ['shortage-notif-id'] });
+
+    const result = await service.listGoalContributionPlans(
+      familyId,
+      memberId,
+      goalId,
+      { month: 6, year: 2026 },
+    );
+
+    expect(result.members[0].status).toBe(GoalContributionPlanStatus.MISSED);
+    expect(tx.budgetAlert.create).toHaveBeenCalledTimes(1);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [memberId, 'deputy-id'],
+      expect.objectContaining({
+        type: NotificationType.FINANCE,
+        priority: NotificationPriority.HIGH,
+        referenceType: 'BUDGET_ALERT',
+        referenceId: 'shortage-alert-id',
+      }),
+      { tx },
+    );
+    expect(notifications.dispatch).toHaveBeenCalledWith(['shortage-notif-id']);
+    expect(notifications.notify.mock.invocationCallOrder[0]).toBeLessThan(
+      notifications.dispatch.mock.invocationCallOrder[0],
+    );
+  });
+
   it('approves a pending contribution by creating ledger entry and goal allocation and notifies managers about shortage', async () => {
     tx.familyMember.findFirst.mockResolvedValue({
       id: memberId,
