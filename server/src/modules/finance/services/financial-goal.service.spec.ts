@@ -674,6 +674,10 @@ describe('FinanceService financial goals', () => {
     });
     tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
     tx.ledgerEntry.create.mockResolvedValue({ id: 'entry-id' });
+    // allocatedBefore already at target → milestone does not fire again
+    tx.goalAllocation.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(100) },
+    });
     tx.goalAllocation.create.mockResolvedValue({ id: 'allocation-id' });
     tx.goalAllocation.findMany.mockResolvedValue([
       {
@@ -788,6 +792,10 @@ describe('FinanceService financial goals', () => {
     });
     tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
     tx.ledgerEntry.create.mockResolvedValue({ id: 'entry-id' });
+    // allocatedBefore already at target → milestone does not fire again
+    tx.goalAllocation.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(100) },
+    });
     tx.goalAllocation.create.mockResolvedValue({ id: 'allocation-id' });
     tx.goalAllocation.findMany.mockResolvedValue([
       {
@@ -835,6 +843,97 @@ describe('FinanceService financial goals', () => {
       status: GoalContributionPlanStatus.PAID,
     });
     expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  it('notifies all active members when an approved contribution crosses the goal target', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.familyMember.findMany.mockResolvedValue([
+      { id: memberId },
+      { id: 'contributor-id' },
+    ]);
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.goalContributionPlan.findFirst.mockResolvedValue({
+      id: 'plan-id',
+      familyId,
+      goalId,
+      memberId: 'contributor-id',
+      periodMonth: 6,
+      periodYear: 2026,
+      plannedAmount: new Prisma.Decimal(1500000),
+      pendingAmount: new Prisma.Decimal(1500000),
+      dueDate: new Date('2026-06-30T00:00:00.000Z'),
+      status: GoalContributionPlanStatus.PENDING_CONFIRMATION,
+      submittedAt: new Date('2026-06-15T00:00:00.000Z'),
+      submittedNote: 'Da chuyen khoan',
+    });
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.create.mockResolvedValue({ id: 'entry-id' });
+    // allocatedBefore below target (100) → the contribution crosses the milestone
+    tx.goalAllocation.aggregate.mockResolvedValue({ _sum: { amount: null } });
+    tx.goalAllocation.create.mockResolvedValue({ id: 'allocation-id' });
+    tx.goalAllocation.findMany.mockResolvedValue([
+      {
+        amount: new Prisma.Decimal(1500000),
+        ledgerEntry: { createdByMemberId: 'contributor-id' },
+      },
+    ]);
+    tx.goalContributionPlan.update.mockResolvedValue({});
+    tx.goalContributionPlan.findMany.mockResolvedValue([
+      {
+        id: 'plan-id',
+        familyId,
+        goalId,
+        memberId: 'contributor-id',
+        periodMonth: 6,
+        periodYear: 2026,
+        plannedAmount: new Prisma.Decimal(1500000),
+        pendingAmount: null,
+        dueDate: new Date('2026-06-30T00:00:00.000Z'),
+        status: GoalContributionPlanStatus.PAID,
+        submittedAt: new Date('2026-06-15T00:00:00.000Z'),
+        submittedNote: 'Da chuyen khoan',
+        reviewedAt: new Date('2026-06-16T00:00:00.000Z'),
+        reviewNote: 'ok',
+        member: {
+          id: 'contributor-id',
+          displayName: 'Member A',
+          user: { fullName: 'User A' },
+        },
+      },
+    ]);
+    tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+    notifications.notify.mockResolvedValue({ ids: ['milestone-notif-id'] });
+
+    await service.approveGoalContributionPlan(
+      familyId,
+      memberId,
+      goalId,
+      'plan-id',
+      {
+        note: 'ok',
+      },
+    );
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [memberId, 'contributor-id'],
+      expect.objectContaining({
+        type: NotificationType.FINANCE,
+        priority: NotificationPriority.NORMAL,
+        referenceType: 'FINANCIAL_GOAL',
+        referenceId: goalId,
+      }),
+      { tx },
+    );
+    expect(notifications.dispatch).toHaveBeenCalledWith(['milestone-notif-id']);
+    expect(notifications.notify.mock.invocationCallOrder[0]).toBeLessThan(
+      notifications.dispatch.mock.invocationCallOrder[0],
+    );
   });
 
   it('prevents a normal member from approving contribution plans', async () => {

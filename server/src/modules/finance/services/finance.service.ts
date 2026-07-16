@@ -1963,6 +1963,10 @@ export class FinanceService {
             status: LedgerEntryStatus.ACTIVE,
           },
         });
+        const allocatedBefore = await this.calculateGoalAllocatedAmount(
+          tx,
+          goal.id,
+        );
         await tx.goalAllocation.create({
           data: {
             goalId: goal.id,
@@ -1971,6 +1975,30 @@ export class FinanceService {
             allocatedByMemberId: reviewerMemberId,
           },
         });
+        const allocatedAfter = allocatedBefore.plus(plan.pendingAmount);
+        const reachedTarget =
+          allocatedBefore.lt(goal.targetAmount) &&
+          allocatedAfter.gte(goal.targetAmount);
+        if (reachedTarget) {
+          const allMembers = await tx.familyMember.findMany({
+            where: { familyId, status: MemberStatus.ACTIVE },
+            select: { id: true },
+          });
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            allMembers.map((m) => m.id),
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.NORMAL,
+              title: 'Mục tiêu tài chính đã đạt',
+              body: `Mục tiêu "${goal.goalName}" đã đạt số tiền đề ra.`,
+              referenceType: 'FINANCIAL_GOAL',
+              referenceId: goal.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
+        }
 
         const actualAmounts = await this.calculateGoalContributionActualAmounts(
           tx,
