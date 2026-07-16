@@ -38,6 +38,7 @@ import { SubmitGoalContributionPlanDto } from '../dto/submit-goal-contribution-p
 import { UpdateFinancialGoalDto } from '../dto/update-financial-goal.dto';
 import { UpdateGoalAllocationDto } from '../dto/update-goal-allocation.dto';
 import { FinanceService } from '../services/finance.service';
+import { FinancialGoalService } from '../services/financial-goal.service';
 
 @ApiTags('Finance - Mục tiêu tài chính')
 @ApiBearerAuth()
@@ -49,7 +50,10 @@ import { FinanceService } from '../services/finance.service';
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceGoalsController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financialGoalService: FinancialGoalService,
+  ) {}
 
   @Get('financial-goals')
   @ResponseMessage('Lấy danh sách mục tiêu tài chính thành công')
@@ -60,7 +64,11 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: FinancialGoalQueryDto,
   ) {
-    return this.financeService.listFinancialGoals(familyId, memberId, query);
+    return this.financialGoalService.listFinancialGoals(
+      familyId,
+      memberId,
+      query,
+    );
   }
 
   @Post('financial-goals')
@@ -75,7 +83,11 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Body() dto: CreateFinancialGoalDto,
   ) {
-    return this.financeService.createFinancialGoal(familyId, memberId, dto);
+    return this.financialGoalService.createFinancialGoal(
+      familyId,
+      memberId,
+      dto,
+    );
   }
 
   @Get('financial-goals/:goalId')
@@ -99,7 +111,11 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('goalId') goalId: string,
   ) {
-    return this.financeService.getFinancialGoal(familyId, memberId, goalId);
+    return this.financialGoalService.getFinancialGoal(
+      familyId,
+      memberId,
+      goalId,
+    );
   }
 
   @Patch('financial-goals/:goalId')
@@ -119,7 +135,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Body() dto: UpdateFinancialGoalDto,
   ) {
-    return this.financeService.updateFinancialGoal(
+    return this.financialGoalService.updateFinancialGoal(
       familyId,
       memberId,
       goalId,
@@ -143,7 +159,11 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('goalId') goalId: string,
   ) {
-    return this.financeService.cancelFinancialGoal(familyId, memberId, goalId);
+    return this.financialGoalService.cancelFinancialGoal(
+      familyId,
+      memberId,
+      goalId,
+    );
   }
 
   @Get('financial-goals/:goalId/progress')
@@ -169,7 +189,7 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('goalId') goalId: string,
   ) {
-    return this.financeService.getFinancialGoalProgress(
+    return this.financialGoalService.getFinancialGoalProgress(
       familyId,
       memberId,
       goalId,
@@ -197,7 +217,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Query() period: RequiredFinancePeriodDto,
   ) {
-    return this.financeService.getGoalContributionSuggestions(
+    return this.financialGoalService.getGoalContributionSuggestions(
       familyId,
       memberId,
       goalId,
@@ -206,6 +226,7 @@ export class FinanceGoalsController {
   }
 
   @Post('financial-goals/:goalId/contribution-plans/confirm')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage(
@@ -226,7 +247,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Body() dto: ConfirmGoalContributionPlanDto,
   ) {
-    return this.financeService.confirmGoalContributionPlans(
+    return this.financialGoalService.confirmGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -235,6 +256,7 @@ export class FinanceGoalsController {
   }
 
   @Post('financial-goals/:goalId/contribution-plans/:planId/submit')
+  @UseGuards(VerifiedGuard)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Xác nhận khoản đóng góp thành công')
   @ApiOperation({
@@ -258,7 +280,7 @@ export class FinanceGoalsController {
     @Param('planId') planId: string,
     @Body() dto: SubmitGoalContributionPlanDto,
   ) {
-    return this.financeService.submitGoalContributionPlan(
+    return this.financialGoalService.submitGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -268,6 +290,7 @@ export class FinanceGoalsController {
   }
 
   @Post('financial-goals/:goalId/contribution-plans/:planId/approve')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Phê duyệt khoản đóng góp mục tiêu thành công')
@@ -293,7 +316,7 @@ export class FinanceGoalsController {
     @Param('planId') planId: string,
     @Body() dto: ReviewGoalContributionPlanDto,
   ) {
-    return this.financeService.approveGoalContributionPlan(
+    return this.financialGoalService.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -303,6 +326,7 @@ export class FinanceGoalsController {
   }
 
   @Post('financial-goals/:goalId/contribution-plans/:planId/reject')
+  @UseGuards(VerifiedGuard)
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Từ chối khoản đóng góp mục tiêu thành công')
@@ -327,7 +351,7 @@ export class FinanceGoalsController {
     @Param('planId') planId: string,
     @Body() dto: ReviewGoalContributionPlanDto,
   ) {
-    return this.financeService.rejectGoalContributionPlan(
+    return this.financialGoalService.rejectGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -358,7 +382,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Query() period: RequiredFinancePeriodDto,
   ) {
-    return this.financeService.listGoalContributionPlans(
+    return this.financialGoalService.listGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -388,7 +412,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Query() period: RequiredFinancePeriodDto,
   ) {
-    return this.financeService.getGoalContributionShortage(
+    return this.financialGoalService.getGoalContributionShortage(
       familyId,
       memberId,
       goalId,
@@ -410,7 +434,11 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('goalId') goalId: string,
   ) {
-    return this.financeService.listGoalAllocations(familyId, memberId, goalId);
+    return this.financialGoalService.listGoalAllocations(
+      familyId,
+      memberId,
+      goalId,
+    );
   }
 
   @Post('financial-goals/:goalId/allocations')
@@ -432,7 +460,7 @@ export class FinanceGoalsController {
     @Param('goalId') goalId: string,
     @Body() dto: CreateGoalAllocationDto,
   ) {
-    return this.financeService.createGoalAllocation(
+    return this.financialGoalService.createGoalAllocation(
       familyId,
       memberId,
       goalId,
@@ -456,7 +484,7 @@ export class FinanceGoalsController {
     @Param('allocationId') allocationId: string,
     @Body() dto: UpdateGoalAllocationDto,
   ) {
-    return this.financeService.updateGoalAllocation(
+    return this.financialGoalService.updateGoalAllocation(
       familyId,
       memberId,
       allocationId,
@@ -479,7 +507,7 @@ export class FinanceGoalsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('allocationId') allocationId: string,
   ) {
-    return this.financeService.deleteGoalAllocation(
+    return this.financialGoalService.deleteGoalAllocation(
       familyId,
       memberId,
       allocationId,

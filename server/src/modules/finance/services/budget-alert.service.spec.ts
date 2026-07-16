@@ -9,16 +9,15 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { FinanceService } from './finance.service';
+import { BudgetAlertService } from './budget-alert.service';
+import { FinanceReportService } from './finance-report.service';
 
-describe('FinanceService budget alerts and reports', () => {
+describe('BudgetAlertService budget alerts', () => {
   const familyId = 'family-id';
   const memberId = 'member-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
-  let service: FinanceService;
+  let service: BudgetAlertService;
 
   beforeEach(() => {
     tx = {
@@ -41,13 +40,7 @@ describe('FinanceService budget alerts and reports', () => {
       familyMember: { findFirst: jest.fn() },
       budgetAlert: { findFirst: jest.fn() },
     };
-    notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
-    };
-    service = new FinanceService(
-      prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
-    );
+    service = new BudgetAlertService(prisma as unknown as PrismaService);
   });
 
   it('does not let normal members view jar-linked alerts', async () => {
@@ -143,6 +136,64 @@ describe('FinanceService budget alerts and reports', () => {
     expect(tx.budgetAlert.create).not.toHaveBeenCalled();
   });
 
+  it('updates the active alert when create hits a unique race', async () => {
+    tx.budgetAlert.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'alert-id',
+      status: BudgetAlertStatus.NEW,
+    });
+    tx.budgetAlert.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+      }),
+    );
+    tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+
+    const privateService = service as unknown as {
+      syncAlertCandidates(
+        client: typeof tx,
+        targetFamilyId: string,
+        candidates: Array<{
+          sourceKey: string;
+          alertType: BudgetAlertType;
+          severity: BudgetAlertSeverity;
+          thresholdValue: Prisma.Decimal;
+          actualValue: Prisma.Decimal;
+          message: string;
+        }>,
+        dto: { scope: 'BUDGET' },
+      ): Promise<unknown>;
+    };
+    await privateService.syncAlertCandidates(
+      tx,
+      familyId,
+      [
+        {
+          sourceKey: 'OVER_BUDGET:plan:line',
+          alertType: BudgetAlertType.OVER_BUDGET,
+          severity: BudgetAlertSeverity.HIGH,
+          thresholdValue: new Prisma.Decimal(100),
+          actualValue: new Prisma.Decimal(150),
+          message: 'Vuot ngan sach',
+        },
+      ],
+      { scope: 'BUDGET' },
+    );
+
+    expect(tx.budgetAlert.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'alert-id' },
+        data: expect.objectContaining({
+          severity: BudgetAlertSeverity.HIGH,
+          thresholdValue: new Prisma.Decimal(100),
+          actualValue: new Prisma.Decimal(150),
+          message: 'Vuot ngan sach',
+        }),
+      }),
+    );
+    expect(tx.budgetAlert.create).toHaveBeenCalledTimes(1);
+  });
+
   it('uses high severity when threshold is zero and actual is positive', () => {
     const privateService = service as unknown as {
       calculateAlertSeverity(
@@ -199,7 +250,10 @@ describe('FinanceService budget alerts and reports', () => {
   });
 
   it('redacts jar-linked budget lines and warnings for normal member reports', () => {
-    const privateService = service as unknown as {
+    const financeReportService = new FinanceReportService(
+      prisma as unknown as PrismaService,
+    );
+    const privateService = financeReportService as unknown as {
       redactJarBudgetReport(report: {
         budgetPlan: {
           lines: Array<{ id: string; jarId: string | null }>;

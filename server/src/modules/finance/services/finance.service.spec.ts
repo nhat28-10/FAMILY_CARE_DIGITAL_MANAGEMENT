@@ -15,8 +15,8 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotificationsService } from '../../notifications/notifications.service';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
+import { FinanceReportService } from './finance-report.service';
 import { FinanceService } from './finance.service';
 
 describe('FinanceService budget planning', () => {
@@ -25,8 +25,8 @@ describe('FinanceService budget planning', () => {
   const lineId = 'line-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
   let service: FinanceService;
+  let reportService: FinanceReportService;
 
   beforeEach(() => {
     tx = {
@@ -51,15 +51,13 @@ describe('FinanceService budget planning', () => {
         (operation: ((client: typeof tx) => unknown) | unknown[]) =>
           Array.isArray(operation) ? Promise.all(operation) : operation(tx),
       ),
+      budgetPlan: { findFirst: jest.fn() },
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn(), count: jest.fn() },
     };
-    notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 0 }),
-    };
-    service = new FinanceService(
+    service = new FinanceService(prisma as unknown as PrismaService);
+    reportService = new FinanceReportService(
       prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
     );
   });
 
@@ -151,97 +149,99 @@ describe('FinanceService budget planning', () => {
   });
 
   it('builds an inclusive hybrid planned-vs-actual report', async () => {
-    jest.spyOn(service, 'getBudgetPlan').mockResolvedValue({
-      id: planId,
-      familyId,
-      planName: 'June plan',
-      periodType: BudgetPeriodType.MONTHLY,
-      periodStart: new Date('2026-06-01T00:00:00.000Z'),
-      periodEnd: new Date('2026-06-30T00:00:00.000Z'),
-      expectedSharedIncome: null,
-      expectedSharedExpense: null,
-      status: BudgetPlanStatus.ACTIVE,
-      createdByMemberId: 'member-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdByMember: {
-        id: 'member-id',
-        displayName: null,
-        user: { id: 'user-id', fullName: null, avatarUrl: null },
+    (prisma.budgetPlan as { findFirst: jest.Mock }).findFirst.mockResolvedValue(
+      {
+        id: planId,
+        familyId,
+        planName: 'June plan',
+        periodType: BudgetPeriodType.MONTHLY,
+        periodStart: new Date('2026-06-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-06-30T00:00:00.000Z'),
+        expectedSharedIncome: null,
+        expectedSharedExpense: null,
+        status: BudgetPlanStatus.ACTIVE,
+        createdByMemberId: 'member-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdByMember: {
+          id: 'member-id',
+          displayName: null,
+          user: { id: 'user-id', fullName: null, avatarUrl: null },
+        },
+        lines: [
+          {
+            id: 'income-line',
+            budgetPlanId: planId,
+            categoryId: 'income-category',
+            jarId: null,
+            plannedAmount: new Prisma.Decimal(1000),
+            thresholdAmount: null,
+            thresholdPercent: null,
+            essentialType: null,
+            note: null,
+            financeLedgerId: null,
+            category: {
+              id: 'income-category',
+              familyId,
+              name: 'Salary',
+              categoryType: FinanceCategoryType.INCOME,
+              essentialType: 'NEUTRAL',
+              status: 'ACTIVE',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            jar: null,
+          },
+          {
+            id: 'expense-line',
+            budgetPlanId: planId,
+            categoryId: 'expense-category',
+            jarId: null,
+            plannedAmount: new Prisma.Decimal(500),
+            thresholdAmount: null,
+            thresholdPercent: new Prisma.Decimal(10),
+            essentialType: null,
+            note: null,
+            financeLedgerId: null,
+            category: {
+              id: 'expense-category',
+              familyId,
+              name: 'Food',
+              categoryType: FinanceCategoryType.EXPENSE,
+              essentialType: 'ESSENTIAL',
+              status: 'ACTIVE',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            jar: null,
+          },
+          {
+            id: 'jar-line',
+            budgetPlanId: planId,
+            categoryId: null,
+            jarId: 'jar-id',
+            plannedAmount: new Prisma.Decimal(200),
+            thresholdAmount: null,
+            thresholdPercent: null,
+            essentialType: null,
+            note: null,
+            financeLedgerId: null,
+            category: null,
+            jar: {
+              id: 'jar-id',
+              financeModelId: 'model-id',
+              name: 'Savings',
+              jarCode: 'SAVINGS',
+              allocationPercentage: new Prisma.Decimal(20),
+              description: null,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          },
+        ],
       },
-      lines: [
-        {
-          id: 'income-line',
-          budgetPlanId: planId,
-          categoryId: 'income-category',
-          jarId: null,
-          plannedAmount: new Prisma.Decimal(1000),
-          thresholdAmount: null,
-          thresholdPercent: null,
-          essentialType: null,
-          note: null,
-          financeLedgerId: null,
-          category: {
-            id: 'income-category',
-            familyId,
-            name: 'Salary',
-            categoryType: FinanceCategoryType.INCOME,
-            essentialType: 'NEUTRAL',
-            status: 'ACTIVE',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          jar: null,
-        },
-        {
-          id: 'expense-line',
-          budgetPlanId: planId,
-          categoryId: 'expense-category',
-          jarId: null,
-          plannedAmount: new Prisma.Decimal(500),
-          thresholdAmount: null,
-          thresholdPercent: new Prisma.Decimal(10),
-          essentialType: null,
-          note: null,
-          financeLedgerId: null,
-          category: {
-            id: 'expense-category',
-            familyId,
-            name: 'Food',
-            categoryType: FinanceCategoryType.EXPENSE,
-            essentialType: 'ESSENTIAL',
-            status: 'ACTIVE',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          jar: null,
-        },
-        {
-          id: 'jar-line',
-          budgetPlanId: planId,
-          categoryId: null,
-          jarId: 'jar-id',
-          plannedAmount: new Prisma.Decimal(200),
-          thresholdAmount: null,
-          thresholdPercent: null,
-          essentialType: null,
-          note: null,
-          financeLedgerId: null,
-          category: null,
-          jar: {
-            id: 'jar-id',
-            financeModelId: 'model-id',
-            name: 'Savings',
-            jarCode: 'SAVINGS',
-            allocationPercentage: new Prisma.Decimal(20),
-            description: null,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ],
-    });
+    );
     (
       prisma.financeLedger as { findUnique: jest.Mock }
     ).findUnique.mockResolvedValue({ id: 'ledger-id' });
@@ -260,7 +260,7 @@ describe('FinanceService budget planning', () => {
       },
     ]);
 
-    const report = await service.getBudgetPlanReport(familyId, planId);
+    const report = await reportService.getBudgetPlanReport(familyId, planId);
 
     expect(report.totals.plannedIncome.toString()).toBe('1000');
     expect(report.totals.plannedExpense.toString()).toBe('700');

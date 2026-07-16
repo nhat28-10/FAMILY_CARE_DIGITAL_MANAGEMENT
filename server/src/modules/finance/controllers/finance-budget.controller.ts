@@ -31,6 +31,7 @@ import { CreateBudgetLineDto } from '../dto/create-budget-line.dto';
 import { CreateBudgetPlanDto } from '../dto/create-budget-plan.dto';
 import { UpdateBudgetLineDto } from '../dto/update-budget-line.dto';
 import { UpdateBudgetPlanDto } from '../dto/update-budget-plan.dto';
+import { FinanceReportService } from '../services/finance-report.service';
 import { FinanceService } from '../services/finance.service';
 
 @ApiTags('Finance - Kế hoạch ngân sách')
@@ -43,7 +44,10 @@ import { FinanceService } from '../services/finance.service';
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceBudgetController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financeReportService: FinanceReportService,
+  ) {}
 
   @Get('budget-plans')
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
@@ -196,7 +200,10 @@ export class FinanceBudgetController {
     @Param('familyId') familyId: string,
     @Param('budgetPlanId') budgetPlanId: string,
   ) {
-    return this.financeService.getBudgetPlanReport(familyId, budgetPlanId);
+    return this.financeReportService.getBudgetPlanReport(
+      familyId,
+      budgetPlanId,
+    );
   }
 
   @Post('budget-plans/:budgetPlanId/lines')

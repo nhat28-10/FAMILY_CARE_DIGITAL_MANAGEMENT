@@ -13,7 +13,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentFamilyMember } from '../../family-members/decorators/current-family-member.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
-import { FinanceService } from '../services/finance.service';
+import { FinanceReportService } from '../services/finance-report.service';
 
 @ApiTags('Finance - Báo cáo tài chính')
 @ApiBearerAuth()
@@ -25,7 +25,7 @@ import { FinanceService } from '../services/finance.service';
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceReportsController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(private readonly financeReportService: FinanceReportService) {}
 
   @Get('reports/overview')
   @ResponseMessage('Lấy báo cáo tổng quan tài chính thành công')
@@ -46,7 +46,7 @@ export class FinanceReportsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: FinanceReportQueryDto,
   ) {
-    return this.financeService.getFinanceOverviewReport(
+    return this.financeReportService.getFinanceOverviewReport(
       familyId,
       memberId,
       query,
@@ -68,7 +68,11 @@ export class FinanceReportsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: FinanceReportQueryDto,
   ) {
-    return this.financeService.getBudgetGoalReport(familyId, memberId, query);
+    return this.financeReportService.getBudgetGoalReport(
+      familyId,
+      memberId,
+      query,
+    );
   }
 
   @Get('reports/non-essential-spending')
@@ -89,7 +93,7 @@ export class FinanceReportsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: FinanceReportQueryDto,
   ) {
-    return this.financeService.getNonEssentialSpendingReport(
+    return this.financeReportService.getNonEssentialSpendingReport(
       familyId,
       memberId,
       query,
