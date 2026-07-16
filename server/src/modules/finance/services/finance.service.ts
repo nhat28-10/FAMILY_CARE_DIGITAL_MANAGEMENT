@@ -1729,13 +1729,14 @@ export class FinanceService {
     };
   }
 
-  confirmGoalContributionPlans(
+  async confirmGoalContributionPlans(
     familyId: string,
     memberId: string,
     goalId: string,
     dto: ConfirmGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const member = await this.getMemberInFamilyOrThrow(
         familyId,
         memberId,
@@ -1826,18 +1827,22 @@ export class FinanceService {
         goal,
         dto.periodMonth,
         dto.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
-  submitGoalContributionPlan(
+  async submitGoalContributionPlan(
     familyId: string,
     memberId: string,
     goalId: string,
     planId: string,
     dto: SubmitGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.getMemberInFamilyOrThrow(familyId, memberId, tx);
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       const plan = await this.requireGoalContributionPlan(
@@ -1879,8 +1884,11 @@ export class FinanceService {
         goal,
         plan.periodMonth,
         plan.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   approveGoalContributionPlan(
@@ -1906,6 +1914,7 @@ export class FinanceService {
     planId: string,
     dto: ReviewGoalContributionPlanDto,
   ) {
+    const pendingNotificationIds: string[] = [];
     const result = await this.prisma.$transaction(
       async (tx) => {
         const reviewer = await this.getMemberInFamilyOrThrow(
@@ -1995,11 +2004,14 @@ export class FinanceService {
           goal,
           plan.periodMonth,
           plan.periodYear,
+          pendingNotificationIds,
         );
         return { view, goalName: goal.goalName };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    await this.notificationsService.dispatch(pendingNotificationIds);
 
     await this.notifyContributionShortageAfterApproval(
       familyId,
@@ -2013,14 +2025,15 @@ export class FinanceService {
     return result.view;
   }
 
-  rejectGoalContributionPlan(
+  async rejectGoalContributionPlan(
     familyId: string,
     reviewerMemberId: string,
     goalId: string,
     planId: string,
     dto: ReviewGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const reviewer = await this.getMemberInFamilyOrThrow(
         familyId,
         reviewerMemberId,
@@ -2055,17 +2068,21 @@ export class FinanceService {
         goal,
         plan.periodMonth,
         plan.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
-  listGoalContributionPlans(
+  async listGoalContributionPlans(
     familyId: string,
     memberId: string,
     goalId: string,
     period: RequiredFinancePeriodDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const member = await this.getMemberInFamilyOrThrow(
         familyId,
         memberId,
@@ -2079,8 +2096,11 @@ export class FinanceService {
         goal,
         period.month,
         period.year,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   async getGoalContributionShortage(
@@ -2126,13 +2146,14 @@ export class FinanceService {
     });
   }
 
-  createGoalAllocation(
+  async createGoalAllocation(
     familyId: string,
     memberId: string,
     goalId: string,
     dto: CreateGoalAllocationDto,
   ) {
-    return this.prisma.$transaction(
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const member = await this.getMemberInFamilyOrThrow(
           familyId,
@@ -2160,6 +2181,10 @@ export class FinanceService {
           entry.amount,
           dto.amount,
         );
+        const allocatedBefore = await this.calculateGoalAllocatedAmount(
+          tx,
+          goal.id,
+        );
         const allocation = await tx.goalAllocation.create({
           data: {
             goalId,
@@ -2169,6 +2194,30 @@ export class FinanceService {
           },
           include: { ledgerEntry: true },
         });
+        const allocatedAfter = allocatedBefore.plus(allocation.amount);
+        const reachedTarget =
+          allocatedBefore.lt(goal.targetAmount) &&
+          allocatedAfter.gte(goal.targetAmount);
+        if (reachedTarget) {
+          const allMembers = await tx.familyMember.findMany({
+            where: { familyId, status: MemberStatus.ACTIVE },
+            select: { id: true },
+          });
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            allMembers.map((m) => m.id),
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.NORMAL,
+              title: 'Mục tiêu tài chính đã đạt',
+              body: `Mục tiêu "${goal.goalName}" đã đạt số tiền đề ra.`,
+              referenceType: 'FINANCIAL_GOAL',
+              referenceId: goal.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
+        }
         return {
           allocation,
           ...(await this.refreshGoalStatus(tx, goal.id)),
@@ -2176,6 +2225,8 @@ export class FinanceService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   updateGoalAllocation(
@@ -2310,12 +2361,13 @@ export class FinanceService {
     return alert;
   }
 
-  recomputeBudgetGoalAlerts(
+  async recomputeBudgetGoalAlerts(
     familyId: string,
     memberId: string,
     dto: RecomputeBudgetAlertsDto,
   ) {
-    return this.prisma.$transaction(
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const member = await this.getMemberInFamilyOrThrow(
           familyId,
@@ -2354,14 +2406,22 @@ export class FinanceService {
             )),
           );
         }
-        return this.syncAlertCandidates(tx, familyId, candidates, {
-          ...dto,
-          periodStart: this.dateKey(period.start),
-          periodEnd: this.dateKey(period.end),
-        });
+        return this.syncAlertCandidates(
+          tx,
+          familyId,
+          candidates,
+          {
+            ...dto,
+            periodStart: this.dateKey(period.start),
+            periodEnd: this.dateKey(period.end),
+          },
+          pendingNotificationIds,
+        );
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   acknowledgeBudgetAlert(familyId: string, memberId: string, alertId: string) {
@@ -2910,6 +2970,7 @@ export class FinanceService {
     familyId: string,
     candidates: AlertCandidate[],
     dto: RecomputeBudgetAlertsDto,
+    pendingNotificationIds: string[] = [],
   ) {
     const activeKeys = candidates.map((candidate) => candidate.sourceKey);
     for (const candidate of candidates) {
@@ -2935,7 +2996,7 @@ export class FinanceService {
       if (existing) {
         await tx.budgetAlert.update({ where: { id: existing.id }, data });
       } else {
-        await tx.budgetAlert.create({
+        const alert = await tx.budgetAlert.create({
           data: {
             familyId,
             sourceKey: candidate.sourceKey,
@@ -2943,6 +3004,30 @@ export class FinanceService {
             ...data,
           },
         });
+        const alertRecipients = await tx.familyMember.findMany({
+          where: {
+            familyId,
+            status: MemberStatus.ACTIVE,
+            familyRole: {
+              in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+            },
+          },
+          select: { id: true },
+        });
+        const { ids } = await this.notificationsService.notify(
+          familyId,
+          alertRecipients.map((m) => m.id),
+          {
+            type: NotificationType.FINANCE,
+            priority: NotificationPriority.HIGH,
+            title: 'Cảnh báo ngân sách',
+            body: candidate.message,
+            referenceType: 'BUDGET_ALERT',
+            referenceId: alert.id,
+          },
+          { tx },
+        );
+        pendingNotificationIds.push(...ids);
       }
     }
     const nonEssentialPrefix =
@@ -3676,6 +3761,7 @@ export class FinanceService {
     goal: FinancialGoalWithJar,
     periodMonth: number,
     periodYear: number,
+    pendingNotificationIds: string[] = [],
   ) {
     const plans = await tx.goalContributionPlan.findMany({
       where: {
@@ -3751,6 +3837,7 @@ export class FinanceService {
       periodMonth,
       periodYear,
       rows,
+      pendingNotificationIds,
     );
 
     const totalPlannedAmount = rows.reduce(
@@ -3866,6 +3953,7 @@ export class FinanceService {
     periodMonth: number,
     periodYear: number,
     rows: GoalContributionPlanRow[],
+    pendingNotificationIds: string[] = [],
   ) {
     const prefix = `CONTRIBUTION_SHORTAGE:${goal.id}:${periodMonth}:${periodYear}:`;
     const activeRows = rows.filter(
@@ -3899,7 +3987,7 @@ export class FinanceService {
       if (existing) {
         await tx.budgetAlert.update({ where: { id: existing.id }, data });
       } else {
-        await tx.budgetAlert.create({
+        const alert = await tx.budgetAlert.create({
           data: {
             familyId,
             sourceKey,
@@ -3907,6 +3995,30 @@ export class FinanceService {
             ...data,
           },
         });
+        const alertRecipients = await tx.familyMember.findMany({
+          where: {
+            familyId,
+            status: MemberStatus.ACTIVE,
+            familyRole: {
+              in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+            },
+          },
+          select: { id: true },
+        });
+        const { ids } = await this.notificationsService.notify(
+          familyId,
+          alertRecipients.map((m) => m.id),
+          {
+            type: NotificationType.FINANCE,
+            priority: NotificationPriority.HIGH,
+            title: 'Cảnh báo ngân sách',
+            body: `Kế hoạch đóng góp mục tiêu "${goal.goalName}" của ${row.displayName} đang thiếu ${row.shortageAmount}.`,
+            referenceType: 'BUDGET_ALERT',
+            referenceId: alert.id,
+          },
+          { tx },
+        );
+        pendingNotificationIds.push(...ids);
       }
     }
     await tx.budgetAlert.updateMany({

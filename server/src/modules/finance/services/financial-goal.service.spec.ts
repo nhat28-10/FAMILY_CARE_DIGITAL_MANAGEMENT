@@ -210,6 +210,10 @@ describe('FinanceService financial goals', () => {
       familyRole: FamilyRole.FAMILY_MANAGER,
       status: MemberStatus.ACTIVE,
     });
+    tx.familyMember.findMany.mockResolvedValue([
+      { id: memberId },
+      { id: 'other-member-id' },
+    ]);
     tx.financialGoal.findFirst.mockResolvedValue(goal);
     tx.ledgerEntry.findFirst.mockResolvedValue({
       id: 'entry-id',
@@ -219,9 +223,13 @@ describe('FinanceService financial goals', () => {
       amount: new Prisma.Decimal(100),
     });
     tx.goalAllocation.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: null } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(100) } });
-    tx.goalAllocation.create.mockResolvedValue({ id: 'allocation-id' });
+      .mockResolvedValueOnce({ _sum: { amount: null } }) // ledger-entry availability check
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // allocatedBefore
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(100) } }); // allocatedAfter (refreshGoalStatus)
+    tx.goalAllocation.create.mockResolvedValue({
+      id: 'allocation-id',
+      amount: new Prisma.Decimal(100),
+    });
     tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
     tx.financialGoal.update.mockResolvedValue({
       ...goal,
@@ -237,6 +245,51 @@ describe('FinanceService financial goals', () => {
 
     expect(result.goal.status).toBe(FinancialGoalStatus.ACHIEVED);
     expect(result.progress.isAchieved).toBe(true);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      expect.arrayContaining([memberId, 'other-member-id']),
+      expect.objectContaining({ type: NotificationType.FINANCE }),
+      { tx },
+    );
+    expect(notifications.dispatch).toHaveBeenCalled();
+  });
+
+  it('does not notify a goal milestone when the target has not been reached', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.ledgerEntry.findFirst.mockResolvedValue({
+      id: 'entry-id',
+      createdByMemberId: memberId,
+      status: LedgerEntryStatus.ACTIVE,
+      entryType: LedgerEntryType.REWARD,
+      amount: new Prisma.Decimal(100),
+    });
+    tx.goalAllocation.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } }) // ledger-entry availability check
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // allocatedBefore
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(40) } }); // allocatedAfter (refreshGoalStatus)
+    tx.goalAllocation.create.mockResolvedValue({
+      id: 'allocation-id',
+      amount: new Prisma.Decimal(40),
+    });
+    tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
+    tx.financialGoal.update.mockResolvedValue(goal);
+
+    const result = await service.createGoalAllocation(
+      familyId,
+      memberId,
+      goalId,
+      { ledgerEntryId: 'entry-id', amount: 40 },
+    );
+
+    expect(result.progress.isAchieved).toBe(false);
+    expect(notifications.notify).not.toHaveBeenCalled();
+    expect(notifications.dispatch).toHaveBeenCalledWith([]);
   });
 
   it('suggests monthly goal contributions proportionally after shared contributions and handles null monthly finance values', async () => {
