@@ -13,19 +13,18 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotificationsService } from '../../notifications/notifications.service';
 import { SpendingSupportDecision } from '../dto/review-spending-support-request.dto';
 import { FinanceService } from './finance.service';
+import { SpendingSupportRequestService } from './spending-support-request.service';
 
-describe('FinanceService spending support requests', () => {
+describe('SpendingSupportRequestService spending support requests', () => {
   const familyId = 'family-id';
   const memberId = 'member-id';
   const reviewerId = 'reviewer-id';
   const requestId = 'request-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
-  let service: FinanceService;
+  let service: SpendingSupportRequestService;
 
   const activeMember = {
     id: memberId,
@@ -77,13 +76,8 @@ describe('FinanceService spending support requests', () => {
       financeLedger: { findUnique: jest.fn() },
       memberMonthlyFinance: { findUnique: jest.fn() },
     };
-    notifications = {
-      notify: jest.fn().mockResolvedValue({ ids: [] }),
-      dispatch: jest.fn().mockResolvedValue(undefined),
-    };
-    service = new FinanceService(
+    service = new SpendingSupportRequestService(
       prisma as unknown as PrismaService,
-      notifications as unknown as NotificationsService,
     );
   });
 
@@ -292,7 +286,11 @@ describe('FinanceService spending support requests', () => {
       .fn()
       .mockResolvedValue(2);
 
-    const result = await service.getOverview(familyId, memberId, {
+    const financeService = new FinanceService(
+      prisma as unknown as PrismaService,
+    );
+
+    const result = await financeService.getOverview(familyId, memberId, {
       month: 6,
       year: 2026,
     });

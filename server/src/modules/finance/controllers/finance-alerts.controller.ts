@@ -28,7 +28,7 @@ import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { BudgetAlertQueryDto } from '../dto/budget-alert-query.dto';
 import { RecomputeBudgetAlertsDto } from '../dto/recompute-budget-alerts.dto';
 import { ResolveBudgetAlertDto } from '../dto/resolve-budget-alert.dto';
-import { FinanceService } from '../services/finance.service';
+import { BudgetAlertService } from '../services/budget-alert.service';
 
 @ApiTags('Finance - Cảnh báo tài chính')
 @ApiBearerAuth()
@@ -40,7 +40,7 @@ import { FinanceService } from '../services/finance.service';
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceAlertsController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(private readonly budgetAlertService: BudgetAlertService) {}
 
   @Get('alerts')
   @ResponseMessage('Lấy danh sách cảnh báo tài chính thành công')
@@ -57,7 +57,7 @@ export class FinanceAlertsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: BudgetAlertQueryDto,
   ) {
-    return this.financeService.listBudgetAlerts(familyId, memberId, query);
+    return this.budgetAlertService.listBudgetAlerts(familyId, memberId, query);
   }
 
   @Get('alerts/:alertId')
@@ -77,7 +77,7 @@ export class FinanceAlertsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('alertId') alertId: string,
   ) {
-    return this.financeService.getBudgetAlert(familyId, memberId, alertId);
+    return this.budgetAlertService.getBudgetAlert(familyId, memberId, alertId);
   }
 
   @Post('alerts/recompute')
@@ -93,7 +93,7 @@ export class FinanceAlertsController {
     @CurrentFamilyMember('id') memberId: string,
     @Body() dto: RecomputeBudgetAlertsDto,
   ) {
-    return this.financeService.recomputeBudgetGoalAlerts(
+    return this.budgetAlertService.recomputeBudgetGoalAlerts(
       familyId,
       memberId,
       dto,
@@ -116,7 +116,7 @@ export class FinanceAlertsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('alertId') alertId: string,
   ) {
-    return this.financeService.acknowledgeBudgetAlert(
+    return this.budgetAlertService.acknowledgeBudgetAlert(
       familyId,
       memberId,
       alertId,
@@ -140,7 +140,7 @@ export class FinanceAlertsController {
     @Param('alertId') alertId: string,
     @Body() dto: ResolveBudgetAlertDto,
   ) {
-    return this.financeService.resolveBudgetAlert(
+    return this.budgetAlertService.resolveBudgetAlert(
       familyId,
       memberId,
       alertId,

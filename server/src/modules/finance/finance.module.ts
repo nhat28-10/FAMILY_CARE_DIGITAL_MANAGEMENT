@@ -11,7 +11,11 @@ import { FinanceModelsController } from './controllers/finance-models.controller
 import { FinanceMonthlyController } from './controllers/finance-monthly.controller';
 import { FinanceReportsController } from './controllers/finance-reports.controller';
 import { FinanceSupportRequestsController } from './controllers/finance-support-requests.controller';
+import { BudgetAlertService } from './services/budget-alert.service';
+import { FinanceReportService } from './services/finance-report.service';
 import { FinanceService } from './services/finance.service';
+import { FinancialGoalService } from './services/financial-goal.service';
+import { SpendingSupportRequestService } from './services/spending-support-request.service';
 
 @Module({
   imports: [FamilyMembersModule, NotificationsModule],
@@ -26,7 +30,19 @@ import { FinanceService } from './services/finance.service';
     FinanceAlertsController,
     FinanceReportsController,
   ],
-  providers: [FinanceService],
-  exports: [FinanceService],
+  providers: [
+    FinanceService,
+    FinanceReportService,
+    FinancialGoalService,
+    BudgetAlertService,
+    SpendingSupportRequestService,
+  ],
+  exports: [
+    FinanceService,
+    FinanceReportService,
+    FinancialGoalService,
+    BudgetAlertService,
+    SpendingSupportRequestService,
+  ],
 })
 export class FinanceModule {}

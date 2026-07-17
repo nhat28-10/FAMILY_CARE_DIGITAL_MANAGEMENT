@@ -29,7 +29,7 @@ import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateSpendingSupportRequestDto } from '../dto/create-spending-support-request.dto';
 import { ReviewSpendingSupportRequestDto } from '../dto/review-spending-support-request.dto';
 import { SpendingSupportRequestQueryDto } from '../dto/spending-support-request-query.dto';
-import { FinanceService } from '../services/finance.service';
+import { SpendingSupportRequestService } from '../services/spending-support-request.service';
 
 @ApiTags('Finance - Hỗ trợ chi tiêu')
 @ApiBearerAuth()
@@ -41,7 +41,9 @@ import { FinanceService } from '../services/finance.service';
 @UseGuards(JwtAuthGuard, FamilyPermissionGuard)
 @Controller('families/:familyId/finance')
 export class FinanceSupportRequestsController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly spendingSupportRequestService: SpendingSupportRequestService,
+  ) {}
 
   @Get('support-requests')
   @ResponseMessage('Lấy danh sách yêu cầu hỗ trợ chi tiêu thành công')
@@ -62,7 +64,7 @@ export class FinanceSupportRequestsController {
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: SpendingSupportRequestQueryDto,
   ) {
-    return this.financeService.listSpendingSupportRequests(
+    return this.spendingSupportRequestService.listSpendingSupportRequests(
       familyId,
       memberId,
       query,
@@ -83,7 +85,7 @@ export class FinanceSupportRequestsController {
     @CurrentFamilyMember('id') memberId: string,
     @Body() dto: CreateSpendingSupportRequestDto,
   ) {
-    return this.financeService.createSpendingSupportRequest(
+    return this.spendingSupportRequestService.createSpendingSupportRequest(
       familyId,
       memberId,
       dto,
@@ -107,7 +109,7 @@ export class FinanceSupportRequestsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('requestId') requestId: string,
   ) {
-    return this.financeService.getSpendingSupportRequest(
+    return this.spendingSupportRequestService.getSpendingSupportRequest(
       familyId,
       memberId,
       requestId,
@@ -134,7 +136,7 @@ export class FinanceSupportRequestsController {
     @Param('requestId') requestId: string,
     @Body() dto: ReviewSpendingSupportRequestDto,
   ) {
-    return this.financeService.reviewSpendingSupportRequest(
+    return this.spendingSupportRequestService.reviewSpendingSupportRequest(
       familyId,
       memberId,
       requestId,
@@ -162,7 +164,7 @@ export class FinanceSupportRequestsController {
     @CurrentFamilyMember('id') memberId: string,
     @Param('requestId') requestId: string,
   ) {
-    return this.financeService.cancelSpendingSupportRequest(
+    return this.spendingSupportRequestService.cancelSpendingSupportRequest(
       familyId,
       memberId,
       requestId,

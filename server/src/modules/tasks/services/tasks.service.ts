@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   FinanceLedgerStatus,
@@ -40,7 +41,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { StorageService } from '../../storage/storage.service';
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { CreateTaskCategoryDto } from '../dto/create-task-category.dto';
 import { CreateRecurringTaskDto } from '../dto/create-recurring-task.dto';
@@ -622,12 +623,10 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
-  private readonly logger = new Logger(TasksService.name);
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
-  ) {}
+    @Optional() private readonly storage?: StorageService,
+  ) { }
 
   async uploadTaskProofFile(
     familyId: string,
@@ -997,13 +996,13 @@ export class TasksService {
       assignmentCandidates.length === 0
         ? []
         : await this.prisma.taskAssignment.findMany({
-            where: {
-              taskId,
-              assignedToMemberId: dto.assignedToMemberId,
-              dueAt: { in: assignmentCandidates.map((item) => item.dueAt) },
-            },
-            select: { dueAt: true },
-          });
+          where: {
+            taskId,
+            assignedToMemberId: dto.assignedToMemberId,
+            dueAt: { in: assignmentCandidates.map((item) => item.dueAt) },
+          },
+          select: { dueAt: true },
+        });
     const existingDueAtTimes = new Set(
       existingAssignments
         .filter((assignment) => assignment.dueAt)
@@ -1039,10 +1038,10 @@ export class TasksService {
       createdAssignmentIds.length === 0
         ? []
         : await this.prisma.taskAssignment.findMany({
-            where: { id: { in: createdAssignmentIds } },
-            select: assignmentResponseSelect,
-            orderBy: { dueAt: 'asc' },
-          });
+          where: { id: { in: createdAssignmentIds } },
+          select: assignmentResponseSelect,
+          orderBy: { dueAt: 'asc' },
+        });
 
     return {
       task: {
@@ -2428,7 +2427,7 @@ export class TasksService {
       });
     });
 
-    return this.mapSubmissionResponse(submission);
+    return this.mapSubmissionResponseWithFreshProofUrls(submission);
   }
 
   async updateTaskProof(
@@ -2527,14 +2526,13 @@ export class TasksService {
       this.prisma.taskSubmission.count({ where }),
     ]);
 
-    return buildPaginated(
+    const items = await Promise.all(
       submissions.map((submission) =>
-        this.mapSubmissionListItemResponse(submission),
+        this.mapSubmissionListItemResponseWithFreshProofUrls(submission),
       ),
-      total,
-      query.page,
-      query.limit,
     );
+
+    return buildPaginated(items, total, query.page, query.limit);
   }
 
   async getTaskSubmission(
@@ -2553,7 +2551,7 @@ export class TasksService {
       );
     }
     this.assertCanViewSubmission(submission, memberId, familyRole);
-    return this.mapSubmissionResponse(submission);
+    return this.mapSubmissionResponseWithFreshProofUrls(submission);
   }
 
   async reviewTaskSubmission(
@@ -2695,7 +2693,7 @@ export class TasksService {
       dto.decision === ReviewTaskSubmissionDecision.APPROVED
         ? 'Duyệt hoàn thành công việc thành công'
         : 'Từ chối hoàn thành công việc thành công',
-      this.mapSubmissionResponse(result),
+      await this.mapSubmissionResponseWithFreshProofUrls(result),
     );
   }
 
@@ -2908,7 +2906,6 @@ export class TasksService {
         id: memberId,
         familyId,
         status: MemberStatus.ACTIVE,
-        familyRole: FamilyRole.FAMILY_MEMBER,
       },
     });
     if (!member) {
@@ -3759,15 +3756,15 @@ export class TasksService {
       allocatedAt: allocation.allocatedAt,
       jar: allocation.jar
         ? {
-            id: allocation.jar.id,
-            name: allocation.jar.name,
-          }
+          id: allocation.jar.id,
+          name: allocation.jar.name,
+        }
         : null,
       goal: allocation.goal
         ? {
-            id: allocation.goal.id,
-            goalName: allocation.goal.goalName,
-          }
+          id: allocation.goal.id,
+          goalName: allocation.goal.goalName,
+        }
         : null,
       allocatedByMember: this.mapUnavailabilityMember(
         allocation.allocatedByMember,
@@ -3816,6 +3813,20 @@ export class TasksService {
     };
   }
 
+  private async mapSubmissionResponseWithFreshProofUrls(
+    submission: SubmissionResponsePayload,
+  ) {
+    const response = this.mapSubmissionResponse(submission);
+    return {
+      ...response,
+      proofs: await Promise.all(
+        submission.proofs.map((proof) =>
+          this.mapProofResponseWithFreshFileUrls(proof),
+        ),
+      ),
+    };
+  }
+
   private mapSubmissionListItemResponse(submission: SubmissionListItemPayload) {
     return {
       id: submission.id,
@@ -3837,6 +3848,20 @@ export class TasksService {
     };
   }
 
+  private async mapSubmissionListItemResponseWithFreshProofUrls(
+    submission: SubmissionListItemPayload,
+  ) {
+    const response = this.mapSubmissionListItemResponse(submission);
+    return {
+      ...response,
+      proofs: await Promise.all(
+        submission.proofs.map((proof) =>
+          this.mapProofResponseWithFreshFileUrls(proof),
+        ),
+      ),
+    };
+  }
+
   private mapProofResponse(proof: ProofResponsePayload) {
     return {
       id: proof.id,
@@ -3849,6 +3874,25 @@ export class TasksService {
       createdAt: proof.createdAt,
       updatedAt: proof.updatedAt,
     };
+  }
+
+  private async mapProofResponseWithFreshFileUrls(proof: ProofResponsePayload) {
+    const response = this.mapProofResponse(proof);
+    return {
+      ...response,
+      fileUrl: await this.refreshProofFileUrl(response.fileUrl),
+      thumbnailUrl: await this.refreshProofFileUrl(response.thumbnailUrl),
+    };
+  }
+
+  private async refreshProofFileUrl(fileUrl: string | null) {
+    if (!this.storage || !fileUrl) {
+      return fileUrl;
+    }
+
+    return (
+      (await this.storage.createSignedReadUrlFromStoredUrl(fileUrl)) ?? fileUrl
+    );
   }
 
   private isAssignmentOverdue(assignment: {

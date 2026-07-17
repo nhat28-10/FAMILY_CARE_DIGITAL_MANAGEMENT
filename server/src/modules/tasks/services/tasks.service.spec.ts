@@ -2,7 +2,8 @@ import { ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
   MemberStatus,
-  NotificationType,
+  TaskAssignmentStatus,
+  TaskPriority,
   TaskProofType,
   TaskStatus,
   TaskSubmissionStatus,
@@ -23,14 +24,12 @@ describe('TasksService listTaskSubmissions', () => {
 
   let prisma: {
     $transaction: jest.Mock;
-    task: { findFirst: jest.Mock };
-    familyMember: { findFirst: jest.Mock };
-    taskAssignment: {
+    taskAssignment: { findFirst: jest.Mock };
+    taskSubmission: {
       findFirst: jest.Mock;
-      create: jest.Mock;
-      findUniqueOrThrow: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
     };
-    taskSubmission: { findMany: jest.Mock; count: jest.Mock };
   };
   let notifications: {
     notify: jest.Mock;
@@ -115,6 +114,7 @@ describe('TasksService listTaskSubmissions', () => {
         findUniqueOrThrow: jest.fn(),
       },
       taskSubmission: {
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
       },
@@ -272,6 +272,162 @@ describe('TasksService listTaskSubmissions', () => {
     expect(prisma.taskSubmission.findMany).not.toHaveBeenCalled();
     expect(prisma.taskSubmission.count).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('refreshes signed proof URLs when returning submission detail', async () => {
+    const expiredUrl =
+      'https://r2.example.com/bucket/task-proofs/family-id/proof.jpg?X-Amz-Signature=old';
+    const localUrl = '/uploads/task-proofs/family-id/local.jpg';
+    const storage = {
+      createSignedReadUrlFromStoredUrl: jest
+        .fn()
+        .mockImplementation((url: string) =>
+          url === expiredUrl
+            ? Promise.resolve('https://signed.example/fresh')
+            : null,
+        ),
+    };
+    service = new TasksService(
+      prisma as unknown as PrismaService,
+      storage as never,
+    );
+    prisma.taskSubmission.findFirst.mockResolvedValue(
+      submission('submission-with-proofs', [
+        { ...proof('proof-1', submittedAt), fileUrl: expiredUrl },
+        { ...proof('proof-2', submittedAt), fileUrl: localUrl },
+      ]),
+    );
+
+    const result = await service.getTaskSubmission(
+      familyId,
+      'submission-with-proofs',
+      memberId,
+      FamilyRole.FAMILY_MEMBER,
+    );
+
+    expect(storage.createSignedReadUrlFromStoredUrl).toHaveBeenCalledWith(
+      expiredUrl,
+    );
+    expect(storage.createSignedReadUrlFromStoredUrl).toHaveBeenCalledWith(
+      localUrl,
+    );
+    expect(result.proofs[0].fileUrl).toBe('https://signed.example/fresh');
+    expect(result.proofs[1].fileUrl).toBe(localUrl);
+  });
+});
+
+describe('TasksService createTaskAssignment', () => {
+  const familyId = 'family-id';
+  const taskId = 'task-id';
+  const assignedByMemberId = 'manager-member-id';
+  const assignedToMemberId = 'assigned-manager-member-id';
+  const now = new Date('2026-07-01T08:00:00.000Z');
+
+  let prisma: {
+    task: { findFirst: jest.Mock };
+    familyMember: { findFirst: jest.Mock };
+    taskAssignment: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+    };
+  };
+  let service: TasksService;
+
+  const memberSummary = (id: string, familyRole: FamilyRole) => ({
+    id,
+    userId: `${id}-user`,
+    familyRole,
+    status: MemberStatus.ACTIVE,
+    user: {
+      id: `${id}-user`,
+      fullName: `${id} name`,
+      avatarUrl: null,
+    },
+  });
+
+  const assignmentResponse = () => ({
+    id: 'assignment-id',
+    taskId,
+    assignedToMemberId,
+    assignedByMemberId,
+    status: TaskAssignmentStatus.ASSIGNED,
+    assignedAt: now,
+    startAt: null,
+    dueAt: null,
+    createdAt: now,
+    updatedAt: now,
+    assignedToMember: memberSummary(
+      assignedToMemberId,
+      FamilyRole.FAMILY_MANAGER,
+    ),
+    assignedByMember: memberSummary(
+      assignedByMemberId,
+      FamilyRole.FAMILY_MANAGER,
+    ),
+  });
+
+  beforeEach(() => {
+    prisma = {
+      task: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: taskId,
+          familyId,
+          taskType: TaskType.AD_HOC,
+          status: TaskStatus.ACTIVE,
+          priority: TaskPriority.MEDIUM,
+        }),
+      },
+      familyMember: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: assignedToMemberId,
+          familyId,
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          status: MemberStatus.ACTIVE,
+        }),
+      },
+      taskAssignment: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'assignment-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(assignmentResponse()),
+      },
+    };
+    service = new TasksService(prisma as unknown as PrismaService);
+  });
+
+  it('assigns an ad hoc task to an active family member by FamilyMember id regardless of role', async () => {
+    const result = await service.createTaskAssignment(
+      familyId,
+      taskId,
+      assignedByMemberId,
+      { assignedToMemberId },
+    );
+
+    expect(prisma.familyMember.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: assignedToMemberId,
+        familyId,
+        status: MemberStatus.ACTIVE,
+      },
+    });
+    expect(prisma.familyMember.findFirst).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: assignedToMemberId,
+        }),
+      }),
+    );
+    expect(prisma.taskAssignment.create).toHaveBeenCalledWith({
+      data: {
+        taskId,
+        assignedToMemberId,
+        assignedByMemberId,
+        startAt: undefined,
+        dueAt: undefined,
+      },
+    });
+    expect(result.assignedToMemberId).toBe(assignedToMemberId);
+    expect(result.assignedToMember?.familyRole).toBe(FamilyRole.FAMILY_MANAGER);
   });
 });
 
