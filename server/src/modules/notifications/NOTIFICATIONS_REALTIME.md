@@ -106,6 +106,7 @@ bấm vào thông báo thì mở màn nào:
 | `SOS` | `SOS_ALERT` | `SosAlert.id` | Màn theo dõi SOS alert (map tracking) trong family. |
 | `ALBUM_TAG` | `ALBUM_MEDIA` | id nội dung album (ảnh/video) | Chi tiết nội dung album đã được gắn thẻ. |
 | `JOIN_REQUEST` | `JOIN_REQUEST` | `JoinRequest.id` | Màn danh sách yêu cầu tham gia đang chờ duyệt (manager/deputy nhận khi có request mới; người yêu cầu nhận push-only khi bị từ chối, `id` null). |
+| `JOIN_REQUEST` | `FAMILY` | `Family.id` | Người vừa được duyệt vào family nhận thông báo **persisted** (có `id`, hiện trong danh sách + badge) — điều hướng vào màn chính của family mới. |
 | `MEMBER` | `FAMILY_MEMBER` | `FamilyMember.id` | Chi tiết thành viên trong family (khi có thành viên mới, hoặc thành viên bị xóa — noti cho manager/deputy còn lại). |
 | `MEMBER` | `FAMILY` (push-only) | `Family.id` | Không còn xem được family — user vừa bị xóa khỏi family nhận thông báo này (`id` null vì đã mất membership). |
 | `TASK` | `TASK_ASSIGNMENT` | `TaskAssignment.id` | Chi tiết công việc được giao/nhắc hạn/được nghiệm thu. |
