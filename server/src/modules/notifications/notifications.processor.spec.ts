@@ -29,11 +29,11 @@ describe('NotificationsProcessor', () => {
       },
     };
     dispatcher = { dispatch: jest.fn().mockResolvedValue(undefined) };
-    reminders = { scan: jest.fn().mockResolvedValue(undefined) };
+    reminders = { scan: jest.fn().mockResolvedValue(undefined) } as never;
     processor = new NotificationsProcessor(
       prisma as never,
       dispatcher as never,
-      reminders,
+      reminders as never,
     );
   });
 
