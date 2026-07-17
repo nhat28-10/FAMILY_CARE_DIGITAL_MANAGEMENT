@@ -27,6 +27,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: familycare_redis
+    command:
+      [
+      "redis-server",
+      "--maxmemory",
+      "128mb",
+      "--maxmemory-policy",
+      "noeviction"
+      ]
     volumes:
       - redisdata:/data
     healthcheck:
