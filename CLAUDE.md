@@ -65,15 +65,27 @@ src/
 - `subscription-plans` — **CRUD gói** (SYSTEM_ADMIN quản lý qua `admin/subscription-plans`; user đã
   đăng nhập xem gói active qua `subscription-plans`). Export `SubscriptionPlansService` cho module
   `subscriptions` dùng sau.
+- `notifications` — **funnel `notify()`/`dispatch()`** dùng chung cho mọi module (SOS, join-requests,
+  families, tasks, calendar, finance, albums, chats gọi vào). Quy ước tx: `notify(..., { tx })` bên
+  trong transaction **chỉ persist**, caller tự gọi `dispatch(ids)` SAU KHI transaction commit (enqueue
+  trong tx = bug, rollback vẫn đẩy noti "ma"). Có nhánh push-only (`notifyUsersEphemeral`, `id` trả về
+  `null`, không persist — dùng cho chat và các thông báo cá nhân ngoài phạm vi 1 family cụ thể). Đẩy
+  realtime qua **WS gateway namespace `/notifications`** (connect → tự auto-join room `user:<userId>`,
+  event `notification:new` / `notification:unread-count` / `notification:error` — xem
+  `notifications/NOTIFICATIONS_REALTIME.md`), fan-out qua BullMQ (Redis, queue `notifications`) tới 2
+  channel WS + FCM (`dispatcher/`). `reminders.service.ts` là job quét định kỳ (BullMQ repeatable) nhắc
+  task/lịch sắp đến hạn.
+- `devices` — CRUD `device_tokens` (đăng ký/hủy FCM token theo user, không theo family) để kênh FCM
+  của `notifications` gửi push khi app ở background.
 
 **Bảng DB đã có** (xem `prisma/schema.prisma`): `users`, `password_reset_tokens`, `refresh_tokens`,
 `families`, `family_members`, `join_requests`, `member_monthly_finances`, `finance_ledgers`,
 `finance_categories`, `finance_models`, `finance_jars`, `ledger_entries`, `subscription_plans`,
 `spending_support_requests`, `budget_plans`, `budget_lines`, `financial_goals`, `goal_allocations`,
-`budget_alerts`.
+`budget_alerts`, `device_tokens`.
 
-**Module còn là stub rỗng** (`@Module({})`): ai-chatbot, albums, billing, calendar, chats, devices,
-locations, messages, notifications, rewards, roles-permissions, sos, subscriptions, tasks.
+**Module còn là stub rỗng** (`@Module({})`): ai-chatbot, albums, billing, calendar, chats,
+locations, messages, rewards, roles-permissions, sos, subscriptions, tasks.
 → Khi build, **theo đúng pattern của `auth`/`families`/`finance`** và các convention mục 5.
 
 > ⚠️ Lưu ý vận hành (rút ra từ phiên gần đây): khi **merge/giải xung đột `schema.prisma`**, dễ rơi
