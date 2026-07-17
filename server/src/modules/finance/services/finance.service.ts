@@ -3,7 +3,6 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -66,7 +65,7 @@ type MonthlyGoalContributionSummaryItem = {
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   getMyMonthlyFinance(memberId: string, period: RequiredFinancePeriodDto) {
     return this.prisma.memberMonthlyFinance.findUnique({
@@ -617,9 +616,9 @@ export class FinanceService {
     const entryDate =
       query.month !== undefined || query.year !== undefined
         ? this.periodRange(
-          query.month ?? new Date().getUTCMonth() + 1,
-          query.year ?? new Date().getUTCFullYear(),
-        )
+            query.month ?? new Date().getUTCMonth() + 1,
+            query.year ?? new Date().getUTCFullYear(),
+          )
         : undefined;
 
     const where: Prisma.LedgerEntryWhereInput = {
@@ -844,10 +843,10 @@ export class FinanceService {
           ),
           lines: dto.lines?.length
             ? {
-              create: dto.lines.map((line) =>
-                this.budgetLineCreateData(line),
-              ),
-            }
+                create: dto.lines.map((line) =>
+                  this.budgetLineCreateData(line),
+                ),
+              }
             : undefined,
         },
         include: {
@@ -1434,8 +1433,8 @@ export class FinanceService {
     return entries.reduce(
       (sum, entry) =>
         entryTypes.includes(entry.entryType) &&
-          (categoryId === undefined || entry.categoryId === categoryId) &&
-          (jarId === undefined || entry.jarId === jarId)
+        (categoryId === undefined || entry.categoryId === categoryId) &&
+        (jarId === undefined || entry.jarId === jarId)
           ? sum.plus(entry.amount)
           : sum,
       new Prisma.Decimal(0),

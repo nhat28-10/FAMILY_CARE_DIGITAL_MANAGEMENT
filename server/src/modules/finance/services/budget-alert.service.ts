@@ -17,6 +17,8 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
 } from '@prisma/client';
 
@@ -25,6 +27,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { BudgetAlertQueryDto } from '../dto/budget-alert-query.dto';
 import { RecomputeBudgetAlertsDto } from '../dto/recompute-budget-alerts.dto';
 import { ResolveBudgetAlertDto } from '../dto/resolve-budget-alert.dto';
@@ -48,7 +51,10 @@ type AlertCandidate = {
 
 @Injectable()
 export class BudgetAlertService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async listBudgetAlerts(
     familyId: string,
@@ -98,19 +104,20 @@ export class BudgetAlertService {
     });
     if (!alert) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y cáº£nh bÃ¡o tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy cảnh báo tài chính trong gia đình này',
       );
     }
     this.assertCanViewAlert(member.familyRole, alert);
     return alert;
   }
 
-  recomputeBudgetGoalAlerts(
+  async recomputeBudgetGoalAlerts(
     familyId: string,
     memberId: string,
     dto: RecomputeBudgetAlertsDto,
   ) {
-    return this.prisma.$transaction(
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const member = await this.getMemberInFamilyOrThrow(
           familyId,
@@ -149,14 +156,22 @@ export class BudgetAlertService {
             )),
           );
         }
-        return this.syncAlertCandidates(tx, familyId, candidates, {
-          ...dto,
-          periodStart: this.dateKey(period.start),
-          periodEnd: this.dateKey(period.end),
-        });
+        return this.syncAlertCandidates(
+          tx,
+          familyId,
+          candidates,
+          {
+            ...dto,
+            periodStart: this.dateKey(period.start),
+            periodEnd: this.dateKey(period.end),
+          },
+          pendingNotificationIds,
+        );
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   acknowledgeBudgetAlert(familyId: string, memberId: string, alertId: string) {
@@ -170,7 +185,7 @@ export class BudgetAlertService {
       const alert = await this.requireBudgetAlert(tx, familyId, alertId);
       if (alert.status === BudgetAlertStatus.RESOLVED) {
         throw new BadRequestException(
-          'KhÃ´ng thá»ƒ xÃ¡c nháº­n cáº£nh bÃ¡o Ä‘Ã£ Ä‘Æ°á»£c giáº£i quyáº¿t',
+          'Không thể xác nhận cảnh báo đã được giải quyết',
         );
       }
       if (alert.status === BudgetAlertStatus.ACKNOWLEDGED) return alert;
@@ -196,9 +211,7 @@ export class BudgetAlertService {
       this.assertCanManageAlerts(member.familyRole);
       const alert = await this.requireBudgetAlert(tx, familyId, alertId);
       if (alert.status === BudgetAlertStatus.RESOLVED) {
-        throw new ConflictException(
-          'Cáº£nh bÃ¡o tÃ i chÃ­nh Ä‘Ã£ Ä‘Æ°á»£c giáº£i quyáº¿t',
-        );
+        throw new ConflictException('Cảnh báo tài chính đã được giải quyết');
       }
       return tx.budgetAlert.update({
         where: { id: alert.id },
@@ -221,7 +234,7 @@ export class BudgetAlertService {
     });
     if (!member) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy thành viên đang hoạt động trong gia đình này',
       );
     }
     return member;
@@ -237,7 +250,7 @@ export class BudgetAlertService {
   private assertCanManageAlerts(familyRole: FamilyRole) {
     if (!this.isFinanceManager(familyRole)) {
       throw new ForbiddenException(
-        'KhÃ´ng cÃ³ quyá»n quáº£n lÃ½ cáº£nh bÃ¡o tÃ i chÃ­nh gia Ä‘Ã¬nh',
+        'Không có quyền quản lý cảnh báo tài chính gia đình',
       );
     }
   }
@@ -254,7 +267,7 @@ export class BudgetAlertService {
       (alert.jarId || alert.goal?.relatedJarId)
     ) {
       throw new ForbiddenException(
-        'KhÃ´ng cÃ³ quyá»n xem cáº£nh bÃ¡o tÃ i chÃ­nh gáº¯n vá»›i hÅ© riÃªng',
+        'Không có quyền xem cảnh báo tài chính gắn với hũ riêng',
       );
     }
   }
@@ -289,7 +302,7 @@ export class BudgetAlertService {
     });
     if (!alert) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y cáº£nh bÃ¡o tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy cảnh báo tài chính trong gia đình này',
       );
     }
     return alert;
@@ -349,7 +362,7 @@ export class BudgetAlertService {
       (!dto.periodStart && dto.periodEnd)
     ) {
       throw new BadRequestException(
-        'periodStart vÃ  periodEnd pháº£i Ä‘Æ°á»£c truyá»n cÃ¹ng nhau',
+        'periodStart và periodEnd phải được truyền cùng nhau',
       );
     }
     if (dto.periodStart && dto.periodEnd) {
@@ -491,7 +504,7 @@ export class BudgetAlertService {
           thresholdValue: goal.targetAmount,
           actualValue:
             progress.projectedAmountByDeadline ?? progress.currentAmount,
-          message: `Má»¥c tiÃªu ${goal.goalName} cÃ³ nguy cÆ¡ khÃ´ng Ä‘áº¡t Ä‘Ãºng háº¡n.`,
+          message: `Mục tiêu ${goal.goalName} có nguy cơ không đạt đúng hạn.`,
         });
       }
     }
@@ -548,7 +561,7 @@ export class BudgetAlertService {
         thresholdValue: item.thresholdLimit,
         actualValue: actual,
         message:
-          'Chi tiÃªu khÃ´ng thiáº¿t yáº¿u Ä‘Ã£ vÆ°á»£t ngÆ°á»¡ng cho phÃ©p trong ká»³ nÃ y.',
+          'Chi tiêu không thiết yếu đã vượt ngưỡng cho phép trong kỳ này.',
       }));
   }
 
@@ -578,13 +591,32 @@ export class BudgetAlertService {
       }));
   }
 
+  private async findAlertRecipientIds(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+  ) {
+    const recipients = await tx.familyMember.findMany({
+      where: {
+        familyId,
+        status: MemberStatus.ACTIVE,
+        familyRole: {
+          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+        },
+      },
+      select: { id: true },
+    });
+    return recipients.map((member) => member.id);
+  }
+
   private async syncAlertCandidates(
     tx: Prisma.TransactionClient,
     familyId: string,
     candidates: AlertCandidate[],
     dto: RecomputeBudgetAlertsDto,
+    pendingNotificationIds: string[] = [],
   ) {
     const activeKeys = candidates.map((candidate) => candidate.sourceKey);
+    let alertRecipientIds: string[] | null = null;
     for (const candidate of candidates) {
       const existing = await tx.budgetAlert.findFirst({
         where: {
@@ -608,8 +640,9 @@ export class BudgetAlertService {
       if (existing) {
         await tx.budgetAlert.update({ where: { id: existing.id }, data });
       } else {
+        let alert: { id: string } | null = null;
         try {
-          await tx.budgetAlert.create({
+          alert = await tx.budgetAlert.create({
             data: {
               familyId,
               sourceKey: candidate.sourceKey,
@@ -634,6 +667,23 @@ export class BudgetAlertService {
             throw error;
           }
           await tx.budgetAlert.update({ where: { id: raced.id }, data });
+        }
+        if (alert) {
+          alertRecipientIds ??= await this.findAlertRecipientIds(tx, familyId);
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            alertRecipientIds,
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.HIGH,
+              title: 'Cảnh báo ngân sách',
+              body: candidate.message,
+              referenceType: 'BUDGET_ALERT',
+              referenceId: alert.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
         }
       }
     }
@@ -686,7 +736,7 @@ export class BudgetAlertService {
     });
     if (!plan) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y káº¿ hoáº¡ch ngÃ¢n sÃ¡ch trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy kế hoạch ngân sách trong gia đình này',
       );
     }
     return plan;
@@ -703,7 +753,7 @@ export class BudgetAlertService {
     });
     if (!goal) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y má»¥c tiÃªu tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy mục tiêu tài chính trong gia đình này',
       );
     }
     return goal;
@@ -809,7 +859,7 @@ export class BudgetAlertService {
   private assertValidBudgetPeriod(periodStart: Date, periodEnd: Date) {
     if (periodEnd.getTime() < periodStart.getTime()) {
       throw new BadRequestException(
-        'NgÃ y káº¿t thÃºc ká»³ ngÃ¢n sÃ¡ch pháº£i lá»›n hÆ¡n hoáº·c báº±ng ngÃ y báº¯t Ä‘áº§u',
+        'Ngày kết thúc kỳ ngân sách phải lớn hơn hoặc bằng ngày bắt đầu',
       );
     }
   }

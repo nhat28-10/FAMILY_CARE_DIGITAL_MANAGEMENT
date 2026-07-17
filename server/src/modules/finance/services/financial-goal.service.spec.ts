@@ -27,7 +27,7 @@ describe('FinancialGoalService financial goals', () => {
   const goalId = 'goal-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let financialGoalService: FinancialGoalService;
 
   beforeAll(() => {
@@ -286,7 +286,7 @@ describe('FinancialGoalService financial goals', () => {
     tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
     tx.financialGoal.update.mockResolvedValue(goal);
 
-    const result = await service.createGoalAllocation(
+    const result = await financialGoalService.createGoalAllocation(
       familyId,
       memberId,
       goalId,
@@ -315,11 +315,13 @@ describe('FinancialGoalService financial goals', () => {
       amount: new Prisma.Decimal(25),
     });
     tx.goalAllocation.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: null } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(25) } });
+      .mockResolvedValueOnce({ _sum: { amount: null } }) // ledger-entry availability check
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // allocatedBefore
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(25) } }); // allocatedAfter (refreshGoalStatus)
     tx.goalAllocation.create.mockResolvedValue({
       id: 'allocation-id',
       ledgerEntryId: 'generated-entry-id',
+      amount: new Prisma.Decimal(25),
     });
     tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
 
@@ -769,7 +771,7 @@ describe('FinancialGoalService financial goals', () => {
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
     notifications.notify.mockResolvedValue({ ids: ['shortage-notif-id'] });
 
-    const result = await service.listGoalContributionPlans(
+    const result = await financialGoalService.listGoalContributionPlans(
       familyId,
       memberId,
       goalId,
@@ -1054,7 +1056,7 @@ describe('FinancialGoalService financial goals', () => {
     tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
     notifications.notify.mockResolvedValue({ ids: ['milestone-notif-id'] });
 
-    await service.approveGoalContributionPlan(
+    await financialGoalService.approveGoalContributionPlan(
       familyId,
       memberId,
       goalId,
@@ -1118,7 +1120,7 @@ describe('FinancialGoalService financial goals', () => {
     expect(tx.financeLedger.upsert).not.toHaveBeenCalled();
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
     expect(tx.goalAllocation.create).not.toHaveBeenCalled();
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('prevents a normal member from approving contribution plans', async () => {

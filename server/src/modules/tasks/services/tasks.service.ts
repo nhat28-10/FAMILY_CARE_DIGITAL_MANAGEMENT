@@ -41,6 +41,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { CreateTaskCategoryDto } from '../dto/create-task-category.dto';
@@ -623,10 +624,13 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
     @Optional() private readonly storage?: StorageService,
-  ) { }
+  ) {}
 
   async uploadTaskProofFile(
     familyId: string,
@@ -996,13 +1000,13 @@ export class TasksService {
       assignmentCandidates.length === 0
         ? []
         : await this.prisma.taskAssignment.findMany({
-          where: {
-            taskId,
-            assignedToMemberId: dto.assignedToMemberId,
-            dueAt: { in: assignmentCandidates.map((item) => item.dueAt) },
-          },
-          select: { dueAt: true },
-        });
+            where: {
+              taskId,
+              assignedToMemberId: dto.assignedToMemberId,
+              dueAt: { in: assignmentCandidates.map((item) => item.dueAt) },
+            },
+            select: { dueAt: true },
+          });
     const existingDueAtTimes = new Set(
       existingAssignments
         .filter((assignment) => assignment.dueAt)
@@ -1038,10 +1042,10 @@ export class TasksService {
       createdAssignmentIds.length === 0
         ? []
         : await this.prisma.taskAssignment.findMany({
-          where: { id: { in: createdAssignmentIds } },
-          select: assignmentResponseSelect,
-          orderBy: { dueAt: 'asc' },
-        });
+            where: { id: { in: createdAssignmentIds } },
+            select: assignmentResponseSelect,
+            orderBy: { dueAt: 'asc' },
+          });
 
     return {
       task: {
@@ -3756,15 +3760,15 @@ export class TasksService {
       allocatedAt: allocation.allocatedAt,
       jar: allocation.jar
         ? {
-          id: allocation.jar.id,
-          name: allocation.jar.name,
-        }
+            id: allocation.jar.id,
+            name: allocation.jar.name,
+          }
         : null,
       goal: allocation.goal
         ? {
-          id: allocation.goal.id,
-          goalName: allocation.goal.goalName,
-        }
+            id: allocation.goal.id,
+            goalName: allocation.goal.goalName,
+          }
         : null,
       allocatedByMember: this.mapUnavailabilityMember(
         allocation.allocatedByMember,

@@ -884,7 +884,7 @@ export class FinanceReportService {
   private assertValidBudgetPeriod(periodStart: Date, periodEnd: Date) {
     if (periodEnd.getTime() < periodStart.getTime()) {
       throw new BadRequestException(
-        'NgÃ y káº¿t thÃºc ká»³ ngÃ¢n sÃ¡ch pháº£i lá»›n hÆ¡n hoáº·c báº±ng ngÃ y báº¯t Ä‘áº§u',
+        'Ngày kết thúc kỳ ngân sách phải lớn hơn hoặc bằng ngày bắt đầu',
       );
     }
   }

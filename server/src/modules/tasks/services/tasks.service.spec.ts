@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
   MemberStatus,
+  NotificationType,
   TaskAssignmentStatus,
   TaskPriority,
   TaskProofType,
@@ -24,7 +25,13 @@ describe('TasksService listTaskSubmissions', () => {
 
   let prisma: {
     $transaction: jest.Mock;
-    taskAssignment: { findFirst: jest.Mock };
+    task: { findFirst: jest.Mock };
+    familyMember: { findFirst: jest.Mock };
+    taskAssignment: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+    };
     taskSubmission: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
@@ -289,6 +296,7 @@ describe('TasksService listTaskSubmissions', () => {
     };
     service = new TasksService(
       prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
       storage as never,
     );
     prisma.taskSubmission.findFirst.mockResolvedValue(
@@ -392,7 +400,14 @@ describe('TasksService createTaskAssignment', () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue(assignmentResponse()),
       },
     };
-    service = new TasksService(prisma as unknown as PrismaService);
+    service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
   });
 
   it('assigns an ad hoc task to an active family member by FamilyMember id regardless of role', async () => {

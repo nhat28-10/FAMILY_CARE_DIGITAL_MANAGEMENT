@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { BudgetAlertService } from './budget-alert.service';
 import { FinanceReportService } from './finance-report.service';
 
@@ -18,6 +19,7 @@ describe('BudgetAlertService budget alerts', () => {
   const memberId = 'member-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let service: BudgetAlertService;
 
   beforeEach(() => {
@@ -42,7 +44,14 @@ describe('BudgetAlertService budget alerts', () => {
       familyMember: { findFirst: jest.fn() },
       budgetAlert: { findFirst: jest.fn() },
     };
-    service = new BudgetAlertService(prisma as unknown as PrismaService);
+    notifications = {
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new BudgetAlertService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
   });
 
   it('does not let normal members view jar-linked alerts', async () => {
