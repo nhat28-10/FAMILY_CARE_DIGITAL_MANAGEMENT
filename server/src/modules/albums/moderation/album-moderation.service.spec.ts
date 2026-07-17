@@ -84,6 +84,7 @@ function member(id: string, role: FamilyRole) {
     familyRole: role,
     relationship: Relationship.OTHER,
     status: MemberStatus.ACTIVE,
+    locationSharingEnabled: false,
     joinedAt: now,
     leftAt: null,
     createdAt: now,

@@ -143,7 +143,8 @@ export class SosController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Đã gửi phản hồi')
   @ApiOperation({
-    summary: 'Phản hồi cảnh báo SOS (VIEWED / CONFIRM_SAFE / NEED_HELP)',
+    summary:
+      'Phản hồi cảnh báo SOS (VIEWED / ON_THE_WAY / CONFIRM_SAFE / NEED_HELP)',
   })
   respond(
     @Param('familyId') familyId: string,

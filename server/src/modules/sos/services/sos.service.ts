@@ -8,6 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import {
+  FamilyRole,
   NotificationPriority,
   NotificationType,
   Prisma,
@@ -20,6 +21,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { FamilyMembersService } from '../../family-members/family-members.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SosGateway } from '../sos.gateway';
+import { SosSettingsService } from './sos-settings.service';
 import type { CreateSosAlertDto } from '../dto/create-sos-alert.dto';
 import type { CreateSosResponseDto } from '../dto/create-sos-response.dto';
 import type { ListSosAlertQueryDto } from '../dto/list-sos-alert-query.dto';
@@ -34,7 +36,13 @@ const memberSummary = {
     displayName: true,
     familyRole: true,
     user: {
-      select: { id: true, fullName: true, email: true, avatarUrl: true },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+      },
     },
   },
 } satisfies Prisma.FamilyMemberDefaultArgs;
@@ -53,12 +61,19 @@ const alertInclude = {
 /** Response types a regular member may submit via the respond endpoint. */
 const MEMBER_RESPONSE_TYPES: SosResponseType[] = [
   SosResponseType.VIEWED,
+  SosResponseType.ON_THE_WAY,
   SosResponseType.CONFIRM_SAFE,
   SosResponseType.NEED_HELP,
 ];
 
 /** Suggested GPS reporting cadence pushed to the trigger device on SOS start. */
 const SOS_TRACK_INTERVAL_SEC = 5;
+
+/** Recipients when `notifyAllMembers` is off: only family management. */
+const MANAGER_NOTIFY_ROLES: FamilyRole[] = [
+  FamilyRole.FAMILY_MANAGER,
+  FamilyRole.DEPUTY_MEMBER,
+];
 
 @Injectable()
 export class SosService {
@@ -71,18 +86,67 @@ export class SosService {
     // SosGateway also depends on SosService (WS ingest) — break the cycle.
     @Inject(forwardRef(() => SosGateway))
     private readonly sosGateway: SosGateway,
+    private readonly sosSettingsService: SosSettingsService,
   ) {}
 
   // ---------------------------------------------------------------------------
   // Trigger + read
   // ---------------------------------------------------------------------------
 
-  async trigger(workspaceId: string, memberId: string, dto: CreateSosAlertDto) {
+  async trigger(
+    workspaceId: string,
+    memberId: string,
+    dto: CreateSosAlertDto,
+    deviceId?: string,
+  ) {
+    const settings = await this.sosSettingsService.getEffective(workspaceId);
+    if (!settings.isEnabled) {
+      throw new BadRequestException('Tính năng SOS của gia đình đang bị tắt');
+    }
+
+    // Nút SOS bấm lặp (hoảng loạn) phải idempotent: đã có cảnh báo ACTIVE của
+    // chính thành viên → trả về cảnh báo đó, không tạo mới / không spam
+    // notification. Chỉ nhắc lại thiết bị tiếp tục stream GPS.
+    const existing = await this.prisma.sosAlert.findFirst({
+      where: {
+        workspaceId,
+        triggeredByMemberId: memberId,
+        status: SosAlertStatus.ACTIVE,
+      },
+      include: alertInclude,
+      orderBy: { triggeredAt: 'desc' },
+    });
+    if (existing) {
+      this.sosGateway.emitToUser(
+        existing.triggeredByMember.user.id,
+        'sos:track:start',
+        {
+          alertId: existing.id,
+          workspaceId,
+          intervalSec: SOS_TRACK_INTERVAL_SEC,
+        },
+      );
+      return existing;
+    }
+
+    const sourceType = dto.sourceType ?? SosSourceType.MOBILE_APP;
+    // Wearable/simulated triggers are exempt: the device may have no GPS fix.
+    if (
+      settings.locationRequired &&
+      sourceType === SosSourceType.MOBILE_APP &&
+      (dto.initialLatitude == null || dto.initialLongitude == null)
+    ) {
+      throw new BadRequestException(
+        'Gia đình yêu cầu vị trí ban đầu khi kích hoạt SOS',
+      );
+    }
+
     const alert = await this.prisma.sosAlert.create({
       data: {
         workspaceId,
         triggeredByMemberId: memberId,
-        sourceType: dto.sourceType ?? SosSourceType.MOBILE_APP,
+        deviceId: deviceId ?? null,
+        sourceType,
         severity: dto.severity ?? null,
         initialLatitude: dto.initialLatitude ?? null,
         initialLongitude: dto.initialLongitude ?? null,
@@ -91,14 +155,19 @@ export class SosService {
       include: alertInclude,
     });
 
-    // High-priority fan-out to every other member of the workspace.
-    // Best-effort: alert đã được tạo thành công, lỗi gửi thông báo
+    // High-priority fan-out to the other members (or only management when
+    // notifyAllMembers is off). Alert đã tạo thành công — lỗi thông báo ở đây
     // không được phép biến một thao tác đã thành công thành lỗi 5xx.
     try {
       const members = await this.familyMembersService.listByFamily(workspaceId);
       const recipientIds = members
-        .map((member) => member.id)
-        .filter((id) => id !== memberId);
+        .filter(
+          (member) =>
+            member.id !== memberId &&
+            (settings.notifyAllMembers ||
+              MANAGER_NOTIFY_ROLES.includes(member.familyRole)),
+        )
+        .map((member) => member.id);
       const triggeredByName =
         alert.triggeredByMember.displayName ??
         alert.triggeredByMember.user.fullName ??
@@ -328,7 +397,7 @@ export class SosService {
       workspaceId,
       alertId,
       memberId,
-      SosAlertStatus.RESOLVED,
+      dto.isFalseAlarm ? SosAlertStatus.FALSE_ALARM : SosAlertStatus.RESOLVED,
       SosResponseType.RESOLVED,
       dto.resolutionNote,
     );

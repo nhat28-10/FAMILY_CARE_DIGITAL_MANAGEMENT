@@ -458,6 +458,8 @@ model FamilyMember {
   relationship Relationship @default(OTHER)
   /// ERD: member_status.
   status       MemberStatus @default(ACTIVE)
+  /// Opt-in daily location sharing on the family map (separate from SOS tracking).
+  locationSharingEnabled Boolean @default(false) @map("location_sharing_enabled")
   joinedAt     DateTime     @default(now())
   /// ERD: left_at — set when the member leaves/is removed.
   leftAt       DateTime?
@@ -1240,6 +1242,7 @@ enum SosSeverity {
 /// Type of member response to a SOS alert.
 enum SosResponseType {
   VIEWED
+  ON_THE_WAY
   CONFIRM_SAFE
   NEED_HELP
   RESOLVED

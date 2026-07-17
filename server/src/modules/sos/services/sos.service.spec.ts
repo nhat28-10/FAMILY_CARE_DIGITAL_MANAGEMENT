@@ -1,11 +1,25 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { GpsSourceType, SosAlertStatus } from '@prisma/client';
+import {
+  FamilyRole,
+  GpsSourceType,
+  SosAlertStatus,
+  SosResponseType,
+  SosSourceType,
+} from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FamilyMembersService } from '../../family-members/family-members.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SosGateway } from '../sos.gateway';
 import { SosService } from './sos.service';
+import { SosSettingsService } from './sos-settings.service';
+
+const defaultSettings = {
+  isEnabled: true,
+  notifyAllMembers: true,
+  autoCreateAlertFromFall: false,
+  locationRequired: true,
+};
 
 describe('SosService location tracking', () => {
   const workspaceId = 'family-id';
@@ -33,15 +47,24 @@ describe('SosService location tracking', () => {
       createMany: jest.Mock;
       findFirst: jest.Mock;
     };
+    sosResponse: { create: jest.Mock };
     wearableDevice: { count: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let tx: {
+    sosAlert: { update: jest.Mock };
+    sosResponse: { create: jest.Mock };
   };
   let gateway: {
     emitLocation: jest.Mock;
     emitNewAlert: jest.Mock;
+    emitResolved: jest.Mock;
+    emitResponse: jest.Mock;
     emitToUser: jest.Mock;
   };
   let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let familyMembers: { listByFamily: jest.Mock };
+  let settings: { getEffective: jest.Mock };
   let service: SosService;
 
   beforeEach(() => {
@@ -52,11 +75,22 @@ describe('SosService location tracking', () => {
         createMany: jest.fn(),
         findFirst: jest.fn(),
       },
+      sosResponse: { create: jest.fn() },
       wearableDevice: { count: jest.fn() },
+      $transaction: jest.fn(),
     };
+    tx = {
+      sosAlert: { update: jest.fn() },
+      sosResponse: { create: jest.fn() },
+    };
+    prisma.$transaction.mockImplementation(
+      (fn: (client: typeof tx) => Promise<unknown>) => fn(tx),
+    );
     gateway = {
       emitLocation: jest.fn(),
       emitNewAlert: jest.fn(),
+      emitResolved: jest.fn(),
+      emitResponse: jest.fn(),
       emitToUser: jest.fn(),
     };
     notifications = {
@@ -64,11 +98,15 @@ describe('SosService location tracking', () => {
       dispatch: jest.fn().mockResolvedValue(undefined),
     };
     familyMembers = { listByFamily: jest.fn().mockResolvedValue([]) };
+    settings = {
+      getEffective: jest.fn().mockResolvedValue(defaultSettings),
+    };
     service = new SosService(
       prisma as unknown as PrismaService,
       notifications as unknown as NotificationsService,
       familyMembers as unknown as FamilyMembersService,
       gateway as unknown as SosGateway,
+      settings as unknown as SosSettingsService,
     );
   });
 
@@ -194,7 +232,10 @@ describe('SosService location tracking', () => {
       { id: otherMemberId },
     ]);
 
-    const result = await service.trigger(workspaceId, triggerMemberId, {});
+    const result = await service.trigger(workspaceId, triggerMemberId, {
+      initialLatitude: 10.762622,
+      initialLongitude: 106.660172,
+    });
 
     expect(result).toEqual(expect.objectContaining({ id: alertId }));
     expect(result).not.toHaveProperty('sosAlertId');
@@ -225,6 +266,194 @@ describe('SosService location tracking', () => {
       alert: expect.objectContaining({ id: alertId }),
       lastLocation: expect.objectContaining({ id: 'p1' }),
     });
+  });
+
+  it('returns the existing ACTIVE alert instead of creating a duplicate', async () => {
+    const existing = {
+      id: alertId,
+      status: SosAlertStatus.ACTIVE,
+      triggeredByMember: {
+        id: triggerMemberId,
+        displayName: 'Người A',
+        user: { id: 'user-1', fullName: 'Người A' },
+      },
+    };
+    prisma.sosAlert.findFirst.mockResolvedValue(existing);
+
+    // Không kèm tọa độ dù locationRequired đang bật: nút bấm lặp phải trả về
+    // alert đang có thay vì rơi vào validate vị trí.
+    const result = await service.trigger(workspaceId, triggerMemberId, {});
+
+    expect(result).toEqual(expect.objectContaining({ id: alertId }));
+    expect(prisma.sosAlert.create).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
+    expect(gateway.emitNewAlert).not.toHaveBeenCalled();
+    // Vẫn nhắc thiết bị của người kích hoạt tiếp tục stream GPS.
+    expect(gateway.emitToUser).toHaveBeenCalledWith(
+      'user-1',
+      'sos:track:start',
+      expect.objectContaining({ alertId, workspaceId }),
+    );
+  });
+
+  it('blocks manual trigger when the family disabled SOS', async () => {
+    settings.getEffective.mockResolvedValue({
+      ...defaultSettings,
+      isEnabled: false,
+    });
+
+    await expect(
+      service.trigger(workspaceId, triggerMemberId, {
+        initialLatitude: 10.762622,
+        initialLongitude: 106.660172,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.sosAlert.create).not.toHaveBeenCalled();
+  });
+
+  it('requires initial coordinates for app triggers when locationRequired is on', async () => {
+    await expect(
+      service.trigger(workspaceId, triggerMemberId, {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.sosAlert.create).not.toHaveBeenCalled();
+  });
+
+  it('allows wearable triggers without coordinates even when locationRequired', async () => {
+    prisma.sosAlert.create.mockResolvedValue({
+      id: alertId,
+      triggeredByMember: {
+        id: triggerMemberId,
+        displayName: 'Người A',
+        user: { id: 'user-1', fullName: 'Người A' },
+      },
+    });
+
+    await expect(
+      service.trigger(workspaceId, triggerMemberId, {
+        sourceType: SosSourceType.WEARABLE,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ id: alertId }));
+  });
+
+  it('notifies only managers/deputies when notifyAllMembers is off', async () => {
+    settings.getEffective.mockResolvedValue({
+      ...defaultSettings,
+      notifyAllMembers: false,
+      locationRequired: false,
+    });
+    prisma.sosAlert.create.mockResolvedValue({
+      id: alertId,
+      triggeredByMember: {
+        id: triggerMemberId,
+        displayName: 'Người A',
+        user: { id: 'user-1', fullName: 'Người A' },
+      },
+    });
+    familyMembers.listByFamily.mockResolvedValue([
+      { id: triggerMemberId, familyRole: FamilyRole.FAMILY_MANAGER },
+      { id: 'member-deputy', familyRole: FamilyRole.DEPUTY_MEMBER },
+      { id: otherMemberId, familyRole: FamilyRole.FAMILY_MEMBER },
+    ]);
+
+    await service.trigger(workspaceId, triggerMemberId, {});
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      workspaceId,
+      ['member-deputy'],
+      expect.objectContaining({ referenceId: alertId }),
+    );
+  });
+
+  it('marks the alert FALSE_ALARM when the manager flags it on resolve', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    const closed = {
+      id: alertId,
+      status: SosAlertStatus.FALSE_ALARM,
+      resolvedByMember: { id: otherMemberId },
+      resolutionNote: 'Bấm nhầm',
+      triggeredByMember: { user: { id: 'user-1' } },
+    };
+    tx.sosAlert.update.mockResolvedValue(closed);
+
+    const result = await service.resolve(workspaceId, alertId, otherMemberId, {
+      resolutionNote: 'Bấm nhầm',
+      isFalseAlarm: true,
+    });
+
+    expect(tx.sosAlert.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: SosAlertStatus.FALSE_ALARM,
+        }),
+      }),
+    );
+    expect(result.status).toBe(SosAlertStatus.FALSE_ALARM);
+    expect(gateway.emitResolved).toHaveBeenCalledWith(
+      workspaceId,
+      expect.objectContaining({ status: SosAlertStatus.FALSE_ALARM }),
+    );
+  });
+
+  it('keeps RESOLVED as the default close status', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    tx.sosAlert.update.mockResolvedValue({
+      id: alertId,
+      status: SosAlertStatus.RESOLVED,
+      resolvedByMember: { id: otherMemberId },
+      resolutionNote: null,
+      triggeredByMember: { user: { id: 'user-1' } },
+    });
+
+    await service.resolve(workspaceId, alertId, otherMemberId, {});
+
+    const data = tx.sosAlert.update.mock.calls[0][0].data as {
+      status: SosAlertStatus;
+    };
+    expect(data.status).toBe(SosAlertStatus.RESOLVED);
+  });
+
+  it('accepts ON_THE_WAY as a member response type', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    prisma.sosResponse.create.mockResolvedValue({
+      id: 'r1',
+      responseType: SosResponseType.ON_THE_WAY,
+    });
+
+    const response = await service.respond(
+      workspaceId,
+      alertId,
+      otherMemberId,
+      { responseType: SosResponseType.ON_THE_WAY },
+    );
+
+    expect(response).toEqual(
+      expect.objectContaining({ responseType: SosResponseType.ON_THE_WAY }),
+    );
+    expect(gateway.emitResponse).toHaveBeenCalledWith(
+      workspaceId,
+      expect.objectContaining({ sosAlertId: alertId }),
+    );
+  });
+
+  it('embeds the responder phone in alert detail member summaries', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue({ id: alertId });
+
+    await service.getAlert(workspaceId, alertId);
+
+    const include = prisma.sosAlert.findFirst.mock.calls[0][0].include as {
+      triggeredByMember: { select: { user: { select: { phone?: boolean } } } };
+      responses: {
+        include: {
+          responderMember: {
+            select: { user: { select: { phone?: boolean } } };
+          };
+        };
+      };
+    };
+    expect(include.triggeredByMember.select.user.select.phone).toBe(true);
+    expect(
+      include.responses.include.responderMember.select.user.select.phone,
+    ).toBe(true);
   });
 
   it('returns null snapshot when no alert is active', async () => {

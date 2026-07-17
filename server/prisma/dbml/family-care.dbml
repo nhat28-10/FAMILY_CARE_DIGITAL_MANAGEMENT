@@ -22,6 +22,7 @@ Table users {
   updatedAt DateTime [not null]
   memberships family_members [not null]
   refreshTokens refresh_tokens [not null]
+  deviceTokens device_tokens [not null]
   passwordResetTokens password_reset_tokens [not null]
   emailVerificationTokens email_verification_tokens [not null]
   joinRequests join_requests [not null]
@@ -134,6 +135,7 @@ Table family_members {
   familyRole FamilyRole [not null, default: 'FAMILY_MEMBER']
   relationship Relationship [not null, default: 'OTHER']
   status MemberStatus [not null, default: 'ACTIVE', note: 'ERD: member_status.']
+  locationSharingEnabled Boolean [not null, default: false, note: 'Opt-in daily location sharing on the family map (separate from SOS tracking).']
   joinedAt DateTime [default: `now()`, not null]
   leftAt DateTime [note: 'ERD: left_at — set when the member leaves/is removed.']
   createdAt DateTime [default: `now()`, not null]
@@ -594,6 +596,7 @@ Table task_assignments {
   assignedAt DateTime [default: `now()`, not null]
   startAt DateTime
   dueAt DateTime
+  reminderSentAt DateTime
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   task tasks [not null]
@@ -882,6 +885,19 @@ Table notifications {
   Note: 'Shared in-app notifications (reused across modules; SOS uses type=SOS).'
 }
 
+Table device_tokens {
+  id String [pk]
+  userId String [not null]
+  token String [unique, not null]
+  platform DevicePlatform [not null]
+  deviceName String
+  lastSeenAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+
+  Note: 'Thiết bị nhận FCM push — gắn theo USER (nhận noti của mọi family mình tham gia).'
+}
+
 Table workspace_provisioning_logs {
   id String [pk]
   workspaceId String [not null]
@@ -1027,6 +1043,7 @@ Table calendar_event_participants {
   memberId String [not null]
   responseStatus EventResponseStatus [not null, default: 'INVITED']
   reminderEnabled Boolean [not null, default: true]
+  reminderSentAt DateTime
   event calendar_events [not null]
   member family_members [not null]
 
@@ -1562,6 +1579,7 @@ Enum SosSeverity {
 
 Enum SosResponseType {
   VIEWED
+  ON_THE_WAY
   CONFIRM_SAFE
   NEED_HELP
   RESOLVED
@@ -1598,6 +1616,12 @@ Enum NotificationType {
   SOS
   GENERAL
   ALBUM_TAG
+  JOIN_REQUEST
+  MEMBER
+  TASK
+  CALENDAR
+  FINANCE
+  CHAT
 }
 
 Enum NotificationPriority {
@@ -1605,6 +1629,12 @@ Enum NotificationPriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+Enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
 }
 
 Enum ProvisioningActionType {
@@ -1932,6 +1962,8 @@ Ref: member_location_points.deviceId > wearable_devices.id [delete: Set Null]
 Ref: notifications.familyId > families.id [delete: Cascade]
 
 Ref: notifications.recipientMemberId > family_members.id [delete: Cascade]
+
+Ref: device_tokens.userId > users.id [delete: Cascade]
 
 Ref: workspace_provisioning_logs.workspaceId > families.id [delete: Cascade]
 

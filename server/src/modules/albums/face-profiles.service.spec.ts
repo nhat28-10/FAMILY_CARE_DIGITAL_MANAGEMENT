@@ -40,6 +40,7 @@ function member(
     familyRole,
     relationship: Relationship.OTHER,
     status,
+    locationSharingEnabled: false,
     joinedAt: now,
     leftAt: null,
     createdAt: now,

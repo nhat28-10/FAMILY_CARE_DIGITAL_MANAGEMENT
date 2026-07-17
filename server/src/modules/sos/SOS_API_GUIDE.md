@@ -50,7 +50,16 @@ resolve/cancel.
 ## 2. REST Endpoints (base: `/api/v1/families/:familyId/sos`)
 
 ### 2.1 Kích hoạt SOS
-`POST /alerts` — mọi field đều optional:
+`POST /alerts` — mọi field đều optional, **trừ khi** cài đặt gia đình bật
+`locationRequired` (mặc định **bật**): khi đó kích hoạt từ app (`sourceType`
+`MOBILE_APP`) bắt buộc gửi `initialLatitude` + `initialLongitude` (400 nếu thiếu).
+Nguồn `WEARABLE`/`SIMULATED_DEVICE` được miễn (thiết bị có thể chưa có GPS fix).
+Nếu gia đình tắt SOS (`isEnabled=false`) → 400 `"Tính năng SOS của gia đình đang bị tắt"`.
+
+**Bấm lặp là idempotent**: nếu bạn đang có cảnh báo ACTIVE, `POST /alerts` trả về
+**cảnh báo đang có** (không tạo mới, không gửi lại notification cho cả nhà) và
+re-emit `sos:track:start` cho thiết bị của bạn → FE cứ dùng `data.id` nhận được,
+không cần phân biệt mới/cũ.
 
 ```json
 {
@@ -68,6 +77,33 @@ resolve/cancel.
 
 Side-effect: mọi thành viên khác nhận notification CRITICAL (in-app) + sự kiện
 socket `sos:new`; thiết bị người kích hoạt nhận `sos:track:start` (mục 3.3).
+Nếu cài đặt `notifyAllMembers=false` → chỉ `FAMILY_MANAGER`/`DEPUTY_MEMBER` nhận notification.
+
+### 2.1b Cài đặt SOS & danh bạ khẩn cấp
+
+- `GET /settings` — cài đặt SOS của gia đình (tự tạo mặc định lần đầu):
+  `{ isEnabled, notifyAllMembers, autoCreateAlertFromFall, locationRequired }`.
+- `PATCH /settings` — cập nhật (chỉ MANAGER/DEPUTY), body là các field trên (optional từng field).
+- `GET /emergency-contacts` — danh bạ khẩn cấp (mọi thành viên; sắp theo `priorityOrder`).
+- `POST /emergency-contacts` — thêm (MANAGER/DEPUTY): `{ contactName, phoneNumber, relationshipNote?, priorityOrder?, isActive? }`.
+- `PATCH /emergency-contacts/:contactId` / `DELETE /emergency-contacts/:contactId` — sửa/xóa (MANAGER/DEPUTY).
+
+### 2.1c Thiết bị đeo & sự kiện cảm biến (base: `/api/v1/families/:familyId/wearables`)
+
+- `GET /` — danh sách thiết bị của gia đình (kèm `ownerMember`).
+- `POST /` — ghép nối thiết bị cho chính mình: `{ deviceName, deviceType, deviceIdentifier, gpsEnabled?, sosEnabled? }`.
+  Kèm `ownerMemberId` = ghép hộ thành viên khác (chỉ MANAGER/DEPUTY).
+  Ràng buộc: mỗi thành viên chỉ có **1 thiết bị SOS đang ghép nối** (409 nếu trùng);
+  `deviceIdentifier` duy nhất trong gia đình.
+- `PATCH /:deviceId` — đổi tên/bật tắt GPS-SOS/`pairingStatus` (`UNPAIRED` = gỡ, `LOST` = báo mất) — chủ thiết bị hoặc MANAGER/DEPUTY.
+- `DELETE /:deviceId` — xóa thiết bị (chủ hoặc MANAGER/DEPUTY).
+- `POST /:deviceId/events` — thiết bị gửi sự kiện cảm biến (**chỉ chủ thiết bị**):
+  `{ eventType: SOS_BUTTON_PRESSED|FALL_DETECTED|HARD_IMPACT|ABNORMAL_MOVEMENT, severity?, rawValue?, detectedAt? }`.
+  Tự tạo cảnh báo SOS khi: `SOS_BUTTON_PRESSED` (luôn, nếu thiết bị `sosEnabled` + gia đình bật SOS)
+  hoặc `FALL_DETECTED` (thêm điều kiện cài đặt `autoCreateAlertFromFall=true`).
+  Không tạo trùng khi chủ thiết bị đang có cảnh báo ACTIVE. Response:
+  `{ event, alertId, alertCreated }`.
+- `GET /:deviceId/events` — 50 sự kiện gần nhất.
 
 ### 2.2 Danh sách / chi tiết
 - `GET /alerts?status=ACTIVE` — lịch sử cảnh báo (lọc `ACTIVE|RESOLVED|CANCELED|FALSE_ALARM`).
@@ -121,14 +157,17 @@ Lỗi thường gặp: `403` không phải người kích hoạt / thiết bị 
 **không đóng** cảnh báo (đóng vẫn cần manager resolve).
 
 ### 2.7 Đóng cảnh báo (MANAGER / DEPUTY)
-- `PATCH /alerts/:alertId/resolve` — xử lý xong.
-- `PATCH /alerts/:alertId/cancel` — hủy (báo nhầm...).
+- `PATCH /alerts/:alertId/resolve` — xử lý xong (→ `RESOLVED`, hoặc `FALSE_ALARM` nếu kèm cờ).
+- `PATCH /alerts/:alertId/cancel` — hủy (→ `CANCELED`; bỏ qua `isFalseAlarm`).
 
 ```json
-{ "resolutionNote": "Đã xác nhận thành viên an toàn" }   // optional
+{
+  "resolutionNote": "Đã xác nhận thành viên an toàn",  // optional
+  "isFalseAlarm": true                                  // optional — resolve với trạng thái FALSE_ALARM (báo động giả)
+}
 ```
 
-Side-effect: cả room nhận `sos:resolved`; thiết bị người kích hoạt nhận `sos:track:stop`.
+Side-effect: cả room nhận `sos:resolved` (kèm `status` cuối); thiết bị người kích hoạt nhận `sos:track:stop`.
 
 ---
 
