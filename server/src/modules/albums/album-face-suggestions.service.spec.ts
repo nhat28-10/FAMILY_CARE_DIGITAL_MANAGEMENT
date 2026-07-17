@@ -45,6 +45,7 @@ function member(
     familyRole: role,
     relationship: Relationship.OTHER,
     status,
+    locationSharingEnabled: false,
     joinedAt: now,
     leftAt: null,
     createdAt: now,
@@ -162,7 +163,7 @@ describe('AlbumFaceSuggestionsService', () => {
   let queue: { pushFaceScanJob: jest.Mock };
   let storage: { downloadFileByKey: jest.Mock };
   let faceAi: { detectFaces: jest.Mock };
-  let notifications: { createForMembers: jest.Mock };
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let crypto: FaceEmbeddingCryptoService;
 
   beforeEach(() => {
@@ -222,7 +223,8 @@ describe('AlbumFaceSuggestionsService', () => {
       }),
     };
     notifications = {
-      createForMembers: jest.fn().mockResolvedValue({ count: 1 }),
+      notify: jest.fn().mockResolvedValue({ ids: ['notif-1'] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
     };
     crypto = new FaceEmbeddingCryptoService({
       get: jest.fn(() => 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='),
@@ -436,15 +438,16 @@ describe('AlbumFaceSuggestionsService', () => {
         data: expect.objectContaining({ taggedMemberId: 'target' }),
       }),
     );
-    expect(notifications.createForMembers).toHaveBeenCalledWith(
+    expect(notifications.notify).toHaveBeenCalledWith(
       'family-1',
       ['target'],
       expect.objectContaining({ type: NotificationType.ALBUM_TAG }),
-      prisma,
+      { tx: prisma },
     );
+    expect(notifications.dispatch).toHaveBeenCalledWith(['notif-1']);
 
     prisma.albumMediaTag.create.mockClear();
-    notifications.createForMembers.mockClear();
+    notifications.notify.mockClear();
     prisma.albumMediaTag.findUnique.mockResolvedValue({ tagId: 'tag-1' });
     await service.confirmSuggestion(
       'family-1',
@@ -453,7 +456,7 @@ describe('AlbumFaceSuggestionsService', () => {
       member('requester'),
     );
     expect(prisma.albumMediaTag.create).not.toHaveBeenCalled();
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
   it('rejects a pending suggestion without creating tag or notification', async () => {
@@ -472,6 +475,6 @@ describe('AlbumFaceSuggestionsService', () => {
 
     expect(result.status).toBe(AlbumTagSuggestionStatus.REJECTED);
     expect(prisma.albumMediaTag.create).not.toHaveBeenCalled();
-    expect(notifications.createForMembers).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });

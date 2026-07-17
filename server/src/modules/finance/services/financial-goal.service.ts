@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -67,6 +68,8 @@ const GOAL_ELIGIBLE_ENTRY_TYPES = [
 
 @Injectable()
 export class FinancialGoalService {
+  private readonly logger = new Logger(FinancialGoalService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -167,9 +170,7 @@ export class FinancialGoalService {
       this.assertCanManageGoal(member.familyRole);
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       if (goal.status === FinancialGoalStatus.CANCELED) {
-        throw new ConflictException(
-          'KhÃ´ng thá»ƒ cáº­p nháº­t má»¥c tiÃªu Ä‘Ã£ bá»‹ há»§y',
-        );
+        throw new ConflictException('Không thể cập nhật mục tiêu đã bị hủy');
       }
       this.assertFinancialGoalValues(
         dto.targetAmount ?? goal.targetAmount.toNumber(),
@@ -214,7 +215,7 @@ export class FinancialGoalService {
       this.assertCanManageGoal(member.familyRole);
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       if (goal.status === FinancialGoalStatus.CANCELED) {
-        throw new ConflictException('Má»¥c tiÃªu tÃ i chÃ­nh Ä‘Ã£ bá»‹ há»§y');
+        throw new ConflictException('Mục tiêu tài chính đã bị hủy');
       }
       const canceled = await tx.financialGoal.update({
         where: { id: goal.id },
@@ -331,13 +332,14 @@ export class FinancialGoalService {
     };
   }
 
-  confirmGoalContributionPlans(
+  async confirmGoalContributionPlans(
     familyId: string,
     memberId: string,
     goalId: string,
     dto: ConfirmGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const member = await this.getMemberInFamilyOrThrow(
         familyId,
         memberId,
@@ -347,14 +349,14 @@ export class FinancialGoalService {
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       if (goal.status === FinancialGoalStatus.CANCELED) {
         throw new BadRequestException(
-          'KhÃ´ng thá»ƒ xÃ¡c nháº­n káº¿ hoáº¡ch Ä‘Ã³ng gÃ³p cho má»¥c tiÃªu Ä‘Ã£ bá»‹ há»§y',
+          'Không thể xác nhận kế hoạch đóng góp cho mục tiêu đã bị hủy',
         );
       }
 
       const requestedMemberIds = dto.members.map((item) => item.memberId);
       if (new Set(requestedMemberIds).size !== requestedMemberIds.length) {
         throw new BadRequestException(
-          'Danh sÃ¡ch thÃ nh viÃªn Ä‘Ã³ng gÃ³p khÃ´ng Ä‘Æ°á»£c trá»«ng láº·p',
+          'Danh sách thành viên đóng góp không được trừng lặp',
         );
       }
 
@@ -372,7 +374,7 @@ export class FinancialGoalService {
       );
       if (invalidMemberIds.length > 0) {
         throw new NotFoundException(
-          'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+          'Không tìm thấy thành viên đang hoạt động trong gia đình này',
         );
       }
 
@@ -428,18 +430,22 @@ export class FinancialGoalService {
         goal,
         dto.periodMonth,
         dto.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
-  submitGoalContributionPlan(
+  async submitGoalContributionPlan(
     familyId: string,
     memberId: string,
     goalId: string,
     planId: string,
     dto: SubmitGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.getMemberInFamilyOrThrow(familyId, memberId, tx);
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       const plan = await this.requireGoalContributionPlan(
@@ -481,8 +487,11 @@ export class FinancialGoalService {
         goal,
         plan.periodMonth,
         plan.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   approveGoalContributionPlan(
@@ -508,6 +517,7 @@ export class FinancialGoalService {
     planId: string,
     dto: ReviewGoalContributionPlanDto,
   ) {
+    const pendingNotificationIds: string[] = [];
     const result = await this.prisma.$transaction(
       async (tx) => {
         const reviewer = await this.getMemberInFamilyOrThrow(
@@ -548,9 +558,7 @@ export class FinancialGoalService {
           },
         });
         if (claimed.count !== 1) {
-          throw new ConflictException(
-            'Káº¿ hoáº¡ch Ä‘Ã³ng gÃ³p Ä‘Ã£ Ä‘Æ°á»£c xá»­ lÃ½',
-          );
+          throw new ConflictException('Kế hoạch đóng góp đã được xử lý');
         }
 
         const ledger = await tx.financeLedger.upsert({
@@ -577,6 +585,10 @@ export class FinancialGoalService {
             status: LedgerEntryStatus.ACTIVE,
           },
         });
+        const allocatedBefore = await this.calculateGoalAllocatedAmount(
+          tx,
+          goal.id,
+        );
         await tx.goalAllocation.create({
           data: {
             goalId: goal.id,
@@ -585,6 +597,30 @@ export class FinancialGoalService {
             allocatedByMemberId: reviewerMemberId,
           },
         });
+        const allocatedAfter = allocatedBefore.plus(plan.pendingAmount);
+        const reachedTarget =
+          allocatedBefore.lt(goal.targetAmount) &&
+          allocatedAfter.gte(goal.targetAmount);
+        if (reachedTarget) {
+          const allMembers = await tx.familyMember.findMany({
+            where: { familyId, status: MemberStatus.ACTIVE },
+            select: { id: true },
+          });
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            allMembers.map((m) => m.id),
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.NORMAL,
+              title: 'Mục tiêu tài chính đã đạt',
+              body: `Mục tiêu "${goal.goalName}" đã đạt số tiền đề ra.`,
+              referenceType: 'FINANCIAL_GOAL',
+              referenceId: goal.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
+        }
 
         const actualAmounts = await this.calculateGoalContributionActualAmounts(
           tx,
@@ -618,11 +654,14 @@ export class FinancialGoalService {
           goal,
           plan.periodMonth,
           plan.periodYear,
+          pendingNotificationIds,
         );
         return { view, goalName: goal.goalName };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    await this.notificationsService.dispatch(pendingNotificationIds);
 
     await this.notifyContributionShortageAfterApproval(
       familyId,
@@ -636,14 +675,15 @@ export class FinancialGoalService {
     return result.view;
   }
 
-  rejectGoalContributionPlan(
+  async rejectGoalContributionPlan(
     familyId: string,
     reviewerMemberId: string,
     goalId: string,
     planId: string,
     dto: ReviewGoalContributionPlanDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const reviewer = await this.getMemberInFamilyOrThrow(
         familyId,
         reviewerMemberId,
@@ -678,17 +718,21 @@ export class FinancialGoalService {
         goal,
         plan.periodMonth,
         plan.periodYear,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
-  listGoalContributionPlans(
+  async listGoalContributionPlans(
     familyId: string,
     memberId: string,
     goalId: string,
     period: RequiredFinancePeriodDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       const member = await this.getMemberInFamilyOrThrow(
         familyId,
         memberId,
@@ -702,8 +746,11 @@ export class FinancialGoalService {
         goal,
         period.month,
         period.year,
+        pendingNotificationIds,
       );
     });
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   async getGoalContributionShortage(
@@ -749,13 +796,14 @@ export class FinancialGoalService {
     });
   }
 
-  createGoalAllocation(
+  async createGoalAllocation(
     familyId: string,
     memberId: string,
     goalId: string,
     dto: CreateGoalAllocationDto,
   ) {
-    return this.prisma.$transaction(
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const member = await this.getMemberInFamilyOrThrow(
           familyId,
@@ -787,6 +835,10 @@ export class FinancialGoalService {
           entry.amount,
           dto.amount,
         );
+        const allocatedBefore = await this.calculateGoalAllocatedAmount(
+          tx,
+          goal.id,
+        );
         const allocation = await tx.goalAllocation.create({
           data: {
             goalId,
@@ -796,6 +848,30 @@ export class FinancialGoalService {
           },
           include: { ledgerEntry: true },
         });
+        const allocatedAfter = allocatedBefore.plus(allocation.amount);
+        const reachedTarget =
+          allocatedBefore.lt(goal.targetAmount) &&
+          allocatedAfter.gte(goal.targetAmount);
+        if (reachedTarget) {
+          const allMembers = await tx.familyMember.findMany({
+            where: { familyId, status: MemberStatus.ACTIVE },
+            select: { id: true },
+          });
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            allMembers.map((m) => m.id),
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.NORMAL,
+              title: 'Mục tiêu tài chính đã đạt',
+              body: `Mục tiêu "${goal.goalName}" đã đạt số tiền đề ra.`,
+              referenceType: 'FINANCIAL_GOAL',
+              referenceId: goal.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
+        }
         return {
           allocation,
           ...(await this.refreshGoalStatus(tx, goal.id)),
@@ -803,6 +879,8 @@ export class FinancialGoalService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
   }
 
   updateGoalAllocation(
@@ -892,7 +970,7 @@ export class FinancialGoalService {
     });
     if (!member) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy thành viên đang hoạt động trong gia đình này',
       );
     }
     return member;
@@ -908,7 +986,7 @@ export class FinancialGoalService {
   private assertCanManageGoal(familyRole: FamilyRole) {
     if (!this.isFinanceManager(familyRole)) {
       throw new ForbiddenException(
-        'KhÃ´ng cÃ³ quyá»n quáº£n lÃ½ má»¥c tiÃªu tÃ i chÃ­nh gia Ä‘Ã¬nh',
+        'Không có quyền quản lý mục tiêu tài chính gia đình',
       );
     }
   }
@@ -919,7 +997,7 @@ export class FinancialGoalService {
   ) {
     if (goal.relatedJarId && !this.isFinanceManager(familyRole)) {
       throw new ForbiddenException(
-        'KhÃ´ng cÃ³ quyá»n xem má»¥c tiÃªu tÃ i chÃ­nh gáº¯n vá»›i hÅ© riÃªng',
+        'Không có quyền xem mục tiêu tài chính gắn với hũ riêng',
       );
     }
   }
@@ -929,7 +1007,7 @@ export class FinancialGoalService {
     monthlyContributionTarget?: number | null,
   ) {
     if (targetAmount <= 0) {
-      throw new BadRequestException('targetAmount pháº£i lá»›n hÆ¡n 0');
+      throw new BadRequestException('targetAmount phải lớn hơn 0');
     }
     if (
       monthlyContributionTarget !== undefined &&
@@ -937,7 +1015,7 @@ export class FinancialGoalService {
       monthlyContributionTarget < 0
     ) {
       throw new BadRequestException(
-        'monthlyContributionTarget khÃ´ng Ä‘Æ°á»£c nhá» hÆ¡n 0',
+        'monthlyContributionTarget không được nhỏ hơn 0',
       );
     }
   }
@@ -1007,7 +1085,7 @@ export class FinancialGoalService {
     });
     if (!jar) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y hÅ© tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy hũ tài chính trong gia đình này',
       );
     }
   }
@@ -1023,7 +1101,7 @@ export class FinancialGoalService {
     });
     if (!goal) {
       throw new NotFoundException(
-        'KhÃ´ng tÃ¬m tháº¥y má»¥c tiÃªu tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+        'Không tìm thấy mục tiêu tài chính trong gia đình này',
       );
     }
     return goal;
@@ -1143,6 +1221,7 @@ export class FinancialGoalService {
     goal: FinancialGoalWithJar,
     periodMonth: number,
     periodYear: number,
+    pendingNotificationIds: string[] = [],
   ) {
     const plans = await tx.goalContributionPlan.findMany({
       where: {
@@ -1218,6 +1297,7 @@ export class FinancialGoalService {
       periodMonth,
       periodYear,
       rows,
+      pendingNotificationIds,
     );
 
     const totalPlannedAmount = rows.reduce(
@@ -1326,6 +1406,23 @@ export class FinancialGoalService {
     return plan.dueDate;
   }
 
+  private async findAlertRecipientIds(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+  ) {
+    const recipients = await tx.familyMember.findMany({
+      where: {
+        familyId,
+        status: MemberStatus.ACTIVE,
+        familyRole: {
+          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+        },
+      },
+      select: { id: true },
+    });
+    return recipients.map((member) => member.id);
+  }
+
   private async syncGoalContributionShortageAlerts(
     tx: Prisma.TransactionClient,
     familyId: string,
@@ -1333,6 +1430,7 @@ export class FinancialGoalService {
     periodMonth: number,
     periodYear: number,
     rows: GoalContributionPlanRow[],
+    pendingNotificationIds: string[],
   ) {
     const prefix = `CONTRIBUTION_SHORTAGE:${goal.id}:${periodMonth}:${periodYear}:`;
     const activeRows = rows.filter(
@@ -1341,6 +1439,7 @@ export class FinancialGoalService {
         row.status === GoalContributionPlanStatus.MISSED,
     );
     const activeKeys = activeRows.map((row) => `${prefix}${row.memberId}`);
+    let alertRecipientIds: string[] | null = null;
     for (const row of activeRows) {
       const sourceKey = `${prefix}${row.memberId}`;
       const data = {
@@ -1366,7 +1465,7 @@ export class FinancialGoalService {
       if (existing) {
         await tx.budgetAlert.update({ where: { id: existing.id }, data });
       } else {
-        await tx.budgetAlert.create({
+        const alert = await tx.budgetAlert.create({
           data: {
             familyId,
             sourceKey,
@@ -1374,6 +1473,21 @@ export class FinancialGoalService {
             ...data,
           },
         });
+        alertRecipientIds ??= await this.findAlertRecipientIds(tx, familyId);
+        const { ids } = await this.notificationsService.notify(
+          familyId,
+          alertRecipientIds,
+          {
+            type: NotificationType.FINANCE,
+            priority: NotificationPriority.HIGH,
+            title: 'Cảnh báo ngân sách',
+            body: `Kế hoạch đóng góp mục tiêu "${goal.goalName}" của ${row.displayName} đang thiếu ${row.shortageAmount}.`,
+            referenceType: 'BUDGET_ALERT',
+            referenceId: alert.id,
+          },
+          { tx },
+        );
+        pendingNotificationIds.push(...ids);
       }
     }
     await tx.budgetAlert.updateMany({
@@ -1412,29 +1526,37 @@ export class FinancialGoalService {
       return;
     }
 
-    const recipients = await this.prisma.familyMember.findMany({
-      where: {
-        familyId,
-        status: MemberStatus.ACTIVE,
-        familyRole: {
-          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+    // Kế hoạch đóng góp đã được duyệt thành công (đã commit) — lỗi thông báo
+    // ở đây không được phép biến thao tác đã thành công thành lỗi 5xx.
+    try {
+      const recipients = await this.prisma.familyMember.findMany({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          familyRole: {
+            in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
 
-    await this.notificationsService.createForMembers(
-      familyId,
-      recipients.map((recipient) => recipient.id),
-      {
-        type: NotificationType.GENERAL,
-        priority: NotificationPriority.HIGH,
-        title: 'Quỹ mục tiêu còn thiếu đóng góp',
-        body: `${goalName} tháng ${periodMonth}/${periodYear} còn thiếu ${totalShortageAmount}.`,
-        referenceType: 'FINANCIAL_GOAL',
-        referenceId: goalId,
-      },
-    );
+      await this.notificationsService.notify(
+        familyId,
+        recipients.map((recipient) => recipient.id),
+        {
+          type: NotificationType.FINANCE,
+          priority: NotificationPriority.HIGH,
+          title: 'Quỹ mục tiêu còn thiếu đóng góp',
+          body: `${goalName} tháng ${periodMonth}/${periodYear} còn thiếu ${totalShortageAmount}.`,
+          referenceType: 'FINANCIAL_GOAL',
+          referenceId: goalId,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo thiếu đóng góp mục tiêu (goal ${goalId}): ${(err as Error).message}`,
+      );
+    }
   }
 
   private async goalWithProgress(goal: FinancialGoalWithJar) {

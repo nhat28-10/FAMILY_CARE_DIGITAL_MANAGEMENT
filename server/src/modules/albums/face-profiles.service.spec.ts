@@ -28,8 +28,8 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
 function member(
   id: string,
-  familyRole = FamilyRole.FAMILY_MEMBER,
-  status = MemberStatus.ACTIVE,
+  familyRole: FamilyRole = FamilyRole.FAMILY_MEMBER,
+  status: MemberStatus = MemberStatus.ACTIVE,
   familyId = 'family-1',
 ) {
   return {
@@ -40,6 +40,7 @@ function member(
     familyRole,
     relationship: Relationship.OTHER,
     status,
+    locationSharingEnabled: false,
     joinedAt: now,
     leftAt: null,
     createdAt: now,

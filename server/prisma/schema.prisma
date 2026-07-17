@@ -315,6 +315,7 @@ model User {
   // Relations
   memberships             FamilyMember[]
   refreshTokens           RefreshToken[]
+  deviceTokens            DeviceToken[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   joinRequests            JoinRequest[]
@@ -457,6 +458,8 @@ model FamilyMember {
   relationship Relationship @default(OTHER)
   /// ERD: member_status.
   status       MemberStatus @default(ACTIVE)
+  /// Opt-in daily location sharing on the family map (separate from SOS tracking).
+  locationSharingEnabled Boolean @default(false) @map("location_sharing_enabled")
   joinedAt     DateTime     @default(now())
   /// ERD: left_at — set when the member leaves/is removed.
   leftAt       DateTime?
@@ -1034,6 +1037,7 @@ model TaskAssignment {
   assignedAt         DateTime             @default(now())
   startAt            DateTime?
   dueAt              DateTime?
+  reminderSentAt     DateTime?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -1238,6 +1242,7 @@ enum SosSeverity {
 /// Type of member response to a SOS alert.
 enum SosResponseType {
   VIEWED
+  ON_THE_WAY
   CONFIRM_SAFE
   NEED_HELP
   RESOLVED
@@ -1275,6 +1280,12 @@ enum NotificationType {
   SOS
   GENERAL
   ALBUM_TAG
+  JOIN_REQUEST
+  MEMBER
+  TASK
+  CALENDAR
+  FINANCE
+  CHAT
 }
 
 enum NotificationPriority {
@@ -1495,6 +1506,28 @@ model Notification {
   @@index([recipientMemberId, isRead])
   @@index([familyId])
   @@map("notifications")
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+/// Thiết bị nhận FCM push — gắn theo USER (nhận noti của mọi family mình tham gia).
+model DeviceToken {
+  id         String         @id @default(uuid())
+  userId     String
+  token      String         @unique
+  platform   DevicePlatform
+  deviceName String?
+  lastSeenAt DateTime       @updatedAt
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
 }
 
 // ===========================================================================
@@ -1821,6 +1854,7 @@ model CalendarEventParticipant {
   memberId        String              @map("member_id")
   responseStatus  EventResponseStatus @default(INVITED) @map("response_status")
   reminderEnabled Boolean             @default(true) @map("reminder_enabled")
+  reminderSentAt  DateTime?           @map("reminder_sent_at") @db.Timestamptz
 
   event  CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   member FamilyMember  @relation("CalendarEventParticipations", fields: [memberId], references: [id], onDelete: Cascade)

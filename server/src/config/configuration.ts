@@ -86,6 +86,14 @@ export default () => ({
     ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  },
+  firebase: {
+    // Base64 của file service-account JSON. Rỗng = tắt kênh FCM (dev không cần Firebase).
+    serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || '',
+  },
   storage: {
     // Cloudflare R2 (S3-compatible) — lưu ảnh/file chat + album. DB chỉ lưu URL.
     r2Endpoint: process.env.R2_ENDPOINT || '',

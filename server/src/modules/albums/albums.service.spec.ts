@@ -30,6 +30,7 @@ function familyMember(id: string, familyRole: FamilyRole) {
     familyRole,
     relationship: Relationship.OTHER,
     status: MemberStatus.ACTIVE,
+    locationSharingEnabled: false,
     joinedAt: now,
     leftAt: null,
     createdAt: now,

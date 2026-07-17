@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { FamilyMembersModule } from '../family-members/family-members.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { StorageModule } from '../storage/storage.module';
 import { TaskAssignmentsController } from './controllers/task-assignments.controller';
 import { TaskCategoriesController } from './controllers/task-categories.controller';
@@ -13,7 +14,7 @@ import { TasksController } from './controllers/tasks.controller';
 import { TasksService } from './services/tasks.service';
 
 @Module({
-  imports: [FamilyMembersModule, StorageModule],
+  imports: [FamilyMembersModule, NotificationsModule, StorageModule],
   controllers: [
     TaskCategoriesController,
     TaskAssignmentsController,

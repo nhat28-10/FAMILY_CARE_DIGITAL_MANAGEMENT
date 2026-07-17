@@ -274,6 +274,7 @@ export class AlbumFaceSuggestionsService {
       );
     }
 
+    let notificationIds: string[] = [];
     const updated = await this.prisma.$transaction(async (tx) => {
       let createdTag = false;
       const existingTag = await tx.albumMediaTag.findUnique({
@@ -305,7 +306,7 @@ export class AlbumFaceSuggestionsService {
         include: suggestionInclude,
       });
       if (createdTag && suggestion.suggestedMemberId !== requester.id) {
-        await this.notifications.createForMembers(
+        const { ids } = await this.notifications.notify(
           workspaceId,
           [suggestion.suggestedMemberId],
           {
@@ -316,11 +317,14 @@ export class AlbumFaceSuggestionsService {
             referenceType: 'ALBUM_MEDIA',
             referenceId: mediaId,
           },
-          tx,
+          { tx },
         );
+        notificationIds = ids;
       }
       return saved;
     });
+
+    await this.notifications.dispatch(notificationIds);
 
     return this.mapSuggestion(updated, media, requester);
   }

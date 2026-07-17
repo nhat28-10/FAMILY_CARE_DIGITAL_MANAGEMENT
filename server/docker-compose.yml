@@ -31,6 +31,20 @@ services:
       retries: 10
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: familycare_redis_dev
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redisdata_dev:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   # Optional: run the API in Docker too. Enable with `--profile full`.
   api:
     profiles: ['full']
@@ -45,6 +59,7 @@ services:
       BACKUP_POSTGRES_CONTAINER: familycare_db_dev
       CHOKIDAR_USEPOLLING: 'true'
       FACE_AI_BASE_URL: http://face-ai-service:8000
+      REDIS_HOST: redis
     ports:
       - '3000:3000'
     volumes:
@@ -54,6 +69,8 @@ services:
     command: sh -c "npx prisma generate --generator client && npx prisma migrate deploy && npm run start:dev"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       face-ai-service:
         condition: service_healthy
@@ -84,3 +101,4 @@ services:
 
 volumes:
   pgdata_dev:
+  redisdata_dev:

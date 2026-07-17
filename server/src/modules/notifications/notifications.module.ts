@@ -1,17 +1,44 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 
 import { FamilyMembersModule } from '../family-members/family-members.module';
+import { UsersModule } from '../users/users.module';
 import { NotificationsController } from './notifications.controller';
+import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { NotificationsProcessor } from './notifications.processor';
+import { FcmNotificationChannel } from './dispatcher/fcm-notification.channel';
+import { NotificationDispatcher } from './dispatcher/notification-dispatcher';
+import { WsNotificationChannel } from './dispatcher/ws-notification.channel';
+import { RemindersService } from './reminders.service';
+import { NOTIFICATIONS_QUEUE } from './notifications.types';
 
-/**
- * Shared in-app notifications. `NotificationsService` is exported so other
- * feature modules (e.g. SOS) can fan out notifications to family members.
- */
 @Module({
-  imports: [FamilyMembersModule],
+  imports: [
+    JwtModule.register({}),
+    UsersModule,
+    FamilyMembersModule,
+    BullModule.registerQueue({
+      name: NOTIFICATIONS_QUEUE,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: { age: 24 * 3600 },
+      },
+    }),
+  ],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
+  providers: [
+    NotificationsService,
+    NotificationsGateway,
+    WsNotificationChannel,
+    FcmNotificationChannel,
+    NotificationDispatcher,
+    NotificationsProcessor,
+    RemindersService,
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

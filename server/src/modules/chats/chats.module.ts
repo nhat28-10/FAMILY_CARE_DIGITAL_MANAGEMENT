@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
 import { FamilyMembersModule } from '../family-members/family-members.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { StorageModule } from '../storage/storage.module';
 import { UsersModule } from '../users/users.module';
 import { ChatsGateway } from './chats.gateway';
@@ -20,6 +21,7 @@ import { MessagesService } from './services/messages.service';
     UsersModule,
     FamilyMembersModule,
     StorageModule,
+    NotificationsModule,
   ],
   controllers: [ConversationsController, MessagesController],
   providers: [ConversationsService, MessagesService, ChatsGateway],

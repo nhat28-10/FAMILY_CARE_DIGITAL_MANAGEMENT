@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
   RewardDisputeStatus,
   RewardSettlementStatus,
@@ -38,6 +41,7 @@ import {
   skipFor,
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { CreateTaskCategoryDto } from '../dto/create-task-category.dto';
@@ -620,8 +624,11 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
     @Optional() private readonly storage?: StorageService,
   ) {}
 
@@ -1142,6 +1149,28 @@ export class TasksService {
         where: { id: assignment.id },
         select: assignmentResponseSelect,
       });
+
+    // Assignment đã tạo thành công — lỗi thông báo không được phép biến thao
+    // tác đã thành công thành lỗi 5xx.
+    try {
+      await this.notificationsService.notify(
+        familyId,
+        [dto.assignedToMemberId],
+        {
+          type: NotificationType.TASK,
+          priority: NotificationPriority.NORMAL,
+          title: 'Bạn được giao công việc mới',
+          body: `Bạn được giao công việc "${task.title}".`,
+          referenceType: 'TASK_ASSIGNMENT',
+          referenceId: assignment.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo giao công việc (assignment ${assignment.id}): ${(err as Error).message}`,
+      );
+    }
+
     return this.mapAssignmentResponse(createdAssignment);
   }
 
@@ -1331,6 +1360,28 @@ export class TasksService {
       },
       select: assignmentResponseSelect,
     });
+
+    // Assignment đã được giao lại thành công — lỗi thông báo không được phép
+    // biến thao tác đã thành công thành lỗi 5xx.
+    try {
+      await this.notificationsService.notify(
+        familyId,
+        [dto.assignedToMemberId],
+        {
+          type: NotificationType.TASK,
+          priority: NotificationPriority.NORMAL,
+          title: 'Bạn được giao công việc mới',
+          body: `Bạn được giao công việc "${assignment.task.title}".`,
+          referenceType: 'TASK_ASSIGNMENT',
+          referenceId: updatedAssignment.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo giao lại công việc (assignment ${updatedAssignment.id}): ${(err as Error).message}`,
+      );
+    }
+
     return this.mapAssignmentResponse(updatedAssignment);
   }
 
@@ -2513,6 +2564,7 @@ export class TasksService {
     reviewerMemberId: string,
     dto: ReviewTaskSubmissionDto,
   ) {
+    let notificationIds: string[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
       const submission = await tx.taskSubmission.findFirst({
         where: {
@@ -2531,6 +2583,7 @@ export class TasksService {
               assignedToMemberId: true,
               task: {
                 select: {
+                  title: true,
                   taskType: true,
                   rewardSetting: {
                     select: {
@@ -2587,6 +2640,21 @@ export class TasksService {
       });
 
       if (dto.decision === ReviewTaskSubmissionDecision.APPROVED) {
+        const { ids } = await this.notificationsService.notify(
+          familyId,
+          [submission.assignment.assignedToMemberId],
+          {
+            type: NotificationType.TASK,
+            priority: NotificationPriority.LOW,
+            title: 'Công việc được nghiệm thu',
+            body: `Công việc "${submission.assignment.task.title}" của bạn đã được duyệt hoàn thành.`,
+            referenceType: 'TASK_ASSIGNMENT',
+            referenceId: submission.assignmentId,
+          },
+          { tx },
+        );
+        notificationIds = ids;
+
         await this.createRewardSettlementAfterApproval(tx, submission);
 
         if (submission.assignment.task.taskType === TaskType.AD_HOC) {
@@ -2622,6 +2690,8 @@ export class TasksService {
         select: submissionResponseSelect,
       });
     });
+
+    await this.notificationsService.dispatch(notificationIds);
 
     return withResponseMessage(
       dto.decision === ReviewTaskSubmissionDecision.APPROVED

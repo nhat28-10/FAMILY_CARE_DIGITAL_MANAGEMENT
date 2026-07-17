@@ -70,6 +70,7 @@ const FIELD_LABELS: Record<string, string> = {
   responseType: 'Loại phản hồi',
   message: 'Nội dung',
   resolutionNote: 'Ghi chú xử lý',
+  isFalseAlarm: 'Đánh dấu báo động giả',
   initialLatitude: 'Vĩ độ',
   initialLongitude: 'Kinh độ',
   latitude: 'Vĩ độ',
@@ -79,6 +80,36 @@ const FIELD_LABELS: Record<string, string> = {
   deviceId: 'Mã thiết bị',
   alertId: 'Mã cảnh báo',
   unreadOnly: 'Chỉ chưa đọc',
+
+  // Devices
+  token: 'Token thiết bị',
+  platform: 'Nền tảng',
+  deviceName: 'Tên thiết bị',
+
+  // Locations
+  isSharing: 'Trạng thái chia sẻ vị trí',
+
+  // SOS settings / emergency contacts
+  isEnabled: 'Trạng thái bật SOS',
+  notifyAllMembers: 'Chế độ thông báo tất cả thành viên',
+  autoCreateAlertFromFall: 'Tự tạo cảnh báo khi té ngã',
+  locationRequired: 'Yêu cầu vị trí ban đầu',
+  contactName: 'Tên liên hệ',
+  phoneNumber: 'Số điện thoại',
+  relationshipNote: 'Ghi chú quan hệ',
+  priorityOrder: 'Thứ tự ưu tiên',
+  isActive: 'Trạng thái kích hoạt',
+
+  // Wearables / sensor events
+  deviceType: 'Loại thiết bị',
+  deviceIdentifier: 'Mã định danh thiết bị',
+  gpsEnabled: 'Trạng thái GPS',
+  sosEnabled: 'Trạng thái SOS của thiết bị',
+  pairingStatus: 'Trạng thái ghép nối',
+  ownerMemberId: 'Thành viên sở hữu',
+  eventType: 'Loại sự kiện',
+  rawValue: 'Dữ liệu cảm biến',
+  detectedAt: 'Thời điểm phát hiện',
 };
 
 const PASSWORD_RULE =

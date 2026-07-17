@@ -5,10 +5,12 @@ import {
   BudgetAlertType,
   FamilyRole,
   MemberStatus,
+  NotificationType,
   Prisma,
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { BudgetAlertService } from './budget-alert.service';
 import { FinanceReportService } from './finance-report.service';
 
@@ -17,11 +19,12 @@ describe('BudgetAlertService budget alerts', () => {
   const memberId = 'member-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { notify: jest.Mock; dispatch: jest.Mock };
   let service: BudgetAlertService;
 
   beforeEach(() => {
     tx = {
-      familyMember: { findFirst: jest.fn() },
+      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
       budgetAlert: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -31,7 +34,8 @@ describe('BudgetAlertService budget alerts', () => {
       },
       budgetPlan: { findFirst: jest.fn(), findMany: jest.fn() },
       financeLedger: { findUnique: jest.fn() },
-      financialGoal: { findMany: jest.fn() },
+      financialGoal: { findMany: jest.fn(), update: jest.fn() },
+      goalAllocation: { aggregate: jest.fn() },
     };
     prisma = {
       $transaction: jest.fn((callback: (client: typeof tx) => unknown) =>
@@ -40,7 +44,14 @@ describe('BudgetAlertService budget alerts', () => {
       familyMember: { findFirst: jest.fn() },
       budgetAlert: { findFirst: jest.fn() },
     };
-    service = new BudgetAlertService(prisma as unknown as PrismaService);
+    notifications = {
+      notify: jest.fn().mockResolvedValue({ ids: [] }),
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new BudgetAlertService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
   });
 
   it('does not let normal members view jar-linked alerts', async () => {
@@ -247,6 +258,58 @@ describe('BudgetAlertService budget alerts', () => {
         },
       },
     ]);
+  });
+
+  it('notifies finance managers/deputies with { tx } when recomputing creates a new alert, then dispatches after commit', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.familyMember.findMany.mockResolvedValue([{ id: memberId }]);
+    tx.financialGoal.findMany.mockResolvedValue([
+      {
+        id: 'goal-id',
+        familyId,
+        goalName: 'Emergency fund',
+        targetAmount: new Prisma.Decimal(1000),
+        deadline: new Date('2020-01-01T00:00:00.000Z'),
+        monthlyContributionTarget: null,
+        relatedJarId: null,
+        status: 'ACTIVE',
+        relatedJar: null,
+      },
+    ]);
+    tx.goalAllocation.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(0) },
+    });
+    tx.financialGoal.update.mockResolvedValue({});
+    tx.budgetAlert.findFirst.mockResolvedValue(null);
+    tx.budgetAlert.create.mockResolvedValue({ id: 'alert-id' });
+    tx.budgetAlert.updateMany.mockResolvedValue({ count: 0 });
+    notifications.notify.mockResolvedValue({ ids: ['notif-id-1'] });
+
+    const result = await service.recomputeBudgetGoalAlerts(familyId, memberId, {
+      scope: 'GOAL',
+    });
+
+    expect(result.candidates).toBe(1);
+    expect(tx.budgetAlert.create).toHaveBeenCalledTimes(1);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [memberId],
+      expect.objectContaining({
+        type: NotificationType.FINANCE,
+        referenceType: 'BUDGET_ALERT',
+        referenceId: 'alert-id',
+      }),
+      { tx },
+    );
+    expect(notifications.dispatch).toHaveBeenCalledWith(['notif-id-1']);
+    expect(notifications.notify.mock.invocationCallOrder[0]).toBeLessThan(
+      notifications.dispatch.mock.invocationCallOrder[0],
+    );
   });
 
   it('redacts jar-linked budget lines and warnings for normal member reports', () => {
