@@ -62,7 +62,9 @@ interface NotificationPayload {
   không tính vào unread-count) — chỉ đẩy ngay lúc đó cho thiết bị đang mở. Hiện có 2
   trường hợp dùng kiểu này:
   - `CHAT` — tin nhắn chat mới (mỗi tin nhắn không tạo 1 row `notifications` riêng;
-    conversation tự có unread-count/list của nó ở module `chats`).
+    conversation tự có unread-count/list của nó ở module `chats`). ⚠️ Kênh FCM cho `CHAT`
+    đẩy nguyên `body` là **nội dung tin nhắn đầy đủ** — banner/lock-screen của thiết bị sẽ
+    hiển thị nguyên văn tin nhắn, cân nhắc khi có yêu cầu ẩn nội dung nhạy cảm ở lock-screen.
   - Bị từ chối join request, hoặc bị xóa khỏi family — user đó không còn (hoặc chưa từng
     có) membership để đọc thông báo persist trong family đó.
 

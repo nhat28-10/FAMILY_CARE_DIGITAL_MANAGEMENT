@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -621,6 +622,8 @@ type TaskScheduleValidationInput = {
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -1144,14 +1147,26 @@ export class TasksService {
         select: assignmentResponseSelect,
       });
 
-    await this.notificationsService.notify(familyId, [dto.assignedToMemberId], {
-      type: NotificationType.TASK,
-      priority: NotificationPriority.NORMAL,
-      title: 'Bạn được giao công việc mới',
-      body: `Bạn được giao công việc "${task.title}".`,
-      referenceType: 'TASK_ASSIGNMENT',
-      referenceId: assignment.id,
-    });
+    // Assignment đã tạo thành công — lỗi thông báo không được phép biến thao
+    // tác đã thành công thành lỗi 5xx.
+    try {
+      await this.notificationsService.notify(
+        familyId,
+        [dto.assignedToMemberId],
+        {
+          type: NotificationType.TASK,
+          priority: NotificationPriority.NORMAL,
+          title: 'Bạn được giao công việc mới',
+          body: `Bạn được giao công việc "${task.title}".`,
+          referenceType: 'TASK_ASSIGNMENT',
+          referenceId: assignment.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo giao công việc (assignment ${assignment.id}): ${(err as Error).message}`,
+      );
+    }
 
     return this.mapAssignmentResponse(createdAssignment);
   }
@@ -1343,14 +1358,26 @@ export class TasksService {
       select: assignmentResponseSelect,
     });
 
-    await this.notificationsService.notify(familyId, [dto.assignedToMemberId], {
-      type: NotificationType.TASK,
-      priority: NotificationPriority.NORMAL,
-      title: 'Bạn được giao công việc mới',
-      body: `Bạn được giao công việc "${assignment.task.title}".`,
-      referenceType: 'TASK_ASSIGNMENT',
-      referenceId: updatedAssignment.id,
-    });
+    // Assignment đã được giao lại thành công — lỗi thông báo không được phép
+    // biến thao tác đã thành công thành lỗi 5xx.
+    try {
+      await this.notificationsService.notify(
+        familyId,
+        [dto.assignedToMemberId],
+        {
+          type: NotificationType.TASK,
+          priority: NotificationPriority.NORMAL,
+          title: 'Bạn được giao công việc mới',
+          body: `Bạn được giao công việc "${assignment.task.title}".`,
+          referenceType: 'TASK_ASSIGNMENT',
+          referenceId: updatedAssignment.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo giao lại công việc (assignment ${updatedAssignment.id}): ${(err as Error).message}`,
+      );
+    }
 
     return this.mapAssignmentResponse(updatedAssignment);
   }

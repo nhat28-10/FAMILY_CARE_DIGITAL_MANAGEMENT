@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -131,6 +132,8 @@ const GOAL_ELIGIBLE_ENTRY_TYPES = [
 
 @Injectable()
 export class FinanceService {
+  private readonly logger = new Logger(FinanceService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -1746,14 +1749,14 @@ export class FinanceService {
       const goal = await this.requireFinancialGoal(familyId, goalId, tx);
       if (goal.status === FinancialGoalStatus.CANCELED) {
         throw new BadRequestException(
-          'KhÃ´ng thá»ƒ xÃ¡c nháº­n káº¿ hoáº¡ch Ä‘Ã³ng gÃ³p cho má»¥c tiÃªu Ä‘Ã£ bá»‹ há»§y',
+          'Không thể xác nhận kế hoạch đóng góp cho mục tiêu đã bị hủy',
         );
       }
 
       const requestedMemberIds = dto.members.map((item) => item.memberId);
       if (new Set(requestedMemberIds).size !== requestedMemberIds.length) {
         throw new BadRequestException(
-          'Danh sÃ¡ch thÃ nh viÃªn Ä‘Ã³ng gÃ³p khÃ´ng Ä‘Æ°á»£c trá»«ng láº·p',
+          'Danh sách thành viên đóng góp không được trùng lặp',
         );
       }
 
@@ -1771,7 +1774,7 @@ export class FinanceService {
       );
       if (invalidMemberIds.length > 0) {
         throw new NotFoundException(
-          'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+          'Không tìm thấy thành viên đang hoạt động trong gia đình này',
         );
       }
 
@@ -3015,7 +3018,7 @@ export class FinanceService {
     familyId: string,
     candidates: AlertCandidate[],
     dto: RecomputeBudgetAlertsDto,
-    pendingNotificationIds: string[] = [],
+    pendingNotificationIds: string[],
   ) {
     const activeKeys = candidates.map((candidate) => candidate.sourceKey);
     let alertRecipientIds: string[] | null = null;
@@ -3798,7 +3801,7 @@ export class FinanceService {
     goal: FinancialGoalWithJar,
     periodMonth: number,
     periodYear: number,
-    pendingNotificationIds: string[] = [],
+    pendingNotificationIds: string[],
   ) {
     const plans = await tx.goalContributionPlan.findMany({
       where: {
@@ -3990,7 +3993,7 @@ export class FinanceService {
     periodMonth: number,
     periodYear: number,
     rows: GoalContributionPlanRow[],
-    pendingNotificationIds: string[] = [],
+    pendingNotificationIds: string[],
   ) {
     const prefix = `CONTRIBUTION_SHORTAGE:${goal.id}:${periodMonth}:${periodYear}:`;
     const activeRows = rows.filter(
@@ -4086,29 +4089,37 @@ export class FinanceService {
       return;
     }
 
-    const recipients = await this.prisma.familyMember.findMany({
-      where: {
-        familyId,
-        status: MemberStatus.ACTIVE,
-        familyRole: {
-          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+    // Kế hoạch đóng góp đã được duyệt thành công (đã commit) — lỗi thông báo
+    // ở đây không được phép biến thao tác đã thành công thành lỗi 5xx.
+    try {
+      const recipients = await this.prisma.familyMember.findMany({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          familyRole: {
+            in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
 
-    await this.notificationsService.notify(
-      familyId,
-      recipients.map((recipient) => recipient.id),
-      {
-        type: NotificationType.FINANCE,
-        priority: NotificationPriority.HIGH,
-        title: 'Quỹ mục tiêu còn thiếu đóng góp',
-        body: `${goalName} tháng ${periodMonth}/${periodYear} còn thiếu ${totalShortageAmount}.`,
-        referenceType: 'FINANCIAL_GOAL',
-        referenceId: goalId,
-      },
-    );
+      await this.notificationsService.notify(
+        familyId,
+        recipients.map((recipient) => recipient.id),
+        {
+          type: NotificationType.FINANCE,
+          priority: NotificationPriority.HIGH,
+          title: 'Quỹ mục tiêu còn thiếu đóng góp',
+          body: `${goalName} tháng ${periodMonth}/${periodYear} còn thiếu ${totalShortageAmount}.`,
+          referenceType: 'FINANCIAL_GOAL',
+          referenceId: goalId,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo thiếu đóng góp mục tiêu (goal ${goalId}): ${(err as Error).message}`,
+      );
+    }
   }
 
   private async calculateGoalAllocatedAmount(

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -42,6 +43,8 @@ const memberInclude = {
 
 @Injectable()
 export class FamiliesService {
+  private readonly logger = new Logger(FamiliesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly familyMembersService: FamilyMembersService,
@@ -167,39 +170,47 @@ export class FamiliesService {
     // Evict the removed member from the workspace's realtime SOS room.
     this.sosGateway.kickMemberFromWorkspace(targetUserId, familyId);
 
-    // Persist cho các manager/deputy; người bị xóa nhận push-only (membership
-    // đã REMOVED, không đọc được notification trong family nữa).
-    const managers = await this.prisma.familyMember.findMany({
-      where: {
-        familyId,
-        status: MemberStatus.ACTIVE,
-        familyRole: {
-          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+    // Member đã bị xóa thành công — lỗi thông báo không được phép biến thao
+    // tác đã thành công thành lỗi 5xx.
+    try {
+      // Persist cho các manager/deputy; người bị xóa nhận push-only (membership
+      // đã REMOVED, không đọc được notification trong family nữa).
+      const managers = await this.prisma.familyMember.findMany({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          familyRole: {
+            in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          },
         },
-      },
-      select: { id: true },
-    });
-    await this.notificationsService.notify(
-      familyId,
-      managers.map((m) => m.id),
-      {
+        select: { id: true },
+      });
+      await this.notificationsService.notify(
+        familyId,
+        managers.map((m) => m.id),
+        {
+          type: NotificationType.MEMBER,
+          priority: NotificationPriority.NORMAL,
+          title: 'Thành viên đã bị xóa',
+          body: 'Một thành viên đã bị xóa khỏi gia đình.',
+          referenceType: 'FAMILY_MEMBER',
+          referenceId: removedMember.id,
+        },
+      );
+      await this.notificationsService.notifyUsersEphemeral([targetUserId], {
+        familyId: null,
         type: NotificationType.MEMBER,
         priority: NotificationPriority.NORMAL,
-        title: 'Thành viên đã bị xóa',
-        body: 'Một thành viên đã bị xóa khỏi gia đình.',
-        referenceType: 'FAMILY_MEMBER',
-        referenceId: removedMember.id,
-      },
-    );
-    await this.notificationsService.notifyUsersEphemeral([targetUserId], {
-      familyId: null,
-      type: NotificationType.MEMBER,
-      priority: NotificationPriority.NORMAL,
-      title: 'Bạn đã bị xóa khỏi gia đình',
-      body: 'Bạn không còn là thành viên của gia đình này.',
-      referenceType: 'FAMILY',
-      referenceId: familyId,
-    });
+        title: 'Bạn đã bị xóa khỏi gia đình',
+        body: 'Bạn không còn là thành viên của gia đình này.',
+        referenceType: 'FAMILY',
+        referenceId: familyId,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo xóa thành viên (family ${familyId}): ${(err as Error).message}`,
+      );
+    }
     return null;
   }
 

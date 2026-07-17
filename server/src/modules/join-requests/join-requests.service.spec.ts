@@ -195,6 +195,15 @@ describe('JoinRequestsService', () => {
       );
       expect(notifications.notify).not.toHaveBeenCalled();
     });
+
+    it('vẫn trả về yêu cầu đã tạo dù notify thất bại (best-effort, không làm hỏng request đã persist)', async () => {
+      prisma.joinRequest.findFirst.mockResolvedValue(null);
+      prisma.familyMember.findMany.mockResolvedValue([{ id: managerMemberId }]);
+      notifications.notify.mockRejectedValue(new Error('Redis down'));
+      await expect(service.create(code, userId, {})).resolves.toMatchObject({
+        id: requestId,
+      });
+    });
   });
 
   describe('cancel', () => {

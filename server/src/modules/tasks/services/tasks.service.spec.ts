@@ -363,4 +363,17 @@ describe('TasksService createTaskAssignment', () => {
       }),
     );
   });
+
+  it('still returns the created assignment even if notify fails (best-effort, does not undo the persisted write)', async () => {
+    notifications.notify.mockRejectedValue(new Error('Redis down'));
+
+    const assignment = await service.createTaskAssignment(
+      familyId,
+      taskId,
+      assignedByMemberId,
+      { assignedToMemberId },
+    );
+
+    expect(assignment).toMatchObject({ id: assignmentId });
+  });
 });

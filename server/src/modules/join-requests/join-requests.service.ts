@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -37,6 +38,8 @@ const requesterSelect = {
 
 @Injectable()
 export class JoinRequestsService {
+  private readonly logger = new Logger(JoinRequestsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly familyMembersService: FamilyMembersService,
@@ -79,32 +82,40 @@ export class JoinRequestsService {
       include: { family: { select: familyPreviewSelect } },
     });
 
-    const requester = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { fullName: true, email: true },
-    });
-    const approvers = await this.prisma.familyMember.findMany({
-      where: {
-        familyId: family.id,
-        status: MemberStatus.ACTIVE,
-        familyRole: {
-          in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+    // Request đã tạo thành công — lỗi thông báo không được phép làm hỏng kết
+    // quả trả về cho requester.
+    try {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true, email: true },
+      });
+      const approvers = await this.prisma.familyMember.findMany({
+        where: {
+          familyId: family.id,
+          status: MemberStatus.ACTIVE,
+          familyRole: {
+            in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          },
         },
-      },
-      select: { id: true },
-    });
-    await this.notificationsService.notify(
-      family.id,
-      approvers.map((m) => m.id),
-      {
-        type: NotificationType.JOIN_REQUEST,
-        priority: NotificationPriority.HIGH,
-        title: 'Yêu cầu tham gia mới',
-        body: `${requester?.fullName ?? requester?.email ?? 'Một người dùng'} muốn tham gia gia đình ${family.name}.`,
-        referenceType: 'JOIN_REQUEST',
-        referenceId: request.id,
-      },
-    );
+        select: { id: true },
+      });
+      await this.notificationsService.notify(
+        family.id,
+        approvers.map((m) => m.id),
+        {
+          type: NotificationType.JOIN_REQUEST,
+          priority: NotificationPriority.HIGH,
+          title: 'Yêu cầu tham gia mới',
+          body: `${requester?.fullName ?? requester?.email ?? 'Một người dùng'} muốn tham gia gia đình ${family.name}.`,
+          referenceType: 'JOIN_REQUEST',
+          referenceId: request.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo yêu cầu tham gia mới (family ${family.id}): ${(err as Error).message}`,
+      );
+    }
     return request;
   }
 
@@ -205,42 +216,50 @@ export class JoinRequestsService {
         }),
       ]);
 
-      const familyRecord = await this.prisma.family.findUnique({
-        where: { id: familyId },
-        select: { name: true },
-      });
-      await this.notificationsService.notify(familyId, [member.id], {
-        type: NotificationType.JOIN_REQUEST,
-        priority: NotificationPriority.NORMAL,
-        title: 'Yêu cầu tham gia được duyệt',
-        body: `Bạn đã trở thành thành viên của gia đình ${familyRecord?.name ?? ''}.`,
-        referenceType: 'FAMILY',
-        referenceId: familyId,
-      });
-      const others = await this.prisma.familyMember.findMany({
-        where: {
+      // Membership đã tạo/kích hoạt thành công — lỗi thông báo không được
+      // phép làm hỏng kết quả duyệt trả về cho manager.
+      try {
+        const familyRecord = await this.prisma.family.findUnique({
+          where: { id: familyId },
+          select: { name: true },
+        });
+        await this.notificationsService.notify(familyId, [member.id], {
+          type: NotificationType.JOIN_REQUEST,
+          priority: NotificationPriority.NORMAL,
+          title: 'Yêu cầu tham gia được duyệt',
+          body: `Bạn đã trở thành thành viên của gia đình ${familyRecord?.name ?? ''}.`,
+          referenceType: 'FAMILY',
+          referenceId: familyId,
+        });
+        const others = await this.prisma.familyMember.findMany({
+          where: {
+            familyId,
+            status: MemberStatus.ACTIVE,
+            id: { not: member.id },
+          },
+          select: { id: true },
+        });
+        const newMemberUser = await this.prisma.user.findUnique({
+          where: { id: request.userId },
+          select: { fullName: true, email: true },
+        });
+        await this.notificationsService.notify(
           familyId,
-          status: MemberStatus.ACTIVE,
-          id: { not: member.id },
-        },
-        select: { id: true },
-      });
-      const newMemberUser = await this.prisma.user.findUnique({
-        where: { id: request.userId },
-        select: { fullName: true, email: true },
-      });
-      await this.notificationsService.notify(
-        familyId,
-        others.map((m) => m.id),
-        {
-          type: NotificationType.MEMBER,
-          priority: NotificationPriority.LOW,
-          title: 'Thành viên mới',
-          body: `${newMemberUser?.fullName ?? newMemberUser?.email ?? 'Một thành viên mới'} vừa tham gia gia đình.`,
-          referenceType: 'FAMILY_MEMBER',
-          referenceId: member.id,
-        },
-      );
+          others.map((m) => m.id),
+          {
+            type: NotificationType.MEMBER,
+            priority: NotificationPriority.LOW,
+            title: 'Thành viên mới',
+            body: `${newMemberUser?.fullName ?? newMemberUser?.email ?? 'Một thành viên mới'} vừa tham gia gia đình.`,
+            referenceType: 'FAMILY_MEMBER',
+            referenceId: member.id,
+          },
+        );
+      } catch (err) {
+        this.logger.error(
+          `Không thể gửi thông báo duyệt yêu cầu tham gia (family ${familyId}): ${(err as Error).message}`,
+        );
+      }
       return member;
     } catch (error) {
       if (this.isLostRace(error)) {
@@ -270,15 +289,21 @@ export class JoinRequestsService {
           decidedAt: new Date(),
         },
       });
-      await this.notificationsService.notifyUsersEphemeral([request.userId], {
-        familyId: null,
-        type: NotificationType.JOIN_REQUEST,
-        priority: NotificationPriority.NORMAL,
-        title: 'Yêu cầu tham gia bị từ chối',
-        body: 'Yêu cầu tham gia gia đình của bạn đã bị từ chối.',
-        referenceType: 'JOIN_REQUEST',
-        referenceId: updated.id,
-      });
+      try {
+        await this.notificationsService.notifyUsersEphemeral([request.userId], {
+          familyId: null,
+          type: NotificationType.JOIN_REQUEST,
+          priority: NotificationPriority.NORMAL,
+          title: 'Yêu cầu tham gia bị từ chối',
+          body: 'Yêu cầu tham gia gia đình của bạn đã bị từ chối.',
+          referenceType: 'JOIN_REQUEST',
+          referenceId: updated.id,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Không thể gửi thông báo từ chối yêu cầu tham gia (request ${updated.id}): ${(err as Error).message}`,
+        );
+      }
       return updated;
     } catch (error) {
       if (this.isRecordNotFound(error)) {

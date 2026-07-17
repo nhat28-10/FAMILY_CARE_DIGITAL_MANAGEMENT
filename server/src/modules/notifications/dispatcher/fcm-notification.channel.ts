@@ -108,10 +108,11 @@ export class FcmNotificationChannel
       });
     }
     if (deadTokens.length > 0) {
+      const uniqueDeadTokens = [...new Set(deadTokens)];
       await this.prisma.deviceToken.deleteMany({
-        where: { token: { in: deadTokens } },
+        where: { token: { in: uniqueDeadTokens } },
       });
-      this.logger.log(`Đã dọn ${deadTokens.length} FCM token chết`);
+      this.logger.log(`Đã dọn ${uniqueDeadTokens.length} FCM token chết`);
     }
   }
 

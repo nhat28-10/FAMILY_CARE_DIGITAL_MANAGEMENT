@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
@@ -82,6 +83,8 @@ const CHAT_MIME_TO_EXT: Record<string, string> = {
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly conversationsService: ConversationsService,
@@ -226,31 +229,39 @@ export class MessagesService {
     const payload = this.sanitizeMessage(message);
     this.chatsGateway.emitMessageNew(conversationId, payload);
 
-    const otherParticipants =
-      await this.prisma.conversationParticipant.findMany({
-        where: {
-          conversationId,
-          memberId: { not: memberId },
-          participantStatus: ParticipantStatus.ACTIVE,
+    // Tin nhắn đã gửi thành công — lỗi thông báo không được phép biến thao
+    // tác đã thành công thành lỗi 5xx.
+    try {
+      const otherParticipants =
+        await this.prisma.conversationParticipant.findMany({
+          where: {
+            conversationId,
+            memberId: { not: memberId },
+            participantStatus: ParticipantStatus.ACTIVE,
+          },
+          select: { member: { select: { userId: true, displayName: true } } },
+        });
+      const senderName =
+        message.senderMember?.displayName ??
+        message.senderMember?.user?.fullName ??
+        'Tin nhắn mới';
+      await this.notificationsService.notifyUsersEphemeral(
+        otherParticipants.map((p) => p.member.userId),
+        {
+          familyId: workspaceId,
+          type: NotificationType.CHAT,
+          priority: NotificationPriority.NORMAL,
+          title: senderName,
+          body: content ?? '[Đính kèm]',
+          referenceType: 'CONVERSATION',
+          referenceId: conversationId,
         },
-        select: { member: { select: { userId: true, displayName: true } } },
-      });
-    const senderName =
-      message.senderMember?.displayName ??
-      message.senderMember?.user?.fullName ??
-      'Tin nhắn mới';
-    await this.notificationsService.notifyUsersEphemeral(
-      otherParticipants.map((p) => p.member.userId),
-      {
-        familyId: workspaceId,
-        type: NotificationType.CHAT,
-        priority: NotificationPriority.NORMAL,
-        title: senderName,
-        body: content ?? '[Đính kèm]',
-        referenceType: 'CONVERSATION',
-        referenceId: conversationId,
-      },
-    );
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo tin nhắn mới (conversation ${conversationId}): ${(err as Error).message}`,
+      );
+    }
 
     return payload;
   }

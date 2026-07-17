@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
@@ -61,6 +62,8 @@ const SOS_TRACK_INTERVAL_SEC = 5;
 
 @Injectable()
 export class SosService {
+  private readonly logger = new Logger(SosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -89,22 +92,30 @@ export class SosService {
     });
 
     // High-priority fan-out to every other member of the workspace.
-    const members = await this.familyMembersService.listByFamily(workspaceId);
-    const recipientIds = members
-      .map((member) => member.id)
-      .filter((id) => id !== memberId);
-    const triggeredByName =
-      alert.triggeredByMember.displayName ??
-      alert.triggeredByMember.user.fullName ??
-      'Một thành viên';
-    await this.notificationsService.notify(workspaceId, recipientIds, {
-      type: NotificationType.SOS,
-      priority: NotificationPriority.CRITICAL,
-      title: 'Cảnh báo SOS',
-      body: `${triggeredByName} đã kích hoạt SOS`,
-      referenceType: 'SOS_ALERT',
-      referenceId: alert.id,
-    });
+    // Best-effort: alert đã được tạo thành công, lỗi gửi thông báo
+    // không được phép biến một thao tác đã thành công thành lỗi 5xx.
+    try {
+      const members = await this.familyMembersService.listByFamily(workspaceId);
+      const recipientIds = members
+        .map((member) => member.id)
+        .filter((id) => id !== memberId);
+      const triggeredByName =
+        alert.triggeredByMember.displayName ??
+        alert.triggeredByMember.user.fullName ??
+        'Một thành viên';
+      await this.notificationsService.notify(workspaceId, recipientIds, {
+        type: NotificationType.SOS,
+        priority: NotificationPriority.CRITICAL,
+        title: 'Cảnh báo SOS',
+        body: `${triggeredByName} đã kích hoạt SOS`,
+        referenceType: 'SOS_ALERT',
+        referenceId: alert.id,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo SOS cho gia đình ${workspaceId}: ${(err as Error).message}`,
+      );
+    }
 
     this.sosGateway.emitNewAlert(workspaceId, alert);
 
