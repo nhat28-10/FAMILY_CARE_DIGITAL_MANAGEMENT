@@ -68,27 +68,33 @@ export class RemindersService implements OnApplicationBootstrap {
         task: { select: { familyId: true, title: true } },
       },
     });
-    if (due.length === 0) {
-      return;
-    }
+    // Per-row: notify rồi đóng dấu NGAY từng row. Nếu gom updateMany sau vòng
+    // lặp, notify lỗi giữa chừng → row đã nhắc không được đóng dấu → BullMQ
+    // retry bắn nhắc trùng. 1 row lỗi không chặn row khác, không fail job.
     for (const assignment of due) {
-      await this.notificationsService.notify(
-        assignment.task.familyId,
-        [assignment.assignedToMemberId],
-        {
-          type: NotificationType.TASK,
-          priority: NotificationPriority.HIGH,
-          title: 'Công việc sắp đến hạn',
-          body: `Công việc "${assignment.task.title}" sẽ đến hạn trong 30 phút tới.`,
-          referenceType: 'TASK_ASSIGNMENT',
-          referenceId: assignment.id,
-        },
-      );
+      try {
+        await this.notificationsService.notify(
+          assignment.task.familyId,
+          [assignment.assignedToMemberId],
+          {
+            type: NotificationType.TASK,
+            priority: NotificationPriority.HIGH,
+            title: 'Công việc sắp đến hạn',
+            body: `Công việc "${assignment.task.title}" sẽ đến hạn trong 30 phút tới.`,
+            referenceType: 'TASK_ASSIGNMENT',
+            referenceId: assignment.id,
+          },
+        );
+        await this.prisma.taskAssignment.update({
+          where: { id: assignment.id },
+          data: { reminderSentAt: new Date() },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Không thể gửi nhắc hạn cho task assignment ${assignment.id}: ${(err as Error).message}`,
+        );
+      }
     }
-    await this.prisma.taskAssignment.updateMany({
-      where: { id: { in: due.map((a) => a.id) } },
-      data: { reminderSentAt: new Date() },
-    });
   }
 
   private async scanCalendarEvents(now: Date, windowEnd: Date): Promise<void> {
@@ -107,26 +113,30 @@ export class RemindersService implements OnApplicationBootstrap {
         event: { select: { id: true, workspaceId: true, title: true } },
       },
     });
-    if (upcoming.length === 0) {
-      return;
-    }
+    // Per-row như scanTaskAssignments — giữ idempotency khi notify lỗi giữa chừng.
     for (const participant of upcoming) {
-      await this.notificationsService.notify(
-        participant.event.workspaceId,
-        [participant.memberId],
-        {
-          type: NotificationType.CALENDAR,
-          priority: NotificationPriority.HIGH,
-          title: 'Sự kiện sắp diễn ra',
-          body: `Sự kiện "${participant.event.title}" sẽ bắt đầu trong 30 phút tới.`,
-          referenceType: 'CALENDAR_EVENT',
-          referenceId: participant.event.id,
-        },
-      );
+      try {
+        await this.notificationsService.notify(
+          participant.event.workspaceId,
+          [participant.memberId],
+          {
+            type: NotificationType.CALENDAR,
+            priority: NotificationPriority.HIGH,
+            title: 'Sự kiện sắp diễn ra',
+            body: `Sự kiện "${participant.event.title}" sẽ bắt đầu trong 30 phút tới.`,
+            referenceType: 'CALENDAR_EVENT',
+            referenceId: participant.event.id,
+          },
+        );
+        await this.prisma.calendarEventParticipant.update({
+          where: { id: participant.id },
+          data: { reminderSentAt: new Date() },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Không thể gửi nhắc sự kiện cho participant ${participant.id}: ${(err as Error).message}`,
+        );
+      }
     }
-    await this.prisma.calendarEventParticipant.updateMany({
-      where: { id: { in: upcoming.map((p) => p.id) } },
-      data: { reminderSentAt: new Date() },
-    });
   }
 }
