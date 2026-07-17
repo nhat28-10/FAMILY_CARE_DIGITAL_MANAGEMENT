@@ -92,7 +92,7 @@ ENV mới: `REDIS_HOST`, `REDIS_PORT`, `FIREBASE_SERVICE_ACCOUNT` (base64 servic
 | Member bị xóa / rời | `family-members.service` | MANAGER + người bị ảnh hưởng | `MEMBER` / NORMAL |
 | Được giao task | `tasks` services (create assignment) | Member được giao | `TASK` / NORMAL |
 | Task đến hạn (30' trước `dueAt`) | Job quét định kỳ | Member được giao | `TASK` / HIGH |
-| Task hoàn thành | `tasks` services | Người giao việc | `TASK` / LOW |
+| Task hoàn thành (bài nộp được duyệt) | `tasks` services | Người được giao ("Công việc được nghiệm thu") — chốt 2026-07-17, thay cho "người giao việc" ở bản nháp; noti "có bài nộp chờ duyệt" cho manager để phase sau | `TASK` / LOW |
 | Sự kiện lịch sắp diễn ra (30' trước `startTime`) | Job quét định kỳ | Participant có `reminderEnabled` | `CALENDAR` / HIGH |
 | Budget vượt ngưỡng | `finance` (chỗ tạo `BudgetAlert`) | MANAGER + DEPUTY | `FINANCE` / HIGH |
 | Goal đạt mốc | `finance` (goal allocation) | Mọi member | `FINANCE` / NORMAL |
