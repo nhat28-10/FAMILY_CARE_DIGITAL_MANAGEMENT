@@ -35,4 +35,16 @@ export class UsersService {
       data: { lastLoginAt: new Date() },
     });
   }
+
+  findByFirebaseUid(firebaseUid: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { firebaseUid } });
+  }
+
+  /** Gắn Firebase UID vào tài khoản sẵn có (auto-link đăng nhập Google). */
+  linkFirebaseUid(id: string, firebaseUid: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { firebaseUid },
+    });
+  }
 }

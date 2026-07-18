@@ -28,6 +28,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailVerificationService } from './email-verification.service';
+import { FirebaseAuthService } from './firebase-auth.service';
 import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtPayload } from './types/jwt-payload.type';
@@ -52,6 +53,7 @@ export class AuthService {
     private readonly passwordResetService: PasswordResetService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly firebaseAuthService: FirebaseAuthService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -136,6 +138,44 @@ export class AuthService {
     }
 
     // Stamp last login, then issue tokens with the updated record.
+    const loggedInUser = await this.usersService.updateLastLogin(user.id);
+    return this.buildAuthResult(loggedInUser);
+  }
+
+  /**
+   * Đăng nhập bằng Google: verify Firebase ID token → tìm user theo
+   * firebaseUid, chưa có thì auto-link theo email (đã verify) hoặc tạo mới,
+   * rồi phát cặp token nội bộ như login thường.
+   */
+  async loginWithFirebase(dto: { idToken: string }): Promise<AuthResult> {
+    const decoded = await this.firebaseAuthService.verifyIdToken(dto.idToken);
+
+    let user = await this.usersService.findByFirebaseUid(decoded.uid);
+
+    if (!user) {
+      // Chỉ tin email đã được Google xác minh — điều kiện để auto-link an toàn.
+      if (!decoded.email || !decoded.email_verified) {
+        throw new UnauthorizedException('Tài khoản Google chưa xác minh email');
+      }
+
+      const existing = await this.usersService.findByEmail(decoded.email);
+      user = existing
+        ? await this.usersService.linkFirebaseUid(existing.id, decoded.uid)
+        : await this.usersService.create({
+            email: decoded.email,
+            passwordHash: null,
+            firebaseUid: decoded.uid,
+            fullName: decoded.name ?? null,
+            avatarUrl: decoded.picture ?? null,
+            userType: UserType.NORMAL_USER,
+            verificationStatus: VerificationStatus.VERIFIED,
+          });
+    }
+
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản đã bị khóa');
+    }
+
     const loggedInUser = await this.usersService.updateLastLogin(user.id);
     return this.buildAuthResult(loggedInUser);
   }
