@@ -54,7 +54,10 @@ export class FirebaseAuthService implements OnModuleInit {
     }
     try {
       return await admin.auth().verifyIdToken(idToken);
-    } catch {
+    } catch (err) {
+      this.logger.warn(
+        `Verify Firebase ID token thất bại: ${(err as Error & { code?: string }).code ?? ''} ${(err as Error).message}`,
+      );
       throw new UnauthorizedException(
         'Token Google không hợp lệ hoặc đã hết hạn',
       );

@@ -29,7 +29,9 @@ Sau bước đăng nhập, mọi thứ (guards, refresh rotation, phân quyền 
 ## Thay đổi schema (1 migration)
 
 - `User.passwordHash`: `String` → `String?` (user chỉ-có-Google không có mật khẩu).
-- Thêm `User.firebaseUid String? @unique @map("firebase_uid")`.
+- Thêm `User.firebaseUid String? @unique` (KHÔNG `@map` — bảng `users` hiện dùng cột
+  camelCase, `schema.prisma` không có `@map` trên field nào của `User`; đổi sang
+  snake_case sau này cần migration thật, không phải rename field).
 
 ## API mới
 
@@ -39,7 +41,9 @@ Luồng xử lý:
 1. `verifyIdToken(idToken)` — fail → 401 `"Token Google không hợp lệ hoặc đã hết hạn"`.
 2. Tìm user theo `firebaseUid` → có → đăng nhập luôn.
 3. Chưa có → tìm theo `email`:
-   - tồn tại + `email_verified=true` → gắn `firebaseUid` vào tài khoản đó (auto-link);
+   - tồn tại + `email_verified=true` → gắn `firebaseUid` vào tài khoản đó (auto-link),
+     đồng thời nâng `verificationStatus=VERIFIED` (Google đã xác minh email, cùng bằng
+     chứng sở hữu hộp thư như flow OTP);
    - tồn tại + `email_verified=false` → 401 từ chối (không link email chưa verify);
 4. Không tồn tại → tạo user mới: `passwordHash=null`, `fullName`/`avatarUrl` lấy từ claims
    Google (`name`/`picture`), `verificationStatus=VERIFIED`.

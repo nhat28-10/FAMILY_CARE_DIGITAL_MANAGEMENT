@@ -6,7 +6,12 @@ import {
 } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
-import { AccountStatus, UserType, VerificationStatus } from '@prisma/client';
+import {
+  AccountStatus,
+  Prisma,
+  UserType,
+  VerificationStatus,
+} from '@prisma/client';
 
 import type { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
@@ -193,6 +198,32 @@ describe('AuthService', () => {
         userType: UserType.NORMAL_USER,
         verificationStatus: VerificationStatus.VERIFIED,
       });
+    });
+
+    it('recovers from a P2002 race on first Google login (concurrent create)', async () => {
+      firebaseAuth.verifyIdToken.mockResolvedValue(decoded);
+      usersService.findByEmail.mockResolvedValue(null);
+      const created = {
+        ...baseUser,
+        email: decoded.email,
+        passwordHash: null,
+        firebaseUid: decoded.uid,
+      };
+      const p2002 = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint',
+        { code: 'P2002', clientVersion: 'test' },
+      );
+      usersService.create.mockRejectedValue(p2002);
+      usersService.findByFirebaseUid
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(created);
+      usersService.updateLastLogin.mockResolvedValue(created);
+
+      const result = await service.loginWithFirebase({ idToken: 't' });
+
+      expect(result.user.id).toBe(baseUser.id);
+      expect(usersService.findByFirebaseUid).toHaveBeenCalledTimes(2);
+      expect(usersService.updateLastLogin).toHaveBeenCalledWith(created.id);
     });
 
     it('propagates verification failures from FirebaseAuthService', async () => {

@@ -160,17 +160,37 @@ export class AuthService {
       }
 
       const existing = await this.usersService.findByEmail(decoded.email);
-      user = existing
-        ? await this.usersService.linkFirebaseUid(existing.id, decoded.uid)
-        : await this.usersService.create({
-            email: decoded.email,
-            passwordHash: null,
-            firebaseUid: decoded.uid,
-            fullName: decoded.name ?? null,
-            avatarUrl: decoded.picture ?? null,
-            userType: UserType.NORMAL_USER,
-            verificationStatus: VerificationStatus.VERIFIED,
-          });
+      try {
+        user = existing
+          ? await this.usersService.linkFirebaseUid(existing.id, decoded.uid)
+          : await this.usersService.create({
+              email: decoded.email,
+              passwordHash: null,
+              firebaseUid: decoded.uid,
+              fullName: decoded.name ?? null,
+              avatarUrl: decoded.picture ?? null,
+              userType: UserType.NORMAL_USER,
+              verificationStatus: VerificationStatus.VERIFIED,
+            });
+      } catch (err) {
+        // Race giữa 2 lần đăng nhập Google đầu tiên cùng tài khoản: người
+        // thua cuộc chạm unique index (firebaseUid hoặc email) → re-fetch
+        // theo firebaseUid, người thắng đã tạo/gắn xong thì dùng lại record đó.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          const refetched = await this.usersService.findByFirebaseUid(
+            decoded.uid,
+          );
+          if (!refetched) {
+            throw err;
+          }
+          user = refetched;
+        } else {
+          throw err;
+        }
+      }
     }
 
     if (user.accountStatus !== AccountStatus.ACTIVE) {
