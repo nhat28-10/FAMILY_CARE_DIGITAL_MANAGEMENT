@@ -12,6 +12,7 @@ const FIELD_LABELS: Record<string, string> = {
   description: 'Mô tả',
   avatarUrl: 'Ảnh đại diện',
   refreshToken: 'Refresh token',
+  idToken: 'Token đăng nhập Google',
   invitedPhone: 'Số điện thoại',
   displayName: 'Tên hiển thị',
   page: 'Trang',

@@ -21,6 +21,7 @@ import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
 import { UsersService } from '../users/users.service';
+import { FirebaseLoginDto } from './dto/firebase-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -28,6 +29,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailVerificationService } from './email-verification.service';
+import { FirebaseAuthService } from './firebase-auth.service';
 import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtPayload } from './types/jwt-payload.type';
@@ -52,6 +54,7 @@ export class AuthService {
     private readonly passwordResetService: PasswordResetService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly firebaseAuthService: FirebaseAuthService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -116,7 +119,18 @@ export class AuthService {
     const user = await this.usersService.findByEmail(dto.email);
 
     // Verify credentials. Use a generic message to avoid user enumeration.
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    if (!user) {
+      throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
+    }
+
+    // Tài khoản social-only không có mật khẩu để so sánh.
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Tài khoản này đăng nhập bằng Google, vui lòng dùng nút Đăng nhập Google',
+      );
+    }
+
+    if (!(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
@@ -125,6 +139,64 @@ export class AuthService {
     }
 
     // Stamp last login, then issue tokens with the updated record.
+    const loggedInUser = await this.usersService.updateLastLogin(user.id);
+    return this.buildAuthResult(loggedInUser);
+  }
+
+  /**
+   * Đăng nhập bằng Google: verify Firebase ID token → tìm user theo
+   * firebaseUid, chưa có thì auto-link theo email (đã verify) hoặc tạo mới,
+   * rồi phát cặp token nội bộ như login thường.
+   */
+  async loginWithFirebase(dto: FirebaseLoginDto): Promise<AuthResult> {
+    const decoded = await this.firebaseAuthService.verifyIdToken(dto.idToken);
+
+    let user = await this.usersService.findByFirebaseUid(decoded.uid);
+
+    if (!user) {
+      // Chỉ tin email đã được Google xác minh — điều kiện để auto-link an toàn.
+      if (!decoded.email || !decoded.email_verified) {
+        throw new UnauthorizedException('Tài khoản Google chưa xác minh email');
+      }
+
+      const existing = await this.usersService.findByEmail(decoded.email);
+      try {
+        user = existing
+          ? await this.usersService.linkFirebaseUid(existing.id, decoded.uid)
+          : await this.usersService.create({
+              email: decoded.email,
+              passwordHash: null,
+              firebaseUid: decoded.uid,
+              fullName: decoded.name ?? null,
+              avatarUrl: decoded.picture ?? null,
+              userType: UserType.NORMAL_USER,
+              verificationStatus: VerificationStatus.VERIFIED,
+            });
+      } catch (err) {
+        // Race giữa 2 lần đăng nhập Google đầu tiên cùng tài khoản: người
+        // thua cuộc chạm unique index (firebaseUid hoặc email) → re-fetch
+        // theo firebaseUid, người thắng đã tạo/gắn xong thì dùng lại record đó.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          const refetched = await this.usersService.findByFirebaseUid(
+            decoded.uid,
+          );
+          if (!refetched) {
+            throw err;
+          }
+          user = refetched;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản đã bị khóa');
+    }
+
     const loggedInUser = await this.usersService.updateLastLogin(user.id);
     return this.buildAuthResult(loggedInUser);
   }

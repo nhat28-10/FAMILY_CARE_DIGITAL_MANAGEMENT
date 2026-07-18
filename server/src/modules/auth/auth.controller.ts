@@ -20,6 +20,7 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import type { SafeUser } from '../users/users.types';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { FirebaseLoginDto } from './dto/firebase-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -62,6 +63,20 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Account is locked' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('firebase')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đăng nhập thành công')
+  @ApiOperation({ summary: 'Đăng nhập bằng Google qua Firebase ID token' })
+  @ApiBody({ type: FirebaseLoginDto })
+  @ApiResponse({ status: 200, description: 'Login succeeded, tokens issued' })
+  @ApiResponse({ status: 401, description: 'Invalid/expired Firebase token' })
+  @ApiResponse({ status: 403, description: 'Account is locked' })
+  @ApiResponse({ status: 503, description: 'Google login not configured' })
+  firebaseLogin(@Body() dto: FirebaseLoginDto) {
+    return this.authService.loginWithFirebase(dto);
   }
 
   @Post('refresh')

@@ -38,7 +38,11 @@ export class PasswordResetService {
    */
   async requestReset(email: string): Promise<null> {
     const user = await this.usersService.findByEmail(email);
-    if (!user || user.accountStatus !== AccountStatus.ACTIVE) {
+    if (
+      !user ||
+      user.accountStatus !== AccountStatus.ACTIVE ||
+      !user.passwordHash
+    ) {
       return null;
     }
 
@@ -75,7 +79,11 @@ export class PasswordResetService {
       new BadRequestException('Mã không hợp lệ hoặc đã hết hạn');
 
     const user = await this.usersService.findByEmail(email);
-    if (!user || user.accountStatus !== AccountStatus.ACTIVE) {
+    if (
+      !user ||
+      user.accountStatus !== AccountStatus.ACTIVE ||
+      !user.passwordHash
+    ) {
       throw invalid();
     }
 

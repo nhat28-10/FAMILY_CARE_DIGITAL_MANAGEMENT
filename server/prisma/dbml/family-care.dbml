@@ -10,7 +10,8 @@ Project "Family Care Digital Management" {
 Table users {
   id String [pk]
   email String [unique, not null]
-  passwordHash String [not null]
+  passwordHash String
+  firebaseUid String [unique, note: 'Firebase Auth UID — set khi user đăng nhập Google (social login). Null = chưa liên kết.']
   fullName String
   phone String [unique, note: 'ERD: phone_number — optional, unique when present.']
   avatarUrl String [note: 'ERD: avatar_url.']
