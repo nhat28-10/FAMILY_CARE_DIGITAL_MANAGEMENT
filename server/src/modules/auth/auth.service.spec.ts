@@ -217,5 +217,15 @@ describe('AuthService', () => {
         new ForbiddenException('Tài khoản đã bị khóa'),
       );
     });
+
+    it('propagates 503 when Google login is not configured', async () => {
+      firebaseAuth.verifyIdToken.mockRejectedValue(
+        new ServiceUnavailableException('Đăng nhập Google chưa được cấu hình'),
+      );
+
+      await expect(service.loginWithFirebase({ idToken: 't' })).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
   });
 });
