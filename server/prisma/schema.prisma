@@ -294,7 +294,9 @@ enum TaskProofType {
 model User {
   id                 String             @id @default(uuid())
   email              String             @unique
-  passwordHash       String
+  passwordHash       String?
+  /// Firebase Auth UID — set khi user đăng nhập Google (social login). Null = chưa liên kết.
+  firebaseUid        String?            @unique
   fullName           String?
   /// ERD: phone_number — optional, unique when present.
   phone              String?            @unique

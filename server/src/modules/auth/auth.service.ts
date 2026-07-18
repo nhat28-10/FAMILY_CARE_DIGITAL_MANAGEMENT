@@ -116,7 +116,18 @@ export class AuthService {
     const user = await this.usersService.findByEmail(dto.email);
 
     // Verify credentials. Use a generic message to avoid user enumeration.
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    if (!user) {
+      throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
+    }
+
+    // Tài khoản social-only không có mật khẩu để so sánh.
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Tài khoản này đăng nhập bằng Google, vui lòng dùng nút Đăng nhập Google',
+      );
+    }
+
+    if (!(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
