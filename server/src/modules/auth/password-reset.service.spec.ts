@@ -24,6 +24,7 @@ describe('PasswordResetService', () => {
     id: userId,
     email,
     accountStatus: AccountStatus.ACTIVE,
+    passwordHash: 'hash',
   };
 
   let prisma: {
@@ -120,6 +121,18 @@ describe('PasswordResetService', () => {
       usersService.findByEmail.mockResolvedValue(activeUser);
       prisma.passwordResetToken.findFirst.mockResolvedValue({
         createdAt: new Date(), // just issued → within 60s cooldown
+      });
+
+      await expect(service.requestReset(email)).resolves.toBeNull();
+
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(mail.sendPasswordResetOtp).not.toHaveBeenCalled();
+    });
+
+    it('silently skips accounts without a password (Google-only)', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        ...activeUser,
+        passwordHash: null,
       });
 
       await expect(service.requestReset(email)).resolves.toBeNull();
@@ -231,6 +244,19 @@ describe('PasswordResetService', () => {
 
       expect(prisma.user.update).not.toHaveBeenCalled();
       expect(refreshTokens.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects accounts without a password with the generic message', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        ...activeUser,
+        passwordHash: null,
+      });
+
+      await expect(
+        service.reset(email, '123456', 'NewP@ssword1'),
+      ).rejects.toThrow(
+        new BadRequestException('Mã không hợp lệ hoặc đã hết hạn'),
+      );
     });
   });
 });
