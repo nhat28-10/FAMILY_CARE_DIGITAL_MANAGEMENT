@@ -21,6 +21,7 @@ import * as bcrypt from 'bcrypt';
 
 import { SafeUser, sanitizeUser } from '../users/users.types';
 import { UsersService } from '../users/users.service';
+import { FirebaseLoginDto } from './dto/firebase-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -147,7 +148,7 @@ export class AuthService {
    * firebaseUid, chưa có thì auto-link theo email (đã verify) hoặc tạo mới,
    * rồi phát cặp token nội bộ như login thường.
    */
-  async loginWithFirebase(dto: { idToken: string }): Promise<AuthResult> {
+  async loginWithFirebase(dto: FirebaseLoginDto): Promise<AuthResult> {
     const decoded = await this.firebaseAuthService.verifyIdToken(dto.idToken);
 
     let user = await this.usersService.findByFirebaseUid(decoded.uid);
