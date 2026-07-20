@@ -89,11 +89,20 @@ export class StripeService {
     amount: number;
     currency?: string;
   }): Promise<string> {
+    return this.createRecurringPrice({ ...params, interval: 'year' });
+  }
+
+  async createRecurringPrice(params: {
+    name: string;
+    amount: number;
+    interval: Stripe.PriceCreateParams.Recurring['interval'];
+    currency?: string;
+  }): Promise<string> {
     const currency = (params.currency ?? DEFAULT_PRICE_CURRENCY).toLowerCase();
     const price = await this.stripe.prices.create({
       currency,
       unit_amount: toMinorUnit(params.amount, currency),
-      recurring: { interval: 'year' },
+      recurring: { interval: params.interval },
       product_data: { name: params.name },
     });
     return price.id;

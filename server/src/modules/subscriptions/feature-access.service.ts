@@ -28,8 +28,8 @@ export class FeatureAccessService {
       return {
         ...subscription,
         allowed: false,
-        message:
-          'Gói dịch vụ đã hết hạn hoặc chưa được thanh toán. Vui lòng gia hạn để dùng chức năng nâng cao.',
+        missingFeature: features[0],
+        message: 'Tính năng yêu cầu nâng cấp gói.',
       };
     }
 
@@ -40,7 +40,7 @@ export class FeatureAccessService {
           ...subscription,
           allowed: false,
           missingFeature: feature,
-          message: `Gói hiện tại không hỗ trợ chức năng: ${feature}.`,
+          message: 'Tính năng yêu cầu nâng cấp gói.',
         };
       }
     }
@@ -48,12 +48,15 @@ export class FeatureAccessService {
     return {
       ...subscription,
       allowed: true,
-      message: 'Gói hiện tại được phép sử dụng chức năng này.',
+      message: 'Gói hiện tại được phép sử dụng tính năng này.',
     };
   }
 
   private readBooleanFeature(access: unknown, path: string): boolean {
     if (!this.isObject(access)) return false;
+
+    const flatValue = access[path];
+    if (typeof flatValue === 'boolean') return flatValue;
 
     let cursor: unknown = access;
     for (const segment of path.split('.')) {

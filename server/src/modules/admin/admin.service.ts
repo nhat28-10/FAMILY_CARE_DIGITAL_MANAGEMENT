@@ -86,7 +86,16 @@ type AdminPaymentRow = Prisma.PaymentTransactionGetPayload<{
 
 const adminSubscriptionInclude = {
   family: { select: { id: true, name: true } },
-  plan: { select: { planCode: true, name: true, annualPrice: true } },
+  plan: {
+    select: {
+      planCode: true,
+      name: true,
+      annualPrice: true,
+      billingPeriod: true,
+      monthlyPrice: true,
+      yearlyPrice: true,
+    },
+  },
 } as const;
 
 type AdminSubscriptionRow = Prisma.FamilySubscriptionGetPayload<{
@@ -443,6 +452,7 @@ export class AdminService {
           data: {
             planId: plan.id,
             status: FamilySubscriptionStatus.ACTIVE,
+            currentPeriodStart: newPeriodStart,
             currentPeriodEnd: newPeriodEnd,
             cancelAtPeriodEnd: false,
             purchasedByUserId: adminId,
@@ -454,6 +464,7 @@ export class AdminService {
             familyId,
             planId: plan.id,
             status: FamilySubscriptionStatus.ACTIVE,
+            currentPeriodStart: newPeriodStart,
             currentPeriodEnd: newPeriodEnd,
             cancelAtPeriodEnd: false,
             purchasedByUserId: adminId,
@@ -526,10 +537,12 @@ export class AdminService {
       where: { familyId },
       select: { stripeSubscriptionId: true },
     });
-    if (!subscription) {
+    const fallbackStripeSubscriptionId =
+      await this.latestPaidStripeSubscriptionId(familyId);
+    if (!subscription && !fallbackStripeSubscriptionId) {
       throw new NotFoundException('Không tìm thấy gói dịch vụ của gia đình');
     }
-    if (!subscription.stripeSubscriptionId) {
+    if (!subscription?.stripeSubscriptionId && !fallbackStripeSubscriptionId) {
       throw new BadRequestException(
         'Family workspace chưa có Stripe subscription để đồng bộ.',
       );
@@ -537,7 +550,7 @@ export class AdminService {
 
     await this.subscriptionLifecycle.syncFamilySubscriptionFromStripe(
       familyId,
-      subscription.stripeSubscriptionId,
+      subscription?.stripeSubscriptionId ?? fallbackStripeSubscriptionId!,
     );
 
     return {
@@ -554,12 +567,25 @@ export class AdminService {
         orderBy: { createdAt: 'desc' },
         include: provisioningLogInclude,
       });
+    const latestSuccessProvisioningLog =
+      await this.prisma.workspaceProvisioningLog.findFirst({
+        where: {
+          workspaceId: familyId,
+          status: ProvisioningStatus.SUCCESS,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { finishedAt: true, createdAt: true },
+      });
 
     return {
       familyId: family.id,
       familyName: family.name,
       workspaceStatus: family.status,
       activationStatus: family.activationStatus,
+      provisionedAt:
+        latestSuccessProvisioningLog?.finishedAt ??
+        latestSuccessProvisioningLog?.createdAt ??
+        null,
       currentSubscriptionStatus: family.subscription?.status ?? null,
       latestProvisioningLog: latestProvisioningLog
         ? this.toProvisioningLogItem(latestProvisioningLog)
@@ -627,6 +653,22 @@ export class AdminService {
     if (!adminId) {
       throw new BadRequestException(
         'Không xác định được quản trị viên thao tác',
+      );
+    }
+
+    const latestLog = await this.prisma.workspaceProvisioningLog.findFirst({
+      where: { workspaceId: familyId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, status: true },
+    });
+    if (!latestLog) {
+      throw new BadRequestException(
+        'Workspace chưa có provisioning record để retry.',
+      );
+    }
+    if (latestLog.status !== ProvisioningStatus.FAILED) {
+      throw new BadRequestException(
+        'Chỉ được retry khi provisioning gần nhất ở trạng thái FAILED.',
       );
     }
 
@@ -1108,7 +1150,9 @@ export class AdminService {
     latestPayment: AdminPaymentRow | null,
   ) {
     const currentPeriodStart =
+      subscription.currentPeriodStart ??
       this.extractManualPeriodStart(latestPayment?.rawPayload) ??
+      this.extractPayloadDate(latestPayment?.rawPayload, ['periodStart']) ??
       (latestPayment ? this.extractPaidAt(latestPayment) : null);
 
     return {
@@ -1125,18 +1169,38 @@ export class AdminService {
     return {
       familyId: subscription.familyId,
       familyName: subscription.family?.name ?? null,
+      planCode: subscription.plan.planCode,
+      status: subscription.status,
       currentPlanCode: subscription.plan.planCode,
       subscriptionStatus: subscription.status,
+      currentPeriodStart: subscription.currentPeriodStart,
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       stripeCustomerId: subscription.stripeCustomerId,
       stripeSubscriptionId: subscription.stripeSubscriptionId,
+      plan: {
+        planCode: subscription.plan.planCode,
+        name: subscription.plan.name,
+        annualPrice: this.decimalToNumber(subscription.plan.annualPrice),
+        billingPeriod: subscription.plan.billingPeriod,
+        monthlyPrice: this.decimalToNumber(subscription.plan.monthlyPrice),
+        yearlyPrice: this.decimalToNumber(subscription.plan.yearlyPrice),
+      },
     };
   }
 
   private extractManualPeriodStart(rawPayload?: Prisma.JsonValue): Date | null {
     if (!rawPayload) return null;
     const value = this.stringAt(rawPayload, ['newPeriodStart']);
+    return value ? new Date(value) : null;
+  }
+
+  private extractPayloadDate(
+    rawPayload: Prisma.JsonValue | undefined,
+    path: Array<string | number>,
+  ): Date | null {
+    if (!rawPayload) return null;
+    const value = this.stringAt(rawPayload, path);
     return value ? new Date(value) : null;
   }
 
@@ -1190,6 +1254,38 @@ export class AdminService {
       ]) ??
       this.stringAt(object, ['items', 'data', 0, 'price', 'id']) ??
       this.stringAt(object, ['price', 'id']) ??
+      null
+    );
+  }
+
+  private async latestPaidStripeSubscriptionId(
+    familyId: string,
+  ): Promise<string | null> {
+    const payment = await this.prisma.paymentTransaction.findFirst({
+      where: { familyId, ...this.paymentStatusWhere('PAID') },
+      orderBy: { createdAt: 'desc' },
+      select: { rawPayload: true },
+    });
+    return payment
+      ? this.extractStripeSubscriptionId(payment.rawPayload)
+      : null;
+  }
+
+  private extractStripeSubscriptionId(
+    rawPayload: Prisma.JsonValue,
+  ): string | null {
+    const direct = this.stringAt(rawPayload, ['stripeSubscriptionId']);
+    if (direct) return direct;
+
+    const object = this.eventObject(rawPayload) ?? rawPayload;
+    return (
+      this.stringAt(object, ['subscription']) ??
+      this.stringAt(object, ['subscription_details', 'subscription']) ??
+      this.stringAt(object, [
+        'parent',
+        'subscription_details',
+        'subscription',
+      ]) ??
       null
     );
   }

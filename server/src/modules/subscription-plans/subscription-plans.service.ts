@@ -1,9 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BillingPeriod, Prisma } from '@prisma/client';
 
 import {
   buildPaginated,
@@ -40,17 +41,22 @@ export class SubscriptionPlansService {
       throw new ConflictException('Mã gói đã tồn tại');
     }
 
+    const contract = this.resolvePlanContract(dto);
+
     // Auto-create a recurring Stripe Price for paid plans when none was given.
     let stripePriceId = dto.stripePriceId ?? null;
     if (
       !stripePriceId &&
       dto.planCode !== FREE_PLAN_CODE &&
-      dto.annualPrice > 0 &&
+      contract.billingPeriod !== BillingPeriod.FREE &&
+      contract.price > 0 &&
       this.stripeService.isConfigured
     ) {
-      stripePriceId = await this.stripeService.createRecurringYearlyPrice({
+      stripePriceId = await this.stripeService.createRecurringPrice({
         name: dto.name,
-        amount: dto.annualPrice,
+        amount: contract.price,
+        interval:
+          contract.billingPeriod === BillingPeriod.MONTHLY ? 'month' : 'year',
       });
     }
 
@@ -58,7 +64,10 @@ export class SubscriptionPlansService {
       data: {
         planCode: dto.planCode,
         name: dto.name,
-        annualPrice: dto.annualPrice,
+        annualPrice: contract.annualPrice,
+        billingPeriod: contract.billingPeriod,
+        monthlyPrice: contract.monthlyPrice,
+        yearlyPrice: contract.yearlyPrice,
         maxMembers: dto.maxMembers,
         storageLimit: dto.storageLimit,
         featureAccess:
@@ -122,11 +131,16 @@ export class SubscriptionPlansService {
       current,
       dto,
     );
+    const contract = this.resolvePlanContract(dto, current);
 
     return this.prisma.subscriptionPlan.update({
       where: { id },
       data: {
         ...dto,
+        annualPrice: contract.annualPrice,
+        billingPeriod: contract.billingPeriod,
+        monthlyPrice: contract.monthlyPrice,
+        yearlyPrice: contract.yearlyPrice,
         featureAccess:
           (dto.featureAccess as Prisma.InputJsonValue | undefined) ?? undefined,
         ...(stripePriceId !== undefined ? { stripePriceId } : {}),
@@ -151,22 +165,102 @@ export class SubscriptionPlansService {
     const targetPlanCode = dto.planCode ?? current.planCode;
     if (targetPlanCode === FREE_PLAN_CODE) return undefined;
 
-    const targetPrice = dto.annualPrice ?? Number(current.annualPrice);
+    const contract = this.resolvePlanContract(dto, current);
+    if (contract.billingPeriod === BillingPeriod.FREE) return undefined;
+
+    const targetPrice = contract.price;
     if (targetPrice <= 0) return undefined;
 
     const priceChanged =
-      dto.annualPrice !== undefined &&
-      Number(dto.annualPrice) !== Number(current.annualPrice);
+      targetPrice !== Number(current.annualPrice) ||
+      contract.billingPeriod !== current.billingPeriod;
     if (current.stripePriceId && !priceChanged) return undefined;
 
-    const newPriceId = await this.stripeService.createRecurringYearlyPrice({
+    const newPriceId = await this.stripeService.createRecurringPrice({
       name: dto.name ?? current.name,
-      amount: dto.annualPrice ?? Number(current.annualPrice),
+      amount: targetPrice,
+      interval:
+        contract.billingPeriod === BillingPeriod.MONTHLY ? 'month' : 'year',
     });
     if (current.stripePriceId) {
       await this.stripeService.archivePrice(current.stripePriceId);
     }
     return newPriceId;
+  }
+
+  private resolvePlanContract(
+    dto: UpdateSubscriptionPlanDto,
+    current?: SubscriptionPlan,
+  ): {
+    billingPeriod: BillingPeriod;
+    price: number;
+    annualPrice: number;
+    monthlyPrice: number | null;
+    yearlyPrice: number | null;
+  } {
+    const planCode = dto.planCode ?? current?.planCode;
+    const billingPeriod =
+      dto.billingPeriod ??
+      current?.billingPeriod ??
+      this.inferBillingPeriod(planCode);
+
+    if (billingPeriod === BillingPeriod.FREE || planCode === FREE_PLAN_CODE) {
+      return {
+        billingPeriod: BillingPeriod.FREE,
+        price: 0,
+        annualPrice: dto.annualPrice ?? 0,
+        monthlyPrice: dto.monthlyPrice ?? null,
+        yearlyPrice: dto.yearlyPrice ?? null,
+      };
+    }
+
+    const monthlyPrice =
+      dto.monthlyPrice ??
+      (current?.monthlyPrice === null || current?.monthlyPrice === undefined
+        ? undefined
+        : Number(current.monthlyPrice));
+    const yearlyPrice =
+      dto.yearlyPrice ??
+      (current?.yearlyPrice === null || current?.yearlyPrice === undefined
+        ? undefined
+        : Number(current.yearlyPrice));
+    const legacyPrice =
+      dto.annualPrice ??
+      (current?.annualPrice === undefined
+        ? undefined
+        : Number(current.annualPrice));
+
+    const price =
+      billingPeriod === BillingPeriod.MONTHLY
+        ? (monthlyPrice ?? legacyPrice)
+        : (yearlyPrice ?? legacyPrice);
+    if (price === undefined) {
+      throw new BadRequestException(
+        billingPeriod === BillingPeriod.MONTHLY
+          ? 'monthlyPrice là bắt buộc cho gói MONTHLY.'
+          : 'yearlyPrice là bắt buộc cho gói YEARLY.',
+      );
+    }
+
+    return {
+      billingPeriod,
+      price,
+      annualPrice: dto.annualPrice ?? price,
+      monthlyPrice:
+        billingPeriod === BillingPeriod.MONTHLY
+          ? (dto.monthlyPrice ?? price)
+          : (dto.monthlyPrice ?? monthlyPrice ?? null),
+      yearlyPrice:
+        billingPeriod === BillingPeriod.YEARLY
+          ? (dto.yearlyPrice ?? price)
+          : (dto.yearlyPrice ?? yearlyPrice ?? null),
+    };
+  }
+
+  private inferBillingPeriod(planCode?: string): BillingPeriod {
+    if (planCode === FREE_PLAN_CODE) return BillingPeriod.FREE;
+    if (planCode === 'MONTHLY') return BillingPeriod.MONTHLY;
+    return BillingPeriod.YEARLY;
   }
 
   async remove(id: string): Promise<null> {

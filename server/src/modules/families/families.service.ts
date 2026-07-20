@@ -83,10 +83,32 @@ export class FamiliesService {
         data: {
           workspaceId: created.id,
           actionType: ProvisioningActionType.CREATE,
+          status: ProvisioningStatus.PENDING,
+          message: 'Family workspace creation started.',
+          startedAt: now,
+          createdByUserId: userId,
+        },
+      });
+
+      await tx.workspaceProvisioningLog.create({
+        data: {
+          workspaceId: created.id,
+          actionType: ProvisioningActionType.CREATE,
           status: ProvisioningStatus.SUCCESS,
           message: 'Family workspace được tạo và kích hoạt thành công.',
           startedAt: now,
           finishedAt: now,
+          createdByUserId: userId,
+        },
+      });
+
+      await tx.workspaceProvisioningLog.create({
+        data: {
+          workspaceId: created.id,
+          actionType: ProvisioningActionType.ACTIVATE,
+          status: ProvisioningStatus.PENDING,
+          message: 'Family workspace activation started.',
+          startedAt: now,
           createdByUserId: userId,
         },
       });

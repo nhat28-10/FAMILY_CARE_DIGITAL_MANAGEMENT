@@ -1,5 +1,6 @@
 import {
   AccountStatus,
+  BillingPeriod,
   FamilySubscriptionStatus,
   PrismaClient,
   UserType,
@@ -9,54 +10,63 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-/** Base subscription tiers. Paid tiers get `stripePriceId` later (admin API). */
+/** Base subscription tiers. Paid tiers get `stripePriceId` later. */
 const BASE_PLANS = [
   {
     planCode: 'FREE',
     name: 'Gói miễn phí',
     annualPrice: 0,
+    billingPeriod: BillingPeriod.FREE,
+    monthlyPrice: null,
+    yearlyPrice: null,
     maxMembers: 3,
     storageLimit: 1024,
     featureAccess: {
-      maxFamilies: 1,
-      aiEnabled: false,
-      advancedFinance: false,
+      'calendar.enabled': true,
+      'calendar.reminders': false,
+      'calendar.recurringEvents': false,
+      'album.faceSuggestions': false,
     },
   },
   {
     planCode: 'MONTHLY',
     name: 'Gói tháng',
     annualPrice: 99000,
+    billingPeriod: BillingPeriod.MONTHLY,
+    monthlyPrice: 99000,
+    yearlyPrice: null,
     maxMembers: 10,
     storageLimit: 5120,
     featureAccess: {
-      maxFamilies: 3,
-      aiEnabled: true,
-      advancedFinance: true,
+      'calendar.enabled': true,
+      'calendar.reminders': true,
+      'calendar.recurringEvents': true,
+      'album.faceSuggestions': true,
     },
   },
   {
     planCode: 'YEARLY',
     name: 'Gói năm',
     annualPrice: 990000,
+    billingPeriod: BillingPeriod.YEARLY,
+    monthlyPrice: null,
+    yearlyPrice: 990000,
     maxMembers: 10,
     storageLimit: 5120,
     featureAccess: {
-      maxFamilies: 3,
-      aiEnabled: true,
-      advancedFinance: true,
+      'calendar.enabled': true,
+      'calendar.reminders': true,
+      'calendar.recurringEvents': true,
+      'album.faceSuggestions': true,
     },
   },
 ];
 
 /**
- * Seeds the data needed to use/test the platform. Idempotent — safe to re-run:
+ * Seeds the data needed to use/test the platform. Idempotent and safe to rerun:
  *   - one SYSTEM_ADMIN account (from ADMIN_EMAIL / ADMIN_PASSWORD)
- *   - the FREE / PLUS / PREMIUM subscription plans
- *   - a FREE FamilySubscription for every family that doesn't have one yet
- *
- *   ADMIN_EMAIL, ADMIN_PASSWORD   (required)
- *   BCRYPT_SALT_ROUNDS            (optional, default 10)
+ *   - the FREE / MONTHLY / YEARLY subscription plans
+ *   - a FREE FamilySubscription for every family that does not have one yet
  */
 async function main() {
   const email = process.env.ADMIN_EMAIL;
@@ -88,29 +98,18 @@ async function main() {
     },
   });
 
-  console.log(`✔ Seeded SYSTEM_ADMIN: ${admin.email} (id=${admin.id})`);
+  console.log(`Seeded SYSTEM_ADMIN: ${admin.email} (id=${admin.id})`);
 
   await seedPlans();
   await backfillFreeSubscriptions();
 }
 
-/**
- * Stripe recurring Price id for a paid plan, read from env. Lets teammates
- * sharing one Stripe test account configure plans via `.env` + `npm run seed`
- * instead of PATCHing each DB by hand:
- *   STRIPE_PRICE_PLUS, STRIPE_PRICE_PREMIUM
- */
 function stripePriceIdFor(planCode: string): string | undefined {
   if (planCode === 'MONTHLY') return process.env.STRIPE_PRICE_MONTHLY;
   if (planCode === 'YEARLY') return process.env.STRIPE_PRICE_YEARLY;
   return undefined;
 }
 
-/**
- * Upsert the base plans by planCode. `stripePriceId` is set from env when
- * provided; when the env var is absent the existing value is left untouched
- * (so re-running seed without the vars won't wipe an already-configured price).
- */
 async function seedPlans() {
   for (const plan of BASE_PLANS) {
     const stripePriceId = stripePriceIdFor(plan.planCode);
@@ -119,8 +118,12 @@ async function seedPlans() {
       update: {
         name: plan.name,
         annualPrice: plan.annualPrice,
+        billingPeriod: plan.billingPeriod,
+        monthlyPrice: plan.monthlyPrice,
+        yearlyPrice: plan.yearlyPrice,
         maxMembers: plan.maxMembers,
         storageLimit: plan.storageLimit,
+        featureAccess: plan.featureAccess,
         isActive: true,
         ...(stripePriceId ? { stripePriceId } : {}),
       },
@@ -128,10 +131,12 @@ async function seedPlans() {
     });
   }
 
-  const configured = BASE_PLANS.filter((p) => stripePriceIdFor(p.planCode)).length;
+  const configured = BASE_PLANS.filter((p) =>
+    stripePriceIdFor(p.planCode),
+  ).length;
   console.log(
-    `✔ Seeded ${BASE_PLANS.length} subscription plans ` +
-    `(${configured} paid plan(s) linked to Stripe price)`,
+    `Seeded ${BASE_PLANS.length} subscription plans ` +
+      `(${configured} paid plan(s) linked to Stripe price)`,
   );
 }
 
@@ -156,7 +161,7 @@ async function backfillFreeSubscriptions() {
       },
     });
   }
-  console.log(`✔ Backfilled FREE subscription for ${families.length} families`);
+  console.log(`Backfilled FREE subscription for ${families.length} families`);
 }
 
 main()
