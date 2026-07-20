@@ -6,13 +6,20 @@ import * as admin from 'firebase-admin';
 
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { NotificationChannel } from './notification-channel';
-import type { NotificationDelivery } from '../notifications.types';
+import type {
+  NotificationDelivery,
+  NotificationPayload,
+} from '../notifications.types';
 
 const DEAD_TOKEN_CODES = new Set([
   'messaging/registration-token-not-registered',
   'messaging/invalid-registration-token',
 ]);
 const FCM_BATCH_SIZE = 500;
+/** Channel Android do FE tạo sẵn — SOS dùng Importance.max để xuyên Doze. */
+const SOS_CHANNEL_ID = 'sos_alerts';
+const DEFAULT_CHANNEL_ID = 'general_notifications';
+const SOS_REFERENCE_TYPE = 'SOS_ALERT';
 
 @Injectable()
 export class FcmNotificationChannel
@@ -82,8 +89,13 @@ export class FcmNotificationChannel
           priority: this.isHighPriority(delivery.notification.priority)
             ? ('high' as const)
             : ('normal' as const),
+          notification: {
+            channelId: this.resolveChannelId(delivery.notification),
+          },
         },
         data: {
+          title: delivery.notification.title,
+          body: delivery.notification.body,
           notificationId: delivery.notification.id ?? '',
           type: delivery.notification.type,
           familyId: delivery.notification.familyId ?? '',
@@ -114,6 +126,12 @@ export class FcmNotificationChannel
       });
       this.logger.log(`Đã dọn ${uniqueDeadTokens.length} FCM token chết`);
     }
+  }
+
+  private resolveChannelId(notification: NotificationPayload): string {
+    return notification.referenceType === SOS_REFERENCE_TYPE
+      ? SOS_CHANNEL_ID
+      : DEFAULT_CHANNEL_ID;
   }
 
   private isHighPriority(priority: NotificationPriority): boolean {

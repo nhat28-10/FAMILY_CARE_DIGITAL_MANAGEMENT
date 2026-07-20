@@ -104,6 +104,42 @@ Theo **user**, không theo family:
 | `POST /api/v1/devices/tokens` | `{ token, platform: 'ANDROID' \| 'IOS' \| 'WEB', deviceName? }`. Upsert theo `token` — đổi tài khoản trên cùng máy thì token tự chuyển chủ. Gọi lúc app khởi động / sau khi được cấp quyền notification. |
 | `DELETE /api/v1/devices/tokens/:token` | Gọi lúc **logout** để không nhận push nhầm tài khoản. |
 
+⚠️ **Phải gọi lại `POST` khi `onTokenRefresh`**, không chỉ lúc login. FCM xoay token
+định kỳ; bỏ qua bước này thì push chết âm thầm, không có lỗi nào báo ra.
+
+**Firebase project**: FE bắt buộc dùng `google-services.json` của **đúng project mà BE
+cấu hình ở `FIREBASE_SERVICE_ACCOUNT`** (cùng project với đăng nhập Google). Sai project
+= token đăng ký thành công, push gửi đi nhưng máy không bao giờ nhận, **không có log lỗi**.
+Đối chiếu `project_id` của 2 bên trước khi test.
+
+Backend tự dọn token chết: FCM trả `registration-token-not-registered` /
+`invalid-registration-token` → row bị xóa khỏi `device_tokens` ngay.
+
+#### Shape payload push
+
+Mỗi push gồm cả block `notification` (để Android tự hiện khi app bị kill) và block `data`:
+
+| Key trong `data` | Ghi chú |
+|---|---|
+| `title`, `body` | Lặp lại nội dung của `notification` — dùng khi FE tự render lúc terminated |
+| `type` | `SOS` / `TASK` / `FINANCE` / … — chọn icon, nhóm |
+| `referenceType`, `referenceId` | Điều hướng — bảng §2.5 |
+| `familyId` | Family liên quan |
+| `notificationId` | Id row DB. **Rỗng = noti push-only** (chat) → đừng gọi API mark-read |
+
+> Mọi value trong `data` là **string**. Field trống trả `""` chứ không phải `null` —
+> check `isEmpty` thay vì `!= null`.
+
+**Channel Android** (FE tạo sẵn 2 channel, BE chỉ định channel nào qua `android.notification.channel_id`):
+
+| Loại | `channel_id` | `android.priority` |
+|---|---|---|
+| SOS (`referenceType = SOS_ALERT`) | `sos_alerts` | `high` — xuyên Doze |
+| Còn lại | `general_notifications` | `high` nếu priority `HIGH`/`CRITICAL`, ngược lại `normal` |
+
+Channel `sos_alerts` phải khai `Importance.max` phía FE thì cảnh báo mới kêu được lúc
+máy đang ngủ / màn hình khoá.
+
 ### 2.5 Điều hướng khi bấm thông báo
 
 Dùng `type` để chọn icon/nhóm, `referenceType` + `referenceId` để mở màn đích:
@@ -284,7 +320,12 @@ socket.on('sos:track:stop', () => clearInterval(trackTimer));
       `notification:unread-count` (badge).
 - [ ] Phân biệt `id === null` (push-only): chỉ toast, không thêm list/badge.
 - [ ] Màn danh sách: `GET .../notifications` + mark read / read-all.
-- [ ] Đăng ký FCM token sau khi có quyền notification; xóa token khi logout.
+- [ ] Đăng ký FCM token sau khi có quyền notification; **gọi lại khi `onTokenRefresh`**;
+      xóa token khi logout.
+- [ ] `google-services.json` đúng project với `FIREBASE_SERVICE_ACCOUNT` của BE (đối chiếu
+      `project_id`).
+- [ ] Tạo 2 channel Android: `sos_alerts` (Importance.max) + `general_notifications`.
+- [ ] Xử lý push ở cả 3 trạng thái: foreground / background / terminated.
 - [ ] Router điều hướng theo bảng `referenceType` (mục 2.5) + fallback an toàn.
 
 **SOS:**

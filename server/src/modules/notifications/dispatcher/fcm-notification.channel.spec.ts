@@ -71,6 +71,45 @@ describe('FcmNotificationChannel', () => {
     });
   });
 
+  it('SOS_ALERT → channel sos_alerts, data mang cả title/body cho FE render', async () => {
+    sendEach.mockResolvedValue({
+      responses: [{ success: true }, { success: true }],
+    });
+    await makeChannel().deliver([delivery]);
+    const messages = sendEach.mock.calls[0][0];
+    expect(messages[0]).toMatchObject({
+      android: {
+        priority: 'high',
+        notification: { channelId: 'sos_alerts' },
+      },
+      data: expect.objectContaining({ title: 'SOS', body: 'B' }),
+    });
+  });
+
+  it('notification thường → channel general_notifications, priority normal', async () => {
+    sendEach.mockResolvedValue({
+      responses: [{ success: true }, { success: true }],
+    });
+    await makeChannel().deliver([
+      {
+        ...delivery,
+        notification: {
+          ...delivery.notification,
+          type: NotificationType.TASK,
+          priority: NotificationPriority.NORMAL,
+          referenceType: 'TASK_ASSIGNMENT',
+        },
+      },
+    ]);
+    const messages = sendEach.mock.calls[0][0];
+    expect(messages[0]).toMatchObject({
+      android: {
+        priority: 'normal',
+        notification: { channelId: 'general_notifications' },
+      },
+    });
+  });
+
   it('token bị báo not-registered → xóa khỏi device_tokens', async () => {
     sendEach.mockResolvedValue({
       responses: [
