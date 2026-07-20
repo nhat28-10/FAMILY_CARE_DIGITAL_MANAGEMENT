@@ -451,22 +451,22 @@ model Family {
 }
 
 model FamilyMember {
-  id           String       @id @default(uuid())
-  familyId     String
-  userId       String
+  id                     String       @id @default(uuid())
+  familyId               String
+  userId                 String
   /// ERD: display_name — per-family display name override.
-  displayName  String?
-  familyRole   FamilyRole   @default(FAMILY_MEMBER)
-  relationship Relationship @default(OTHER)
+  displayName            String?
+  familyRole             FamilyRole   @default(FAMILY_MEMBER)
+  relationship           Relationship @default(OTHER)
   /// ERD: member_status.
-  status       MemberStatus @default(ACTIVE)
+  status                 MemberStatus @default(ACTIVE)
   /// Opt-in daily location sharing on the family map (separate from SOS tracking).
-  locationSharingEnabled Boolean @default(false) @map("location_sharing_enabled")
-  joinedAt     DateTime     @default(now())
+  locationSharingEnabled Boolean      @default(false) @map("location_sharing_enabled")
+  joinedAt               DateTime     @default(now())
   /// ERD: left_at — set when the member leaves/is removed.
-  leftAt       DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @default(now()) @updatedAt
+  leftAt                 DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @default(now()) @updatedAt
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -697,12 +697,18 @@ model LedgerEntry {
 
 /// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only; admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.
 model SubscriptionPlan {
-  id            String   @id @default(uuid())
+  id            String        @id @default(uuid())
   /// Unique plan code, e.g. FREE / PLUS / PREMIUM / GOLD. `FREE` is reserved as the default plan for new families.
-  planCode      String   @unique
+  planCode      String        @unique
   name          String
   /// ERD: annual_price — paid plans are billed yearly.
-  annualPrice   Decimal  @db.Decimal(18, 2)
+  annualPrice   Decimal       @db.Decimal(18, 2)
+  /// Canonical billing cadence used by Admin and Stripe price creation.
+  billingPeriod BillingPeriod @default(YEARLY)
+  /// Monthly price for MONTHLY plans. Null for FREE/YEARLY unless configured for display.
+  monthlyPrice  Decimal?      @db.Decimal(18, 2)
+  /// Yearly price for YEARLY plans. Null for FREE/MONTHLY unless configured for display.
+  yearlyPrice   Decimal?      @db.Decimal(18, 2)
   /// ERD: max_members — member cap enforced per workspace subscription.
   maxMembers    Int
   /// ERD: storage_limit — storage allowance in megabytes.
@@ -710,10 +716,10 @@ model SubscriptionPlan {
   /// ERD: feature_access — feature flags/limits map for the tier.
   featureAccess Json?
   /// Stripe recurring (annual) Price id — required for paid tiers (PLUS/PREMIUM).
-  stripePriceId String?  @unique
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  stripePriceId String?       @unique
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   familySubscriptions FamilySubscription[]
 
@@ -727,6 +733,12 @@ enum FamilySubscriptionStatus {
   CANCELED
 }
 
+enum BillingPeriod {
+  FREE
+  MONTHLY
+  YEARLY
+}
+
 /// One row per family (always present). New families start on FREE with no expiry; buying a paid plan moves the row to PLUS/PREMIUM and fills the Stripe ids. Webhooks are the source of truth for status/period changes.
 model FamilySubscription {
   id                   String                   @id @default(uuid())
@@ -735,6 +747,8 @@ model FamilySubscription {
   status               FamilySubscriptionStatus @default(ACTIVE)
   stripeCustomerId     String?
   stripeSubscriptionId String?                  @unique
+  /// null for FREE (no expiry); set from Stripe current_period_start for paid plans.
+  currentPeriodStart   DateTime?
   /// null for FREE (no expiry); set from Stripe current_period_end for paid plans.
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean                  @default(false)

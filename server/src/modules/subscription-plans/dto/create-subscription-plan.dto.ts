@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BillingPeriod } from '@prisma/client';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNumber,
   IsObject,
@@ -11,28 +13,63 @@ import {
   Min,
 } from 'class-validator';
 
+import { OFFICIAL_FEATURE_ACCESS_KEYS } from '../../subscriptions/feature-access.constants';
+import { IsFeatureAccessMap } from './feature-access-map.validator';
+
 export class CreateSubscriptionPlanDto {
   @ApiProperty({
-    example: 'GOLD',
+    example: 'MONTHLY',
     description:
-      'Mã gói duy nhất, CHỮ HOA/số/gạch dưới (vd FREE, PLUS, PREMIUM, GOLD). FREE là mã dành riêng cho gói mặc định.',
+      'Mã gói duy nhất, chữ hoa/số/gạch dưới. FREE là mã dành riêng cho gói mặc định.',
   })
   @IsString()
   @MaxLength(50)
   @Matches(/^[A-Z][A-Z0-9_]*$/, {
-    message: 'planCode chỉ gồm chữ in hoa, số và gạch dưới (bắt đầu bằng chữ)',
+    message: 'planCode chỉ gồm chữ in hoa, số và gạch dưới.',
   })
   planCode: string;
 
-  @ApiProperty({ example: 'Gói Plus' })
+  @ApiProperty({ example: 'Gói tháng' })
   @IsString()
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ example: 990000, description: 'Giá theo năm (annual-only)' })
+  @ApiPropertyOptional({
+    example: 180000,
+    description:
+      'Legacy display price. Prefer monthlyPrice/yearlyPrice with billingPeriod.',
+  })
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  annualPrice: number;
+  annualPrice?: number;
+
+  @ApiPropertyOptional({
+    enum: BillingPeriod,
+    example: BillingPeriod.MONTHLY,
+    description: 'Billing cadence for this plan.',
+  })
+  @IsOptional()
+  @IsEnum(BillingPeriod)
+  billingPeriod?: BillingPeriod;
+
+  @ApiPropertyOptional({
+    example: 180000,
+    description: 'Monthly price for MONTHLY plans.',
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  monthlyPrice?: number;
+
+  @ApiPropertyOptional({
+    example: 1800000,
+    description: 'Yearly price for YEARLY plans.',
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  yearlyPrice?: number;
 
   @ApiProperty({ example: 10, description: 'Số thành viên tối đa' })
   @IsInt()
@@ -45,16 +82,22 @@ export class CreateSubscriptionPlanDto {
   storageLimit: number;
 
   @ApiPropertyOptional({
-    description: 'Map tính năng/giới hạn theo gói',
-    example: { aiChatbot: true, sos: true },
+    description: 'Map tính năng theo key chính thức.',
+    enum: OFFICIAL_FEATURE_ACCESS_KEYS,
+    example: {
+      'calendar.enabled': true,
+      'calendar.reminders': true,
+      'calendar.recurringEvents': true,
+      'album.faceSuggestions': true,
+    },
   })
   @IsOptional()
   @IsObject()
-  featureAccess?: Record<string, unknown>;
+  @IsFeatureAccessMap()
+  featureAccess?: Record<string, boolean>;
 
   @ApiPropertyOptional({
-    description:
-      'Stripe recurring Price id (bắt buộc cho gói trả phí PLUS/PREMIUM)',
+    description: 'Stripe recurring Price id. Bắt buộc cho gói trả phí.',
     example: 'price_1Xxxx',
   })
   @IsOptional()

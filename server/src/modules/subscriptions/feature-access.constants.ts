@@ -35,3 +35,7 @@ export const FEATURE_ACCESS_KEYS = {
 
 export type FeatureAccessKey =
   (typeof FEATURE_ACCESS_KEYS)[keyof typeof FEATURE_ACCESS_KEYS];
+
+export const OFFICIAL_FEATURE_ACCESS_KEYS = Object.values(
+  FEATURE_ACCESS_KEYS,
+) as FeatureAccessKey[];

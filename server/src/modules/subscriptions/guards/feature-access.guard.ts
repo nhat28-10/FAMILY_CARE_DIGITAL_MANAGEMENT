@@ -2,13 +2,13 @@ import {
   BadRequestException,
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import { REQUIRED_FEATURES_KEY } from '../decorators/require-feature.decorator';
 import { FeatureAccessService } from '../feature-access.service';
+import { FeatureNotAvailableException } from '../feature-not-available.exception';
 
 interface RequestWithParams {
   params?: Record<string, string>;
@@ -41,7 +41,10 @@ export class FeatureAccessGuard implements CanActivate {
       requiredFeatures,
     );
     if (!result.allowed) {
-      throw new ForbiddenException(result.message);
+      throw new FeatureNotAvailableException(
+        result.missingFeature ?? requiredFeatures[0],
+        result.message,
+      );
     }
 
     return true;

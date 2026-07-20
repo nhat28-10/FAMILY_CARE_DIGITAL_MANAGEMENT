@@ -1,5 +1,12 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { FamilySubscriptionStatus, Prisma } from '@prisma/client';
+import {
+  ActivationStatus,
+  FamilySubscriptionStatus,
+  Prisma,
+  ProvisioningActionType,
+  ProvisioningStatus,
+  WorkspaceStatus,
+} from '@prisma/client';
 import Stripe from 'stripe';
 
 import { PrismaService } from '../../prisma/prisma.service';
@@ -46,16 +53,6 @@ export class SubscriptionLifecycleService {
     const stripeCustomerId = this.asId(session.customer);
     const purchasedByUserId = session.metadata?.purchasedByUserId ?? null;
 
-    await this.prisma.familySubscription.update({
-      where: { familyId },
-      data: {
-        ...(stripeCustomerId ? { stripeCustomerId } : {}),
-        ...(stripeSubscriptionId ? { stripeSubscriptionId } : {}),
-        status: FamilySubscriptionStatus.ACTIVE,
-        ...(purchasedByUserId ? { purchasedByUserId } : {}),
-      },
-    });
-
     if (stripeSubscriptionId) {
       try {
         const subscription =
@@ -67,7 +64,19 @@ export class SubscriptionLifecycleService {
         this.logger.warn(
           `Không thể đồng bộ subscription sau checkout ${session.id}: ${this.errorMessage(error)}`,
         );
+        await this.upsertFamilySubscription(familyId, {
+          stripeCustomerId,
+          stripeSubscriptionId,
+          status: FamilySubscriptionStatus.ACTIVE,
+          purchasedByUserId,
+        });
       }
+    } else {
+      await this.upsertFamilySubscription(familyId, {
+        stripeCustomerId,
+        status: FamilySubscriptionStatus.ACTIVE,
+        purchasedByUserId,
+      });
     }
 
     if (session.payment_status === 'paid' || session.status === 'complete') {
@@ -116,20 +125,20 @@ export class SubscriptionLifecycleService {
     const plan = priceId ? await this.findPlanByStripePriceId(priceId) : null;
     const period = this.subscriptionPeriod(subscription);
 
-    await this.prisma.familySubscription.update({
-      where: { familyId },
-      data: {
-        ...(plan ? { planId: plan.id } : {}),
-        stripeSubscriptionId: subscription.id,
-        stripeCustomerId: this.asId(subscription.customer),
-        currentPeriodEnd: period.end,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
-        status: this.mapStripeStatus(subscription.status),
-        ...(options.purchasedByUserId
-          ? { purchasedByUserId: options.purchasedByUserId }
-          : {}),
-      },
+    const status = this.mapStripeStatus(subscription.status);
+    await this.upsertFamilySubscription(familyId, {
+      planId: plan?.id,
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId: this.asId(subscription.customer),
+      currentPeriodStart: period.start,
+      currentPeriodEnd: period.end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+      status,
+      purchasedByUserId: options.purchasedByUserId,
     });
+    if (status === FamilySubscriptionStatus.ACTIVE) {
+      await this.recordActivationProvisioning(familyId);
+    }
   }
 
   async syncFamilySubscriptionFromStripe(
@@ -146,16 +155,14 @@ export class SubscriptionLifecycleService {
       where: { planCode: FREE_PLAN_CODE },
     });
 
-    await this.prisma.familySubscription.update({
-      where: { familyId },
-      data: {
-        ...(freePlan ? { planId: freePlan.id } : {}),
-        status: FamilySubscriptionStatus.CANCELED,
-        stripeSubscriptionId: null,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-        purchasedByUserId: null,
-      },
+    await this.upsertFamilySubscription(familyId, {
+      planId: freePlan?.id,
+      status: FamilySubscriptionStatus.CANCELED,
+      stripeSubscriptionId: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      purchasedByUserId: null,
     });
   }
 
@@ -195,15 +202,120 @@ export class SubscriptionLifecycleService {
       : null;
     const period = this.invoicePeriod(invoice);
 
-    await this.prisma.familySubscription.update({
+    await this.upsertFamilySubscription(familyId, {
+      status,
+      planId: plan?.id,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      currentPeriodStart: period.start,
+      currentPeriodEnd: period.end,
+    });
+    if (status === FamilySubscriptionStatus.ACTIVE) {
+      await this.recordActivationProvisioning(familyId);
+    }
+  }
+
+  private async upsertFamilySubscription(
+    familyId: string,
+    input: {
+      planId?: string | null;
+      status: FamilySubscriptionStatus;
+      stripeCustomerId?: string | null;
+      stripeSubscriptionId?: string | null;
+      currentPeriodStart?: Date | null;
+      currentPeriodEnd?: Date | null;
+      cancelAtPeriodEnd?: boolean;
+      purchasedByUserId?: string | null;
+    },
+  ): Promise<void> {
+    const current = await this.prisma.familySubscription.findUnique({
       where: { familyId },
-      data: {
-        status,
-        ...(plan ? { planId: plan.id } : {}),
-        ...(stripeCustomerId ? { stripeCustomerId } : {}),
-        ...(stripeSubscriptionId ? { stripeSubscriptionId } : {}),
-        ...(period.end ? { currentPeriodEnd: period.end } : {}),
+      select: { planId: true },
+    });
+    const planId = input.planId ?? current?.planId ?? (await this.freePlanId());
+    if (!planId) {
+      throw new NotFoundException(
+        'Không tìm thấy gói subscription để đồng bộ thanh toán.',
+      );
+    }
+
+    const data = {
+      planId,
+      status: input.status,
+      ...(input.stripeCustomerId !== undefined
+        ? { stripeCustomerId: input.stripeCustomerId }
+        : {}),
+      ...(input.stripeSubscriptionId !== undefined
+        ? { stripeSubscriptionId: input.stripeSubscriptionId }
+        : {}),
+      ...(input.currentPeriodStart !== undefined
+        ? { currentPeriodStart: input.currentPeriodStart }
+        : {}),
+      ...(input.currentPeriodEnd !== undefined
+        ? { currentPeriodEnd: input.currentPeriodEnd }
+        : {}),
+      ...(input.cancelAtPeriodEnd !== undefined
+        ? { cancelAtPeriodEnd: input.cancelAtPeriodEnd }
+        : {}),
+      ...(input.purchasedByUserId !== undefined
+        ? { purchasedByUserId: input.purchasedByUserId }
+        : {}),
+    };
+
+    await this.prisma.familySubscription.upsert({
+      where: { familyId },
+      create: { familyId, ...data },
+      update: data,
+    });
+  }
+
+  private async freePlanId(): Promise<string | null> {
+    const freePlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { planCode: FREE_PLAN_CODE },
+      select: { id: true },
+    });
+    return freePlan?.id ?? null;
+  }
+
+  private async recordActivationProvisioning(familyId: string): Promise<void> {
+    const latest = await this.prisma.workspaceProvisioningLog.findFirst({
+      where: {
+        workspaceId: familyId,
+        actionType: ProvisioningActionType.ACTIVATE,
+        status: ProvisioningStatus.SUCCESS,
       },
+      select: { id: true },
+    });
+    if (latest) return;
+
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const log = await tx.workspaceProvisioningLog.create({
+        data: {
+          workspaceId: familyId,
+          actionType: ProvisioningActionType.ACTIVATE,
+          status: ProvisioningStatus.PENDING,
+          message: 'Subscription activation provisioning started.',
+          startedAt: now,
+        },
+      });
+
+      await tx.family.update({
+        where: { id: familyId },
+        data: {
+          status: WorkspaceStatus.ACTIVE,
+          activationStatus: ActivationStatus.ACTIVE,
+        },
+      });
+
+      await tx.workspaceProvisioningLog.update({
+        where: { id: log.id },
+        data: {
+          status: ProvisioningStatus.SUCCESS,
+          message: 'Subscription activation provisioning completed.',
+          finishedAt: now,
+        },
+      });
     });
   }
 

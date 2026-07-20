@@ -345,6 +345,9 @@ Table subscription_plans {
   planCode String [unique, not null, note: 'Unique plan code, e.g. FREE / PLUS / PREMIUM / GOLD. `FREE` is reserved as the default plan for new families.']
   name String [not null]
   annualPrice Decimal [not null, note: 'ERD: annual_price — paid plans are billed yearly.']
+  billingPeriod BillingPeriod [not null, default: 'YEARLY', note: 'Canonical billing cadence used by Admin and Stripe price creation.']
+  monthlyPrice Decimal [note: 'Monthly price for MONTHLY plans. Null for FREE/YEARLY unless configured for display.']
+  yearlyPrice Decimal [note: 'Yearly price for YEARLY plans. Null for FREE/MONTHLY unless configured for display.']
   maxMembers Int [not null, note: 'ERD: max_members — member cap enforced per workspace subscription.']
   storageLimit Int [not null, note: 'ERD: storage_limit — storage allowance in megabytes.']
   featureAccess Json [note: 'ERD: feature_access — feature flags/limits map for the tier.']
@@ -364,6 +367,7 @@ Table family_subscriptions {
   status FamilySubscriptionStatus [not null, default: 'ACTIVE']
   stripeCustomerId String
   stripeSubscriptionId String [unique]
+  currentPeriodStart DateTime [note: 'null for FREE (no expiry); set from Stripe current_period_start for paid plans.']
   currentPeriodEnd DateTime [note: 'null for FREE (no expiry); set from Stripe current_period_end for paid plans.']
   cancelAtPeriodEnd Boolean [not null, default: false]
   purchasedByUserId String [note: 'User accountable for the current paid plan (who bought/renewed it). Null for FREE / auto-seeded rows. SetNull on user delete so billing history survives. Only a FAMILY_MANAGER can become the purchaser (enforced in the API).']
@@ -1556,6 +1560,12 @@ Enum FamilySubscriptionStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+}
+
+Enum BillingPeriod {
+  FREE
+  MONTHLY
+  YEARLY
 }
 
 Enum SosSourceType {

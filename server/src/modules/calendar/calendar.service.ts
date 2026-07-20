@@ -16,6 +16,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FEATURE_ACCESS_KEYS } from '../subscriptions/feature-access.constants';
 import { FeatureAccessService } from '../subscriptions/feature-access.service';
+import { FeatureNotAvailableException } from '../subscriptions/feature-not-available.exception';
 import { CalendarEventQueryDto } from './dto/calendar-event-query.dto';
 import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
 import { RespondCalendarEventDto } from './dto/respond-calendar-event.dto';
@@ -350,7 +351,10 @@ export class CalendarService {
       feature,
     ]);
     if (!result.allowed) {
-      throw new ForbiddenException(result.message);
+      throw new FeatureNotAvailableException(
+        result.missingFeature ?? feature,
+        result.message,
+      );
     }
   }
 }
