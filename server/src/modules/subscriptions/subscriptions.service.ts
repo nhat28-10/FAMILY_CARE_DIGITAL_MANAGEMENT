@@ -140,6 +140,7 @@ export class SubscriptionsService {
     active: boolean;
     status: FamilySubscriptionStatus;
     planCode: string;
+    featureAccess: Prisma.JsonValue | null;
     currentPeriodEnd: Date | null;
     message: string;
   }> {
@@ -156,6 +157,7 @@ export class SubscriptionsService {
       active,
       status: subscription.status,
       planCode,
+      featureAccess: subscription.plan.featureAccess,
       currentPeriodEnd: subscription.currentPeriodEnd,
       message: active
         ? 'Gói dịch vụ đang hoạt động.'

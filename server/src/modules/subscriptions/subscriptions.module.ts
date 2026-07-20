@@ -3,6 +3,8 @@ import { Module } from '@nestjs/common';
 import { BillingsModule } from '../billing/billings.module';
 import { FamilyMembersModule } from '../family-members/family-members.module';
 import { FamilySubscriptionController } from './controllers/family-subscription.controller';
+import { FeatureAccessService } from './feature-access.service';
+import { FeatureAccessGuard } from './guards/feature-access.guard';
 import { SubscriptionsService } from './subscriptions.service';
 
 /**
@@ -14,7 +16,7 @@ import { SubscriptionsService } from './subscriptions.service';
 @Module({
   imports: [BillingsModule, FamilyMembersModule],
   controllers: [FamilySubscriptionController],
-  providers: [SubscriptionsService],
-  exports: [SubscriptionsService],
+  providers: [SubscriptionsService, FeatureAccessService, FeatureAccessGuard],
+  exports: [SubscriptionsService, FeatureAccessService, FeatureAccessGuard],
 })
 export class SubscriptionsModule {}
