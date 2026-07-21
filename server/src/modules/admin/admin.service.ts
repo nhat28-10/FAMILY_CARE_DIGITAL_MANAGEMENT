@@ -431,13 +431,25 @@ export class AdminService {
       where: { familyId },
       include: { plan: true },
     });
+    if (!current) {
+      throw new NotFoundException(
+        'Kh\u00f4ng t\u00ecm th\u1ea5y g\u00f3i d\u1ecbch v\u1ee5 c\u1ee7a gia \u0111\u00ecnh',
+      );
+    }
+    if (current.plan.planCode === FREE_PLAN_CODE) {
+      throw new BadRequestException(
+        'Kh\u00f4ng th\u1ec3 gia h\u1ea1n th\u1ee7 c\u00f4ng g\u00f3i mi\u1ec5n ph\u00ed',
+      );
+    }
+    if (current.plan.planCode !== plan.planCode) {
+      throw new BadRequestException(
+        'Gia h\u1ea1n th\u1ee7 c\u00f4ng ch\u1ec9 \u00e1p d\u1ee5ng cho g\u00f3i hi\u1ec7n t\u1ea1i. Kh\u00f4ng d\u00f9ng \u0111\u1ec3 n\u00e2ng/h\u1ea1 g\u00f3i.',
+      );
+    }
     const now = new Date();
-    const oldPeriodEnd = current?.currentPeriodEnd ?? null;
+    const oldPeriodEnd = current.currentPeriodEnd ?? null;
     const activePaidPeriodEnd =
-      current &&
-      current.plan.planCode !== FREE_PLAN_CODE &&
-      current.currentPeriodEnd &&
-      current.currentPeriodEnd > now
+      current.currentPeriodEnd && current.currentPeriodEnd > now
         ? current.currentPeriodEnd
         : null;
     const newPeriodStart = activePaidPeriodEnd
@@ -446,31 +458,17 @@ export class AdminService {
     const newPeriodEnd = this.addMonths(newPeriodStart, dto.monthsToAdd);
 
     await this.prisma.$transaction(async (tx) => {
-      if (current) {
-        await tx.familySubscription.update({
-          where: { familyId },
-          data: {
-            planId: plan.id,
-            status: FamilySubscriptionStatus.ACTIVE,
-            currentPeriodStart: newPeriodStart,
-            currentPeriodEnd: newPeriodEnd,
-            cancelAtPeriodEnd: false,
-            purchasedByUserId: adminId,
-          },
-        });
-      } else {
-        await tx.familySubscription.create({
-          data: {
-            familyId,
-            planId: plan.id,
-            status: FamilySubscriptionStatus.ACTIVE,
-            currentPeriodStart: newPeriodStart,
-            currentPeriodEnd: newPeriodEnd,
-            cancelAtPeriodEnd: false,
-            purchasedByUserId: adminId,
-          },
-        });
-      }
+      await tx.familySubscription.update({
+        where: { familyId },
+        data: {
+          planId: plan.id,
+          status: FamilySubscriptionStatus.ACTIVE,
+          currentPeriodStart: newPeriodStart,
+          currentPeriodEnd: newPeriodEnd,
+          cancelAtPeriodEnd: false,
+          purchasedByUserId: adminId,
+        },
+      });
 
       await tx.paymentTransaction.create({
         data: {
