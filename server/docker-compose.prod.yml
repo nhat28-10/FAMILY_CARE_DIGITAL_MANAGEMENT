@@ -1,4 +1,5 @@
-# Production: API + self-hosted Postgres (data persisted in a named volume).
+# Production: API + self-hosted Postgres + Redis + Face AI.
+# Postgres/Redis data is persisted in named volumes.
 # All values come from `.env.production` (NOT committed).
 #
 #   docker compose -f docker-compose.prod.yml up --build -d
@@ -12,6 +13,9 @@ services:
     image: postgres:16-alpine
     container_name: familycare_db
     env_file: .env.production
+    cpus: '0.75'
+    mem_limit: 768m
+    mem_reservation: 256m
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
@@ -27,6 +31,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: familycare_redis
+    cpus: '0.25'
+    mem_limit: 192m
+    mem_reservation: 64m
     command:
       [
       "redis-server",
@@ -49,10 +56,14 @@ services:
     container_name: familycare_api
     user: root
     env_file: .env.production
+    cpus: '1.0'
+    mem_limit: 768m
+    mem_reservation: 384m
     environment:
       ADMIN_DOCKER_ENABLED: 'true'
       DOCKER_SOCKET_PATH: /var/run/docker.sock
       BACKUP_POSTGRES_CONTAINER: familycare_db
+      FACE_AI_BASE_URL: http://face-ai-service:8000
       REDIS_HOST: redis
     ports:
       - '127.0.0.1:3000:3000'
@@ -67,6 +78,37 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      face-ai-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  face-ai-service:
+    build:
+      context: ../face-ai-service
+      dockerfile: Dockerfile
+    container_name: familycare_face_ai
+    cpus: '2.0'
+    mem_limit: 2g
+    mem_reservation: 1g
+    environment:
+      FACE_AI_MODEL_NAME: ${FACE_AI_MODEL_NAME:-buffalo_l}
+      FACE_AI_DETECTION_SIZE: ${FACE_AI_DETECTION_SIZE:-640}
+      FACE_AI_DEVICE: ${FACE_AI_DEVICE:-cpu}
+      FACE_SCAN_MAX_FACES: ${FACE_SCAN_MAX_FACES:-5}
+    expose:
+      - '8000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
