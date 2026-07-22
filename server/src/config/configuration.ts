@@ -117,6 +117,21 @@ export default () => ({
     queueId: process.env.CLOUDFLARE_QUEUE_ID || '',
     queueApiToken: process.env.CLOUDFLARE_QUEUE_API_TOKEN || '',
   },
+  openai: {
+    // Trợ lý AI (module ai-chatbot). Rỗng = tắt tính năng (request trả 503).
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    maxToolRounds: parseInt(process.env.OPENAI_MAX_TOOL_ROUNDS || '5', 10),
+    timeoutMs: parseInt(process.env.OPENAI_TIMEOUT_MS || '30000', 10),
+    maxHistoryMessages: parseInt(
+      process.env.AI_CHAT_MAX_HISTORY_MESSAGES || '20',
+      10,
+    ),
+    actionExpiresMinutes: parseInt(
+      process.env.AI_ACTION_EXPIRES_MINUTES || '15',
+      10,
+    ),
+  },
   albumModeration: {
     consumerEnabled: process.env.ALBUM_MODERATION_CONSUMER_ENABLED === 'true',
     recoveryEnabled: process.env.ALBUM_MODERATION_RECOVERY_ENABLED !== 'false',

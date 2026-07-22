@@ -31,6 +31,6 @@ import { SosGateway } from './sos.gateway';
     WearablesController,
   ],
   providers: [SosService, SosSettingsService, WearablesService, SosGateway],
-  exports: [SosGateway],
+  exports: [SosGateway, SosService],
 })
 export class SosModule {}

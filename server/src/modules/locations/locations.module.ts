@@ -9,5 +9,6 @@ import { LocationsService } from './locations.service';
   imports: [FamilyMembersModule],
   controllers: [LocationsController],
   providers: [LocationsService],
+  exports: [LocationsService],
 })
 export class LocationsModule {}
