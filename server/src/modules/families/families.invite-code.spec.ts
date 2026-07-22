@@ -26,6 +26,7 @@ describe('FamiliesService invite code', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
   });
 

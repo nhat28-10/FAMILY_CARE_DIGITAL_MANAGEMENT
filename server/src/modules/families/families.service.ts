@@ -4,7 +4,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
+  FamilyMember,
   FamilyRole,
   MemberStatus,
   NotificationPriority,
@@ -24,21 +26,27 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { generateInviteCode } from './invite-code.util';
 
+const memberUserSelect = {
+  id: true,
+  email: true,
+  fullName: true,
+  avatarUrl: true,
+  userType: true,
+} as const;
+
 const memberInclude = {
   members: {
     include: {
       user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatarUrl: true,
-          userType: true,
-        },
+        select: memberUserSelect,
       },
     },
     orderBy: { joinedAt: 'asc' as const },
   },
+};
+
+type MemberWithUser = FamilyMember & {
+  user: Prisma.UserGetPayload<{ select: typeof memberUserSelect }>;
 };
 
 @Injectable()
@@ -51,6 +59,7 @@ export class FamiliesService {
     private readonly sosGateway: SosGateway,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly notificationsService: NotificationsService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -234,6 +243,143 @@ export class FamiliesService {
       );
     }
     return null;
+  }
+
+  /**
+   * Đổi vai trò một thành viên (bổ nhiệm/gỡ phó nhóm). Chỉ giữa DEPUTY_MEMBER
+   * và FAMILY_MEMBER — không đụng FAMILY_MANAGER (dùng transferOwnership).
+   * Idempotent nếu role không đổi. Ràng buộc số phó nhóm theo config.
+   */
+  async changeMemberRole(
+    familyId: string,
+    targetUserId: string,
+    familyRole: FamilyRole,
+  ): Promise<MemberWithUser> {
+    const target = await this.familyMembersService.findByFamilyAndUser(
+      familyId,
+      targetUserId,
+    );
+    if (!target || target.status !== MemberStatus.ACTIVE) {
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
+    }
+    if (target.familyRole === FamilyRole.FAMILY_MANAGER) {
+      throw new BadRequestException(
+        'Không thể đổi vai trò của quản lý gia đình',
+      );
+    }
+    if (target.familyRole === familyRole) {
+      return this.prisma.familyMember.findUniqueOrThrow({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        include: { user: { select: memberUserSelect } },
+      });
+    }
+    if (familyRole === FamilyRole.DEPUTY_MEMBER) {
+      const deputyCount = await this.prisma.familyMember.count({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          familyRole: FamilyRole.DEPUTY_MEMBER,
+        },
+      });
+      const maxDeputies = this.config.get<number>('family.maxDeputies') ?? 2;
+      if (deputyCount >= maxDeputies) {
+        throw new BadRequestException('Đã đạt số phó nhóm tối đa');
+      }
+    }
+
+    const updated = await this.prisma.familyMember.update({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      data: { familyRole },
+      include: { user: { select: memberUserSelect } },
+    });
+
+    // Thao tác đổi role đã thành công — lỗi thông báo không được biến thành 5xx.
+    try {
+      const promoted = familyRole === FamilyRole.DEPUTY_MEMBER;
+      await this.notificationsService.notify(familyId, [updated.id], {
+        type: NotificationType.MEMBER,
+        priority: NotificationPriority.NORMAL,
+        title: promoted
+          ? 'Bạn được bổ nhiệm làm phó nhóm'
+          : 'Vai trò của bạn đã thay đổi',
+        body: promoted
+          ? 'Bạn đã được bổ nhiệm làm phó nhóm trong gia đình.'
+          : 'Vai trò của bạn trong gia đình đã được cập nhật thành thành viên.',
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: updated.id,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo đổi vai trò: ${(err as Error).message}`,
+      );
+    }
+
+    return updated;
+  }
+
+  /**
+   * Trao quyền trưởng nhóm: target lên FAMILY_MANAGER, manager cũ tụt xuống
+   * FAMILY_MEMBER. Swap trong 1 transaction để không bao giờ rơi vào trạng
+   * thái 0 hoặc 2 trưởng nhóm. Manager cũ KHÔNG tính vào giới hạn phó nhóm.
+   */
+  async transferOwnership(
+    familyId: string,
+    currentManagerUserId: string,
+    targetUserId: string,
+  ) {
+    if (targetUserId === currentManagerUserId) {
+      throw new BadRequestException('Không thể trao quyền cho chính mình');
+    }
+    const target = await this.familyMembersService.findByFamilyAndUser(
+      familyId,
+      targetUserId,
+    );
+    if (!target || target.status !== MemberStatus.ACTIVE) {
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
+    }
+
+    const [newManager, oldManager] = await this.prisma.$transaction([
+      this.prisma.familyMember.update({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        data: { familyRole: FamilyRole.FAMILY_MANAGER },
+      }),
+      this.prisma.familyMember.update({
+        where: {
+          familyId_userId: { familyId, userId: currentManagerUserId },
+        },
+        data: { familyRole: FamilyRole.FAMILY_MEMBER },
+      }),
+    ]);
+
+    // Role đã swap thành công — lỗi thông báo không được biến thành 5xx.
+    try {
+      await this.notificationsService.notify(familyId, [newManager.id], {
+        type: NotificationType.MEMBER,
+        priority: NotificationPriority.NORMAL,
+        title: 'Bạn đã trở thành trưởng nhóm',
+        body: 'Bạn đã được trao quyền trưởng nhóm gia đình.',
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: newManager.id,
+      });
+      await this.notificationsService.notify(familyId, [oldManager.id], {
+        type: NotificationType.MEMBER,
+        priority: NotificationPriority.NORMAL,
+        title: 'Bạn đã trao quyền trưởng nhóm',
+        body: 'Bạn đã trao quyền trưởng nhóm cho thành viên khác.',
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: oldManager.id,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo trao quyền: ${(err as Error).message}`,
+      );
+    }
+
+    return this.getById(familyId);
   }
 
   /** Mã mời hiện tại của family — null nếu manager chưa tạo. */
