@@ -27,6 +27,80 @@ import { FinanceReportService } from '../services/finance-report.service';
 export class FinanceReportsController {
   constructor(private readonly financeReportService: FinanceReportService) {}
 
+  @Get('summary')
+  @ResponseMessage('Lấy tóm tắt tài chính gia đình thành công')
+  @ApiOperation({
+    summary: 'Lấy tóm tắt tài chính gia đình cho màn hình tổng quan',
+  })
+  @ApiQuery({
+    name: 'budgetPlanId',
+    required: false,
+    format: 'uuid',
+    description: 'ID kế hoạch ngân sách cần phân tích',
+  })
+  getFamilyFinanceSummary(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() query: FinanceReportQueryDto,
+  ) {
+    return this.financeReportService.getFamilyFinanceSummary(
+      familyId,
+      memberId,
+      query,
+    );
+  }
+
+  @Get('cash-flow-summary')
+  @ResponseMessage('Lấy tóm tắt dòng tiền gia đình thành công')
+  @ApiOperation({
+    summary: 'Lấy tóm tắt dòng tiền vào/ra theo tháng',
+  })
+  getCashFlowSummary(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() query: FinanceReportQueryDto,
+  ) {
+    return this.financeReportService.getCashFlowSummary(
+      familyId,
+      memberId,
+      query,
+    );
+  }
+
+  @Get('category-spending-summary')
+  @ResponseMessage('Lấy tóm tắt chi tiêu theo danh mục thành công')
+  @ApiOperation({
+    summary: 'Lấy thống kê chi tiêu theo danh mục',
+  })
+  getCategorySpendingSummary(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() query: FinanceReportQueryDto,
+  ) {
+    return this.financeReportService.getCategorySpendingSummary(
+      familyId,
+      memberId,
+      query,
+    );
+  }
+
+  @Get('member-contribution-summary')
+  @ResponseMessage('Lấy tóm tắt đóng góp theo thành viên thành công')
+  @ApiOperation({
+    summary: 'Lấy thống kê đóng góp quỹ chung và mục tiêu theo thành viên',
+  })
+  getMemberContributionSummary(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() query: FinanceReportQueryDto,
+  ) {
+    return this.financeReportService.getMemberContributionSummary(
+      familyId,
+      memberId,
+      query,
+    );
+  }
+
   @Get('reports/overview')
   @ResponseMessage('Lấy báo cáo tổng quan tài chính thành công')
   @ApiOperation({

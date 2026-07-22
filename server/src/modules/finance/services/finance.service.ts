@@ -44,8 +44,10 @@ import {
 } from '../dto/finance-period.dto';
 import { UpdateBudgetLineDto } from '../dto/update-budget-line.dto';
 import { UpdateBudgetPlanDto } from '../dto/update-budget-plan.dto';
+import { UpdateFinanceCategoryDto } from '../dto/update-finance-category.dto';
 import { UpdateMemberMonthlyFinanceDto } from '../dto/update-member-monthly-finance.dto';
 import { UpdateFinanceJarDto } from '../dto/update-finance-jar.dto';
+import { UpdateLedgerEntryDto } from '../dto/update-ledger-entry.dto';
 
 type MonthlyGoalContributionSummaryItem = {
   goalId: string;
@@ -604,6 +606,76 @@ export class FinanceService {
     }
   }
 
+  async updateCategory(
+    familyId: string,
+    categoryId: string,
+    dto: UpdateFinanceCategoryDto,
+  ) {
+    const category = await this.prisma.financeCategory.findFirst({
+      where: { id: categoryId, familyId },
+    });
+    if (!category) {
+      throw new NotFoundException(
+        'KhÃ´ng tÃ¬m tháº¥y danh má»¥c tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+      );
+    }
+
+    const name = dto.name?.trim();
+    const categoryType = dto.categoryType ?? category.categoryType;
+    if (name || dto.categoryType) {
+      const duplicate = await this.prisma.financeCategory.findFirst({
+        where: {
+          familyId,
+          id: { not: category.id },
+          name: { equals: name ?? category.name, mode: 'insensitive' },
+          categoryType,
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          'Danh má»¥c tÃ i chÃ­nh vá»›i tÃªn vÃ  loáº¡i nÃ y Ä‘Ã£ tá»“n táº¡i',
+        );
+      }
+    }
+
+    try {
+      return await this.prisma.financeCategory.update({
+        where: { id: category.id },
+        data: {
+          name,
+          categoryType: dto.categoryType,
+          essentialType: dto.essentialType,
+          status: dto.status,
+        },
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'Danh má»¥c tÃ i chÃ­nh vá»›i tÃªn vÃ  loáº¡i nÃ y Ä‘Ã£ tá»“n táº¡i',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async deactivateCategory(familyId: string, categoryId: string) {
+    const category = await this.prisma.financeCategory.findFirst({
+      where: { id: categoryId, familyId },
+    });
+    if (!category) {
+      throw new NotFoundException(
+        'KhÃ´ng tÃ¬m tháº¥y danh má»¥c tÃ i chÃ­nh trong gia Ä‘Ã¬nh nÃ y',
+      );
+    }
+    if (category.status === FinanceCategoryStatus.INACTIVE) {
+      return category;
+    }
+    return this.prisma.financeCategory.update({
+      where: { id: category.id },
+      data: { status: FinanceCategoryStatus.INACTIVE },
+    });
+  }
+
   async listLedgerEntries(familyId: string, query: LedgerEntryQueryDto) {
     const ledger = await this.prisma.financeLedger.findUnique({
       where: { familyId },
@@ -701,6 +773,97 @@ export class FinanceService {
           sourceType: dto.sourceType?.trim(),
           sourceId: dto.sourceId?.trim(),
         },
+        include: { category: true, jar: true },
+      });
+    });
+  }
+
+  async getLedgerEntry(familyId: string, entryId: string) {
+    const entry = await this.prisma.ledgerEntry.findFirst({
+      where: { id: entryId, ledger: { familyId } },
+      include: {
+        category: true,
+        jar: true,
+        createdByMember: {
+          select: {
+            id: true,
+            displayName: true,
+            user: { select: { id: true, fullName: true, avatarUrl: true } },
+          },
+        },
+      },
+    });
+    if (!entry) {
+      throw new NotFoundException(
+        'KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch trong sá»• tÃ i chÃ­nh gia Ä‘Ã¬nh nÃ y',
+      );
+    }
+    return entry;
+  }
+
+  async updateLedgerEntry(
+    familyId: string,
+    entryId: string,
+    dto: UpdateLedgerEntryDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const entry = await this.requireLedgerEntry(tx, familyId, entryId);
+      if (entry.status !== LedgerEntryStatus.ACTIVE) {
+        throw new BadRequestException(
+          'KhÃ´ng thá»ƒ cáº­p nháº­t giao dá»‹ch Ä‘Ã£ bá»‹ há»§y',
+        );
+      }
+
+      if (dto.categoryId) {
+        const category = await tx.financeCategory.findFirst({
+          where: {
+            id: dto.categoryId,
+            familyId,
+            status: FinanceCategoryStatus.ACTIVE,
+          },
+        });
+        if (!category) {
+          throw new NotFoundException(
+            'KhÃ´ng tÃ¬m tháº¥y danh má»¥c tÃ i chÃ­nh Ä‘ang hoáº¡t Ä‘á»™ng trong gia Ä‘Ã¬nh nÃ y',
+          );
+        }
+      }
+
+      if (dto.jarId) {
+        await this.assertJarBelongsToFamily(tx, familyId, dto.jarId);
+      }
+
+      return tx.ledgerEntry.update({
+        where: { id: entry.id },
+        data: {
+          categoryId: dto.categoryId,
+          jarId: dto.jarId,
+          entryType: dto.entryType,
+          amount:
+            dto.amount === undefined
+              ? undefined
+              : new Prisma.Decimal(dto.amount),
+          description: dto.description?.trim(),
+          note: dto.note === null ? null : dto.note?.trim(),
+          entryDate:
+            dto.entryDate === undefined ? undefined : new Date(dto.entryDate),
+          sourceType: dto.sourceType === null ? null : dto.sourceType?.trim(),
+          sourceId: dto.sourceId === null ? null : dto.sourceId?.trim(),
+        },
+        include: { category: true, jar: true },
+      });
+    });
+  }
+
+  async voidLedgerEntry(familyId: string, entryId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const entry = await this.requireLedgerEntry(tx, familyId, entryId);
+      if (entry.status === LedgerEntryStatus.VOIDED) {
+        return entry;
+      }
+      return tx.ledgerEntry.update({
+        where: { id: entry.id },
+        data: { status: LedgerEntryStatus.VOIDED },
         include: { category: true, jar: true },
       });
     });
@@ -1241,6 +1404,22 @@ export class FinanceService {
       );
     }
     return member;
+  }
+
+  private async requireLedgerEntry(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    entryId: string,
+  ) {
+    const entry = await tx.ledgerEntry.findFirst({
+      where: { id: entryId, ledger: { familyId } },
+    });
+    if (!entry) {
+      throw new NotFoundException(
+        'KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch trong sá»• tÃ i chÃ­nh gia Ä‘Ã¬nh nÃ y',
+      );
+    }
+    return entry;
   }
 
   private async requireBudgetPlan(

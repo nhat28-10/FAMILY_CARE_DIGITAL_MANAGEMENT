@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +25,7 @@ import { FamilyRoles } from '../../family-members/decorators/family-roles.decora
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateFinanceCategoryDto } from '../dto/create-finance-category.dto';
+import { UpdateFinanceCategoryDto } from '../dto/update-finance-category.dto';
 import { FinanceService } from '../services/finance.service';
 
 @ApiTags('Finance - Danh mục thu chi')
@@ -68,5 +71,42 @@ export class FinanceCategoriesController {
     @Body() dto: CreateFinanceCategoryDto,
   ) {
     return this.financeService.createCategory(familyId, dto);
+  }
+
+  @Patch('categories/:categoryId')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Cập nhật danh mục tài chính thành công')
+  @ApiOperation({ summary: 'Cập nhật danh mục tài chính của gia đình' })
+  @ApiParam({
+    name: 'categoryId',
+    description: 'ID danh mục tài chính cần thao tác',
+    format: 'uuid',
+  })
+  updateCategory(
+    @Param('familyId') familyId: string,
+    @Param('categoryId') categoryId: string,
+    @Body() dto: UpdateFinanceCategoryDto,
+  ) {
+    return this.financeService.updateCategory(familyId, categoryId, dto);
+  }
+
+  @Delete('categories/:categoryId')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Ngưng sử dụng danh mục tài chính thành công')
+  @ApiOperation({
+    summary: 'Ngưng sử dụng danh mục tài chính, không xóa lịch sử giao dịch',
+  })
+  @ApiParam({
+    name: 'categoryId',
+    description: 'ID danh mục tài chính cần thao tác',
+    format: 'uuid',
+  })
+  deactivateCategory(
+    @Param('familyId') familyId: string,
+    @Param('categoryId') categoryId: string,
+  ) {
+    return this.financeService.deactivateCategory(familyId, categoryId);
   }
 }
