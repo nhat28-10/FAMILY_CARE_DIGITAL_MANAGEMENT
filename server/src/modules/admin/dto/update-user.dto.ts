@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AccountStatus, UserType, VerificationStatus } from '@prisma/client';
+import { AccountStatus, VerificationStatus } from '@prisma/client';
 import {
   IsEnum,
   IsOptional,
@@ -14,11 +14,6 @@ export class AdminUpdateUserDto {
   @IsOptional()
   @IsEnum(AccountStatus)
   accountStatus?: AccountStatus;
-
-  @ApiPropertyOptional({ enum: UserType })
-  @IsOptional()
-  @IsEnum(UserType)
-  userType?: UserType;
 
   @ApiPropertyOptional({ enum: VerificationStatus })
   @IsOptional()
