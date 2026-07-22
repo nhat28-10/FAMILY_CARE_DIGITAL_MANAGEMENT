@@ -26,21 +26,27 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { generateInviteCode } from './invite-code.util';
 
+const memberUserSelect = {
+  id: true,
+  email: true,
+  fullName: true,
+  avatarUrl: true,
+  userType: true,
+} as const;
+
 const memberInclude = {
   members: {
     include: {
       user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatarUrl: true,
-          userType: true,
-        },
+        select: memberUserSelect,
       },
     },
     orderBy: { joinedAt: 'asc' as const },
   },
+};
+
+type MemberWithUser = FamilyMember & {
+  user: Prisma.UserGetPayload<{ select: typeof memberUserSelect }>;
 };
 
 @Injectable()
@@ -226,7 +232,7 @@ export class FamiliesService {
     familyId: string,
     targetUserId: string,
     familyRole: FamilyRole,
-  ): Promise<FamilyMember> {
+  ): Promise<MemberWithUser> {
     const target = await this.familyMembersService.findByFamilyAndUser(
       familyId,
       targetUserId,
@@ -242,7 +248,10 @@ export class FamiliesService {
       );
     }
     if (target.familyRole === familyRole) {
-      return target;
+      return this.prisma.familyMember.findUniqueOrThrow({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        include: { user: { select: memberUserSelect } },
+      });
     }
     if (familyRole === FamilyRole.DEPUTY_MEMBER) {
       const deputyCount = await this.prisma.familyMember.count({
@@ -261,6 +270,7 @@ export class FamiliesService {
     const updated = await this.prisma.familyMember.update({
       where: { familyId_userId: { familyId, userId: targetUserId } },
       data: { familyRole },
+      include: { user: { select: memberUserSelect } },
     });
 
     // Thao tác đổi role đã thành công — lỗi thông báo không được biến thành 5xx.

@@ -125,6 +125,13 @@ describe('FamiliesService.changeMemberRole', () => {
   const familyId = 'family-id';
   const targetUserId = 'target-user-id';
   const targetMemberId = 'target-member-id';
+  const memberUserSelect = {
+    id: true,
+    email: true,
+    fullName: true,
+    avatarUrl: true,
+    userType: true,
+  } as const;
   let prisma: { familyMember: Record<string, jest.Mock> };
   let familyMembers: { findByFamilyAndUser: jest.Mock };
   let notifications: { notify: jest.Mock };
@@ -135,9 +142,16 @@ describe('FamiliesService.changeMemberRole', () => {
     prisma = {
       familyMember: {
         count: jest.fn().mockResolvedValue(0),
-        update: jest
-          .fn()
-          .mockResolvedValue({ id: targetMemberId, familyRole: FamilyRole.DEPUTY_MEMBER }),
+        update: jest.fn().mockResolvedValue({
+          id: targetMemberId,
+          familyRole: FamilyRole.DEPUTY_MEMBER,
+          user: { id: targetUserId },
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: targetMemberId,
+          familyRole: FamilyRole.DEPUTY_MEMBER,
+          user: { id: targetUserId },
+        }),
       },
     };
     familyMembers = { findByFamilyAndUser: jest.fn() };
@@ -169,6 +183,7 @@ describe('FamiliesService.changeMemberRole', () => {
     expect(prisma.familyMember.update).toHaveBeenCalledWith({
       where: { familyId_userId: { familyId, userId: targetUserId } },
       data: { familyRole: FamilyRole.DEPUTY_MEMBER },
+      include: { user: { select: memberUserSelect } },
     });
     expect(notifications.notify).toHaveBeenCalledWith(
       familyId,
@@ -214,6 +229,20 @@ describe('FamiliesService.changeMemberRole', () => {
     await expect(
       service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFound when target member is REMOVED', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.REMOVED,
+    });
+
+    await expect(
+      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
 
   it('is idempotent when the member already has the target role', async () => {
@@ -223,12 +252,19 @@ describe('FamiliesService.changeMemberRole', () => {
       status: MemberStatus.ACTIVE,
     });
 
-    await service.changeMemberRole(
+    const result = await service.changeMemberRole(
       familyId,
       targetUserId,
       FamilyRole.DEPUTY_MEMBER,
     );
 
+    expect(prisma.familyMember.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      include: { user: { select: memberUserSelect } },
+    });
+    expect(result).toEqual(
+      expect.objectContaining({ id: targetMemberId, user: expect.anything() }),
+    );
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
     expect(notifications.notify).not.toHaveBeenCalled();
   });
