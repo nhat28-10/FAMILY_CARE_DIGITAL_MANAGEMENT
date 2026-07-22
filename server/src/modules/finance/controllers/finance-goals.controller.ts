@@ -27,6 +27,7 @@ import { CurrentFamilyMember } from '../../family-members/decorators/current-fam
 import { FamilyRoles } from '../../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
+import { AllocateMonthlySurplusDto } from '../dto/allocate-monthly-surplus.dto';
 import { RequiredFinancePeriodDto } from '../dto/finance-period.dto';
 import { ConfirmGoalContributionPlanDto } from '../dto/confirm-goal-contribution-plan.dto';
 import { CreateFinancialGoalDto } from '../dto/create-financial-goal.dto';
@@ -87,6 +88,28 @@ export class FinanceGoalsController {
       familyId,
       memberId,
       dto,
+    );
+  }
+
+  @Get('financial-goals/surplus-availability')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Lay so du quy thang kha dung thanh cong')
+  @ApiOperation({
+    summary: 'Lay so du quy thang con co the phan bo vao muc tieu',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'So du quy thang va phan da phan bo vao muc tieu',
+  })
+  getMonthlySurplusAvailability(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() period: RequiredFinancePeriodDto,
+  ) {
+    return this.financialGoalService.getMonthlySurplusAvailability(
+      familyId,
+      memberId,
+      period,
     );
   }
 
@@ -461,6 +484,39 @@ export class FinanceGoalsController {
     @Body() dto: CreateGoalAllocationDto,
   ) {
     return this.financialGoalService.createGoalAllocation(
+      familyId,
+      memberId,
+      goalId,
+      dto,
+    );
+  }
+
+  @Post('financial-goals/:goalId/surplus-allocations')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Phan bo so du quy thang vao muc tieu thanh cong')
+  @ApiOperation({
+    summary: 'Phan bo mot phan so du quy thang vao muc tieu tai chinh',
+    description:
+      'Tao but toan audit noi bo tu so du thang. But toan nay khong duoc tinh la thu nhap moi trong bao cao dong tien.',
+  })
+  @ApiParam({
+    name: 'goalId',
+    description: 'ID muc tieu tai chinh can thao tac',
+    format: 'uuid',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'So du quy thang da duoc phan bo vao muc tieu',
+  })
+  allocateMonthlySurplus(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Param('goalId') goalId: string,
+    @Body() dto: AllocateMonthlySurplusDto,
+  ) {
+    return this.financialGoalService.allocateMonthlySurplusToGoal(
       familyId,
       memberId,
       goalId,

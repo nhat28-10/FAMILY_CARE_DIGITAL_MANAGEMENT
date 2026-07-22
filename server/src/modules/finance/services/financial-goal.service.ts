@@ -29,6 +29,7 @@ import {
 } from '../../../common/types/paginated-result';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { AllocateMonthlySurplusDto } from '../dto/allocate-monthly-surplus.dto';
 import { ConfirmGoalContributionPlanDto } from '../dto/confirm-goal-contribution-plan.dto';
 import { CreateFinancialGoalDto } from '../dto/create-financial-goal.dto';
 import { CreateGoalAllocationDto } from '../dto/create-goal-allocation.dto';
@@ -62,6 +63,17 @@ type GoalContributionPlanRow = {
 const GOAL_ELIGIBLE_ENTRY_TYPES = [
   LedgerEntryType.INCOME,
   LedgerEntryType.CONTRIBUTION,
+  LedgerEntryType.ALLOWANCE,
+  LedgerEntryType.REWARD,
+] as const;
+const MONTHLY_SURPLUS_TO_GOAL_SOURCE = 'MONTHLY_SURPLUS_TO_GOAL';
+const FAMILY_FUND_CASH_IN_TYPES = [
+  LedgerEntryType.INCOME,
+  LedgerEntryType.CONTRIBUTION,
+] as const;
+const FAMILY_FUND_CASH_OUT_TYPES = [
+  LedgerEntryType.EXPENSE,
+  LedgerEntryType.SUPPORT,
   LedgerEntryType.ALLOWANCE,
   LedgerEntryType.REWARD,
 ] as const;
@@ -766,6 +778,28 @@ export class FinancialGoalService {
     };
   }
 
+  async getMonthlySurplusAvailability(
+    familyId: string,
+    memberId: string,
+    period: RequiredFinancePeriodDto,
+  ) {
+    const member = await this.getMemberInFamilyOrThrow(familyId, memberId);
+    this.assertCanManageGoal(member.familyRole);
+    const surplus = await this.calculateMonthlySurplusAvailability(
+      this.prisma,
+      familyId,
+      period.month,
+      period.year,
+    );
+    return {
+      periodMonth: period.month,
+      periodYear: period.year,
+      totalSurplus: this.decimalToNumber(surplus.totalSurplus),
+      allocatedSurplus: this.decimalToNumber(surplus.allocatedSurplus),
+      availableSurplus: this.decimalToNumber(surplus.availableSurplus),
+    };
+  }
+
   async listGoalAllocations(
     familyId: string,
     memberId: string,
@@ -864,6 +898,129 @@ export class FinancialGoalService {
         }
         return {
           allocation,
+          ...(await this.refreshGoalStatus(tx, goal.id)),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    await this.notificationsService.dispatch(pendingNotificationIds);
+    return result;
+  }
+
+  async allocateMonthlySurplusToGoal(
+    familyId: string,
+    memberId: string,
+    goalId: string,
+    dto: AllocateMonthlySurplusDto,
+  ) {
+    const pendingNotificationIds: string[] = [];
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const member = await this.getMemberInFamilyOrThrow(
+          familyId,
+          memberId,
+          tx,
+        );
+        this.assertCanManageGoal(member.familyRole);
+        const goal = await this.requireFinancialGoal(familyId, goalId, tx);
+        if (goal.status === FinancialGoalStatus.CANCELED) {
+          throw new BadRequestException(
+            'Khong the phan bo so du vao muc tieu da bi huy',
+          );
+        }
+        if (goal.status === FinancialGoalStatus.ACHIEVED) {
+          throw new ConflictException('Muc tieu tai chinh da hoan thanh');
+        }
+
+        const requestedAmount = new Prisma.Decimal(dto.amount);
+        const surplus = await this.calculateMonthlySurplusAvailability(
+          tx,
+          familyId,
+          dto.periodMonth,
+          dto.periodYear,
+        );
+        if (requestedAmount.greaterThan(surplus.availableSurplus)) {
+          throw new BadRequestException(
+            'So tien phan bo vuot qua so du quy thang con kha dung',
+          );
+        }
+
+        const ledger = await tx.financeLedger.upsert({
+          where: { familyId },
+          create: {
+            familyId,
+            ledgerName: 'Shared Family Ledger',
+            status: FinanceLedgerStatus.ACTIVE,
+          },
+          update: {},
+        });
+        const ledgerEntry = await tx.ledgerEntry.create({
+          data: {
+            ledgerId: ledger.id,
+            jarId: goal.relatedJarId,
+            createdByMemberId: memberId,
+            entryType: LedgerEntryType.ADJUSTMENT,
+            amount: requestedAmount,
+            description: `Allocate monthly surplus to goal: ${goal.goalName}`,
+            note: dto.note?.trim(),
+            entryDate: this.monthEndDate(dto.periodMonth, dto.periodYear),
+            sourceType: MONTHLY_SURPLUS_TO_GOAL_SOURCE,
+            sourceId: `${goal.id}:${this.periodKey(dto.periodMonth, dto.periodYear)}`,
+            status: LedgerEntryStatus.ACTIVE,
+          },
+        });
+
+        const allocatedBefore = await this.calculateGoalAllocatedAmount(
+          tx,
+          goal.id,
+        );
+        const allocation = await tx.goalAllocation.create({
+          data: {
+            goalId,
+            ledgerEntryId: ledgerEntry.id,
+            amount: requestedAmount,
+            allocatedByMemberId: memberId,
+          },
+          include: { ledgerEntry: true },
+        });
+        const allocatedAfter = allocatedBefore.plus(allocation.amount);
+        const reachedTarget =
+          allocatedBefore.lt(goal.targetAmount) &&
+          allocatedAfter.gte(goal.targetAmount);
+        if (reachedTarget) {
+          const allMembers = await tx.familyMember.findMany({
+            where: { familyId, status: MemberStatus.ACTIVE },
+            select: { id: true },
+          });
+          const { ids } = await this.notificationsService.notify(
+            familyId,
+            allMembers.map((m) => m.id),
+            {
+              type: NotificationType.FINANCE,
+              priority: NotificationPriority.NORMAL,
+              title: 'Muc tieu tai chinh da dat',
+              body: `Muc tieu "${goal.goalName}" da dat so tien de ra.`,
+              referenceType: 'FINANCIAL_GOAL',
+              referenceId: goal.id,
+            },
+            { tx },
+          );
+          pendingNotificationIds.push(...ids);
+        }
+
+        return {
+          allocation,
+          surplus: {
+            periodMonth: dto.periodMonth,
+            periodYear: dto.periodYear,
+            totalSurplus: this.decimalToNumber(surplus.totalSurplus),
+            allocatedSurplus: this.decimalToNumber(
+              surplus.allocatedSurplus.plus(requestedAmount),
+            ),
+            availableSurplus: this.decimalToNumber(
+              surplus.availableSurplus.minus(requestedAmount),
+            ),
+          },
           ...(await this.refreshGoalStatus(tx, goal.id)),
         };
       },
@@ -1119,6 +1276,14 @@ export class FinancialGoalService {
     return date.toISOString().slice(0, 10);
   }
 
+  private periodKey(month: number, year: number) {
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  private monthEndDate(month: number, year: number) {
+    return new Date(Date.UTC(year, month, 0));
+  }
+
   private async requireFamilyLedgerEntry(
     tx: Prisma.TransactionClient,
     familyId: string,
@@ -1133,6 +1298,75 @@ export class FinancialGoalService {
       );
     }
     return entry;
+  }
+
+  private async calculateMonthlySurplusAvailability(
+    client: Prisma.TransactionClient | PrismaService,
+    familyId: string,
+    periodMonth: number,
+    periodYear: number,
+  ) {
+    const ledger = await client.financeLedger.findUnique({
+      where: { familyId },
+      select: { id: true },
+    });
+    const zero = new Prisma.Decimal(0);
+    if (!ledger) {
+      return {
+        totalSurplus: zero,
+        allocatedSurplus: zero,
+        availableSurplus: zero,
+      };
+    }
+
+    const { start, end } = this.periodRange(periodMonth, periodYear);
+    const [entries, allocations] = await Promise.all([
+      client.ledgerEntry.findMany({
+        where: {
+          ledgerId: ledger.id,
+          status: LedgerEntryStatus.ACTIVE,
+          entryDate: { gte: start, lt: end },
+        },
+        select: { entryType: true, amount: true, sourceType: true },
+      }),
+      client.goalAllocation.aggregate({
+        where: {
+          ledgerEntry: {
+            ledgerId: ledger.id,
+            status: LedgerEntryStatus.ACTIVE,
+            sourceType: MONTHLY_SURPLUS_TO_GOAL_SOURCE,
+            entryDate: { gte: start, lt: end },
+          },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const totalSurplus = entries.reduce((sum, entry) => {
+      if (FAMILY_FUND_CASH_IN_TYPES.includes(entry.entryType as never)) {
+        return sum.plus(entry.amount);
+      }
+      if (FAMILY_FUND_CASH_OUT_TYPES.includes(entry.entryType as never)) {
+        return sum.minus(entry.amount);
+      }
+      if (
+        entry.entryType === LedgerEntryType.ADJUSTMENT &&
+        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE
+      ) {
+        return sum.plus(entry.amount);
+      }
+      return sum;
+    }, zero);
+    const allocatedSurplus = allocations._sum.amount ?? zero;
+
+    return {
+      totalSurplus,
+      allocatedSurplus,
+      availableSurplus: Prisma.Decimal.max(
+        totalSurplus.minus(allocatedSurplus),
+        zero,
+      ),
+    };
   }
 
   private async createGoalContributionLedgerEntry(

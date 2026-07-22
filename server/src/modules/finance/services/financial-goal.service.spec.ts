@@ -67,8 +67,12 @@ describe('FinancialGoalService financial goals', () => {
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
       },
-      financeLedger: { upsert: jest.fn() },
-      ledgerEntry: { create: jest.fn(), findFirst: jest.fn() },
+      financeLedger: { findUnique: jest.fn(), upsert: jest.fn() },
+      ledgerEntry: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+      },
       goalAllocation: {
         aggregate: jest.fn(),
         create: jest.fn(),
@@ -90,6 +94,8 @@ describe('FinancialGoalService financial goals', () => {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      financeLedger: { findUnique: jest.fn() },
+      ledgerEntry: { findMany: jest.fn() },
       financialGoal: { findFirst: jest.fn() },
       goalAllocation: { aggregate: jest.fn() },
     };
@@ -267,7 +273,11 @@ describe('FinancialGoalService financial goals', () => {
       familyRole: FamilyRole.FAMILY_MANAGER,
       status: MemberStatus.ACTIVE,
     });
-    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    const largeGoal = {
+      ...goal,
+      targetAmount: new Prisma.Decimal(10000000),
+    };
+    tx.financialGoal.findFirst.mockResolvedValue(largeGoal);
     tx.ledgerEntry.findFirst.mockResolvedValue({
       id: 'entry-id',
       createdByMemberId: memberId,
@@ -283,7 +293,7 @@ describe('FinancialGoalService financial goals', () => {
       id: 'allocation-id',
       amount: new Prisma.Decimal(40),
     });
-    tx.financialGoal.findUniqueOrThrow.mockResolvedValue(goal);
+    tx.financialGoal.findUniqueOrThrow.mockResolvedValue(largeGoal);
     tx.financialGoal.update.mockResolvedValue(goal);
 
     const result = await financialGoalService.createGoalAllocation(
@@ -364,6 +374,207 @@ describe('FinancialGoalService financial goals', () => {
       include: { ledgerEntry: true },
     });
     expect(result.progress.currentAmount.equals(25)).toBe(true);
+  });
+
+  it('allocates available monthly surplus to a goal without creating new cash-in', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    const largeGoal = {
+      ...goal,
+      targetAmount: new Prisma.Decimal(10000000),
+    };
+    tx.financialGoal.findFirst.mockResolvedValue(largeGoal);
+    tx.financeLedger.findUnique.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.findMany.mockResolvedValue([
+      {
+        entryType: LedgerEntryType.CONTRIBUTION,
+        amount: new Prisma.Decimal(5000000),
+        sourceType: null,
+      },
+      {
+        entryType: LedgerEntryType.EXPENSE,
+        amount: new Prisma.Decimal(3000000),
+        sourceType: null,
+      },
+    ]);
+    tx.goalAllocation.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } }) // surplus already allocated
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // allocatedBefore
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(1500000) } }); // allocatedAfter
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.create.mockResolvedValue({
+      id: 'surplus-entry-id',
+      amount: new Prisma.Decimal(1500000),
+      entryType: LedgerEntryType.ADJUSTMENT,
+      status: LedgerEntryStatus.ACTIVE,
+    });
+    tx.goalAllocation.create.mockResolvedValue({
+      id: 'allocation-id',
+      ledgerEntryId: 'surplus-entry-id',
+      amount: new Prisma.Decimal(1500000),
+      ledgerEntry: { id: 'surplus-entry-id' },
+    });
+    tx.financialGoal.findUniqueOrThrow.mockResolvedValue(largeGoal);
+
+    const result = await financialGoalService.allocateMonthlySurplusToGoal(
+      familyId,
+      memberId,
+      goalId,
+      {
+        periodMonth: 6,
+        periodYear: 2026,
+        amount: 1500000,
+        note: 'Chuyen so du',
+      },
+    );
+
+    expect(tx.ledgerEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ledgerId: 'ledger-id',
+        createdByMemberId: memberId,
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(1500000),
+        sourceType: 'MONTHLY_SURPLUS_TO_GOAL',
+        sourceId: 'goal-id:2026-06',
+        status: LedgerEntryStatus.ACTIVE,
+      }),
+    });
+    expect(tx.goalAllocation.create).toHaveBeenCalledWith({
+      data: {
+        goalId,
+        ledgerEntryId: 'surplus-entry-id',
+        amount: new Prisma.Decimal(1500000),
+        allocatedByMemberId: memberId,
+      },
+      include: { ledgerEntry: true },
+    });
+    expect(result.surplus).toMatchObject({
+      periodMonth: 6,
+      periodYear: 2026,
+      totalSurplus: 2000000,
+      allocatedSurplus: 1500000,
+      availableSurplus: 500000,
+    });
+  });
+
+  it('returns monthly surplus availability for finance managers', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (
+      prisma.financeLedger as { findUnique: jest.Mock }
+    ).findUnique.mockResolvedValue({ id: 'ledger-id' });
+    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
+      {
+        entryType: LedgerEntryType.CONTRIBUTION,
+        amount: new Prisma.Decimal(5000000),
+        sourceType: null,
+      },
+      {
+        entryType: LedgerEntryType.EXPENSE,
+        amount: new Prisma.Decimal(3000000),
+        sourceType: null,
+      },
+      {
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(500000),
+        sourceType: 'MONTHLY_SURPLUS_TO_GOAL',
+      },
+    ]);
+    (
+      prisma.goalAllocation as { aggregate: jest.Mock }
+    ).aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(500000) },
+    });
+
+    const result = await financialGoalService.getMonthlySurplusAvailability(
+      familyId,
+      memberId,
+      { month: 6, year: 2026 },
+    );
+
+    expect(result).toEqual({
+      periodMonth: 6,
+      periodYear: 2026,
+      totalSurplus: 2000000,
+      allocatedSurplus: 500000,
+      availableSurplus: 1500000,
+    });
+  });
+
+  it('prevents surplus allocation above the remaining monthly surplus', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    tx.financialGoal.findFirst.mockResolvedValue(goal);
+    tx.financeLedger.findUnique.mockResolvedValue({ id: 'ledger-id' });
+    tx.ledgerEntry.findMany.mockResolvedValue([
+      {
+        entryType: LedgerEntryType.CONTRIBUTION,
+        amount: new Prisma.Decimal(5000000),
+        sourceType: null,
+      },
+      {
+        entryType: LedgerEntryType.EXPENSE,
+        amount: new Prisma.Decimal(3000000),
+        sourceType: null,
+      },
+    ]);
+    tx.goalAllocation.aggregate.mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(1000000) },
+    });
+
+    await expect(
+      financialGoalService.allocateMonthlySurplusToGoal(
+        familyId,
+        memberId,
+        goalId,
+        {
+          periodMonth: 6,
+          periodYear: 2026,
+          amount: 1500000,
+        },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.goalAllocation.create).not.toHaveBeenCalled();
+  });
+
+  it('prevents normal members from allocating family monthly surplus', async () => {
+    tx.familyMember.findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await expect(
+      financialGoalService.allocateMonthlySurplusToGoal(
+        familyId,
+        memberId,
+        goalId,
+        {
+          periodMonth: 6,
+          periodYear: 2026,
+          amount: 100000,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
   });
 
   it('suggests monthly goal contributions proportionally after shared contributions and handles null monthly finance values', async () => {

@@ -20,6 +20,8 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
 
+const MONTHLY_SURPLUS_TO_GOAL_SOURCE = 'MONTHLY_SURPLUS_TO_GOAL';
+
 type FinancialGoalWithJar = Prisma.FinancialGoalGetPayload<{
   include: { relatedJar: true };
 }>;
@@ -339,7 +341,12 @@ export class FinanceReportService {
         status: LedgerEntryStatus.ACTIVE,
         entryDate: { gte: context.start, lt: this.nextUtcDay(context.end) },
       },
-      select: { entryType: true, amount: true, entryDate: true },
+      select: {
+        entryType: true,
+        amount: true,
+        entryDate: true,
+        sourceType: true,
+      },
       orderBy: { entryDate: 'asc' },
     });
 
@@ -378,7 +385,10 @@ export class FinanceReportService {
       } else if (this.cashOutTypes().includes(entry.entryType)) {
         bucket.expenseAmount = bucket.expenseAmount.plus(entry.amount);
         totalExpense = totalExpense.plus(entry.amount);
-      } else if (entry.entryType === LedgerEntryType.ADJUSTMENT) {
+      } else if (
+        entry.entryType === LedgerEntryType.ADJUSTMENT &&
+        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE
+      ) {
         bucket.adjustmentAmount = bucket.adjustmentAmount.plus(entry.amount);
         totalAdjustment = totalAdjustment.plus(entry.amount);
       }
