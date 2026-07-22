@@ -86,6 +86,9 @@ export default () => ({
     ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
+  family: {
+    maxDeputies: parseInt(process.env.FAMILY_MAX_DEPUTIES || '2', 10),
+  },
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),

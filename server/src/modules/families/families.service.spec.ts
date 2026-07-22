@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FamilyRole, MemberStatus, NotificationType } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
@@ -32,12 +33,14 @@ describe('FamiliesService.removeMember (soft delete)', () => {
       notify: jest.fn().mockResolvedValue({ ids: [] }),
       notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
     };
+    const config = { get: jest.fn().mockReturnValue(2) };
     service = new FamiliesService(
       prisma as unknown as PrismaService,
       familyMembers as unknown as FamilyMembersService,
       sosGateway as unknown as SosGateway,
       {} as unknown as SubscriptionsService,
       notifications as unknown as NotificationsService,
+      config as unknown as ConfigService,
     );
   });
 
@@ -115,5 +118,118 @@ describe('FamiliesService.removeMember (soft delete)', () => {
       BadRequestException,
     );
     expect(familyMembers.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('FamiliesService.changeMemberRole', () => {
+  const familyId = 'family-id';
+  const targetUserId = 'target-user-id';
+  const targetMemberId = 'target-member-id';
+  let prisma: { familyMember: Record<string, jest.Mock> };
+  let familyMembers: { findByFamilyAndUser: jest.Mock };
+  let notifications: { notify: jest.Mock };
+  let config: { get: jest.Mock };
+  let service: FamiliesService;
+
+  beforeEach(() => {
+    prisma = {
+      familyMember: {
+        count: jest.fn().mockResolvedValue(0),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: targetMemberId, familyRole: FamilyRole.DEPUTY_MEMBER }),
+      },
+    };
+    familyMembers = { findByFamilyAndUser: jest.fn() };
+    notifications = { notify: jest.fn().mockResolvedValue({ ids: [] }) };
+    config = { get: jest.fn().mockReturnValue(2) };
+    service = new FamiliesService(
+      prisma as unknown as PrismaService,
+      familyMembers as unknown as FamilyMembersService,
+      {} as unknown as SosGateway,
+      {} as unknown as SubscriptionsService,
+      notifications as unknown as NotificationsService,
+      config as unknown as ConfigService,
+    );
+  });
+
+  it('promotes an ACTIVE FAMILY_MEMBER to DEPUTY_MEMBER and notifies them', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await service.changeMemberRole(
+      familyId,
+      targetUserId,
+      FamilyRole.DEPUTY_MEMBER,
+    );
+
+    expect(prisma.familyMember.update).toHaveBeenCalledWith({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      data: { familyRole: FamilyRole.DEPUTY_MEMBER },
+    });
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [targetMemberId],
+      expect.objectContaining({
+        type: NotificationType.MEMBER,
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: targetMemberId,
+      }),
+    );
+  });
+
+  it('throws BadRequest when deputy cap is reached', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+    prisma.familyMember.count.mockResolvedValue(2);
+
+    await expect(
+      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+  });
+
+  it('throws BadRequest when target is the FAMILY_MANAGER', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await expect(
+      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFound when target is missing or not ACTIVE', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue(null);
+
+    await expect(
+      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('is idempotent when the member already has the target role', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      familyRole: FamilyRole.DEPUTY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await service.changeMemberRole(
+      familyId,
+      targetUserId,
+      FamilyRole.DEPUTY_MEMBER,
+    );
+
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ import { FamilyRoles } from '../family-members/decorators/family-roles.decorator
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { FamiliesService } from './families.service';
 
 @ApiTags('Families')
@@ -92,6 +93,28 @@ export class FamiliesController {
   @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
   update(@Param('familyId') familyId: string, @Body() dto: UpdateFamilyDto) {
     return this.familiesService.update(familyId, dto);
+  }
+
+  @Patch(':familyId/members/:userId/role')
+  @UseGuards(FamilyPermissionGuard)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
+  @ResponseMessage('Cập nhật vai trò thành viên thành công')
+  @ApiOperation({
+    summary: 'Bổ nhiệm/gỡ phó nhóm (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({ status: 400, description: 'Vượt giới hạn phó nhóm hoặc đổi vai trò quản lý' })
+  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  @ApiResponse({ status: 404, description: 'Member not found in this family' })
+  changeMemberRole(
+    @Param('familyId') familyId: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateMemberRoleDto,
+  ) {
+    return this.familiesService.changeMemberRole(
+      familyId,
+      userId,
+      dto.familyRole,
+    );
   }
 
   @Delete(':familyId/members/:userId')
