@@ -239,6 +239,7 @@ export class FinanceReportService {
     ]);
     return {
       period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
       budget,
       goals,
       spending: {
@@ -307,6 +308,7 @@ export class FinanceReportService {
       : [];
     return {
       period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
       nonEssentialExpense: spending.nonEssentialExpense,
       totalExpense: spending.totalExpense,
       nonEssentialRatio: spending.nonEssentialRatio,
@@ -391,6 +393,7 @@ export class FinanceReportService {
     const netCashFlow = totalIncome.minus(totalExpense);
     return {
       period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
       totals: {
         incomeAmount: totalIncome,
         expenseAmount: totalExpense,
@@ -418,6 +421,7 @@ export class FinanceReportService {
     );
     return {
       period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
       totalExpense: spending.totalExpense,
       essentialExpense: spending.essentialExpense,
       nonEssentialExpense: spending.nonEssentialExpense,
@@ -574,6 +578,7 @@ export class FinanceReportService {
     );
     return {
       period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
       totals: {
         sharedContribution: items.reduce(
           (sum, row) => sum.plus(row.sharedContribution),

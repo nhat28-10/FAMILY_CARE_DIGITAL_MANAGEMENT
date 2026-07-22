@@ -612,6 +612,7 @@ describe('FinancialGoalService financial goals', () => {
       entryType: LedgerEntryType.CONTRIBUTION,
       status: LedgerEntryStatus.ACTIVE,
       createdByMemberId: { in: ['member-a'] },
+      sourceId: { in: ['plan-a'] },
     });
     expect(tx.goalContributionPlan.update).toHaveBeenCalledWith({
       where: { id: 'plan-a' },
@@ -876,7 +877,7 @@ describe('FinancialGoalService financial goals', () => {
           createdByMemberId: 'contributor-id',
           entryType: LedgerEntryType.CONTRIBUTION,
           amount: new Prisma.Decimal(1500000),
-          sourceType: 'MANUAL',
+          sourceType: 'GOAL_CONTRIBUTION_PLAN',
           sourceId: 'plan-id',
           status: LedgerEntryStatus.ACTIVE,
         }),

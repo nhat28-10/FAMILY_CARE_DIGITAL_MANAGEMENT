@@ -885,6 +885,7 @@ export class FinanceService {
     if (!ledger) {
       return {
         period,
+        currency: 'VND',
         ledger: null,
         totalIncome: new Prisma.Decimal(0),
         totalExpense: new Prisma.Decimal(0),
@@ -923,6 +924,7 @@ export class FinanceService {
 
     return {
       period,
+      currency: 'VND',
       ledger,
       totalIncome,
       totalExpense,

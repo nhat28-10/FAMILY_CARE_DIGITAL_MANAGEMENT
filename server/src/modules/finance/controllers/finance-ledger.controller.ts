@@ -12,7 +12,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -27,6 +30,12 @@ import { FamilyRoles } from '../../family-members/decorators/family-roles.decora
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
+import {
+  FINANCE_OVERVIEW_RESPONSE_EXAMPLE,
+  FinanceBadRequestResponseDto,
+  FinanceForbiddenResponseDto,
+  FinanceOverviewApiResponseDto,
+} from '../dto/finance-summary-response.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
 import { OptionalFinancePeriodDto } from '../dto/finance-period.dto';
 import { UpdateLedgerEntryDto } from '../dto/update-ledger-entry.dto';
@@ -146,6 +155,25 @@ export class FinanceLedgerController {
   @ApiResponse({
     status: 403,
     description: 'Không có quyền quản lý tài chính gia đình',
+  })
+  @ApiOkResponse({
+    description:
+      'Envelope chuẩn. data.period dùng month/year; các số tiền là VND; monthlyFinance có thể null.',
+    type: FinanceOverviewApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Finance overview sample',
+        value: FINANCE_OVERVIEW_RESPONSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'month/year không hợp lệ',
+    type: FinanceBadRequestResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Không có quyền quản lý tài chính gia đình',
+    type: FinanceForbiddenResponseDto,
   })
   getOverview(
     @Param('familyId') familyId: string,
