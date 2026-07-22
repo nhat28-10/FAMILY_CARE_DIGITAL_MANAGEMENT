@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -27,6 +29,7 @@ import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
 import { OptionalFinancePeriodDto } from '../dto/finance-period.dto';
+import { UpdateLedgerEntryDto } from '../dto/update-ledger-entry.dto';
 import { FinanceService } from '../services/finance.service';
 
 @ApiTags('Finance - Thu chi gia đình')
@@ -74,6 +77,62 @@ export class FinanceLedgerController {
     @Body() dto: CreateLedgerEntryDto,
   ) {
     return this.financeService.createLedgerEntry(familyId, memberId, dto);
+  }
+
+  @Get('ledger/entries/:entryId')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Lấy chi tiết giao dịch sổ tài chính chung thành công')
+  @ApiOperation({
+    summary: 'Lấy chi tiết một giao dịch trong sổ tài chính chung',
+  })
+  @ApiParam({
+    name: 'entryId',
+    description: 'ID giao dịch cần thao tác',
+    format: 'uuid',
+  })
+  getLedgerEntry(
+    @Param('familyId') familyId: string,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.financeService.getLedgerEntry(familyId, entryId);
+  }
+
+  @Patch('ledger/entries/:entryId')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Cập nhật giao dịch sổ tài chính chung thành công')
+  @ApiOperation({ summary: 'Cập nhật giao dịch trong sổ tài chính chung' })
+  @ApiParam({
+    name: 'entryId',
+    description: 'ID giao dịch cần thao tác',
+    format: 'uuid',
+  })
+  updateLedgerEntry(
+    @Param('familyId') familyId: string,
+    @Param('entryId') entryId: string,
+    @Body() dto: UpdateLedgerEntryDto,
+  ) {
+    return this.financeService.updateLedgerEntry(familyId, entryId, dto);
+  }
+
+  @Delete('ledger/entries/:entryId')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Hủy giao dịch sổ tài chính chung thành công')
+  @ApiOperation({
+    summary:
+      'Hủy mềm giao dịch trong sổ tài chính chung bằng trạng thái VOIDED',
+  })
+  @ApiParam({
+    name: 'entryId',
+    description: 'ID giao dịch cần thao tác',
+    format: 'uuid',
+  })
+  voidLedgerEntry(
+    @Param('familyId') familyId: string,
+    @Param('entryId') entryId: string,
+  ) {
+    return this.financeService.voidLedgerEntry(familyId, entryId);
   }
 
   @Get('overview')

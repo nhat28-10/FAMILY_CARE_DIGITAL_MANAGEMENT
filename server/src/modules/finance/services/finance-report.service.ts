@@ -27,6 +27,15 @@ type FinancialGoalWithJar = Prisma.FinancialGoalGetPayload<{
 @Injectable()
 export class FinanceReportService {
   constructor(private readonly prisma: PrismaService) {}
+
+  getFamilyFinanceSummary(
+    familyId: string,
+    memberId: string,
+    query: FinanceReportQueryDto,
+  ) {
+    return this.getFinanceOverviewReport(familyId, memberId, query);
+  }
+
   async getBudgetPlan(familyId: string, budgetPlanId: string) {
     const plan = await this.prisma.budgetPlan.findFirst({
       where: { id: budgetPlanId, familyId },
@@ -315,6 +324,278 @@ export class FinanceReportService {
     };
   }
 
+  async getCashFlowSummary(
+    familyId: string,
+    memberId: string,
+    query: FinanceReportQueryDto,
+  ) {
+    await this.getMemberInFamilyOrThrow(familyId, memberId);
+    const context = await this.resolveReportContext(familyId, query);
+    const entries = await this.prisma.ledgerEntry.findMany({
+      where: {
+        ledger: { familyId },
+        status: LedgerEntryStatus.ACTIVE,
+        entryDate: { gte: context.start, lt: this.nextUtcDay(context.end) },
+      },
+      select: { entryType: true, amount: true, entryDate: true },
+      orderBy: { entryDate: 'asc' },
+    });
+
+    const zero = new Prisma.Decimal(0);
+    const buckets = new Map<
+      string,
+      {
+        month: string;
+        incomeAmount: Prisma.Decimal;
+        expenseAmount: Prisma.Decimal;
+        adjustmentAmount: Prisma.Decimal;
+        netCashFlow: Prisma.Decimal;
+        netIncludingAdjustments: Prisma.Decimal;
+        entryCount: number;
+      }
+    >();
+    let totalIncome = zero;
+    let totalExpense = zero;
+    let totalAdjustment = zero;
+
+    for (const entry of entries) {
+      const key = this.monthKey(entry.entryDate);
+      const bucket = buckets.get(key) ?? {
+        month: key,
+        incomeAmount: zero,
+        expenseAmount: zero,
+        adjustmentAmount: zero,
+        netCashFlow: zero,
+        netIncludingAdjustments: zero,
+        entryCount: 0,
+      };
+
+      if (this.cashInTypes().includes(entry.entryType)) {
+        bucket.incomeAmount = bucket.incomeAmount.plus(entry.amount);
+        totalIncome = totalIncome.plus(entry.amount);
+      } else if (this.cashOutTypes().includes(entry.entryType)) {
+        bucket.expenseAmount = bucket.expenseAmount.plus(entry.amount);
+        totalExpense = totalExpense.plus(entry.amount);
+      } else if (entry.entryType === LedgerEntryType.ADJUSTMENT) {
+        bucket.adjustmentAmount = bucket.adjustmentAmount.plus(entry.amount);
+        totalAdjustment = totalAdjustment.plus(entry.amount);
+      }
+      bucket.entryCount += 1;
+      bucket.netCashFlow = bucket.incomeAmount.minus(bucket.expenseAmount);
+      bucket.netIncludingAdjustments = bucket.netCashFlow.plus(
+        bucket.adjustmentAmount,
+      );
+      buckets.set(key, bucket);
+    }
+
+    const netCashFlow = totalIncome.minus(totalExpense);
+    return {
+      period: { periodStart: context.start, periodEnd: context.end },
+      totals: {
+        incomeAmount: totalIncome,
+        expenseAmount: totalExpense,
+        adjustmentAmount: totalAdjustment,
+        netCashFlow,
+        netIncludingAdjustments: netCashFlow.plus(totalAdjustment),
+        entryCount: entries.length,
+      },
+      byMonth: [...buckets.values()],
+    };
+  }
+
+  async getCategorySpendingSummary(
+    familyId: string,
+    memberId: string,
+    query: FinanceReportQueryDto,
+  ) {
+    await this.getMemberInFamilyOrThrow(familyId, memberId);
+    const context = await this.resolveReportContext(familyId, query);
+    const spending = await this.buildSpendingSummary(
+      familyId,
+      context.start,
+      context.end,
+      true,
+    );
+    return {
+      period: { periodStart: context.start, periodEnd: context.end },
+      totalExpense: spending.totalExpense,
+      essentialExpense: spending.essentialExpense,
+      nonEssentialExpense: spending.nonEssentialExpense,
+      nonEssentialRatio: spending.nonEssentialRatio,
+      byCategory: spending.byCategory.sort((a, b) =>
+        b.amount.comparedTo(a.amount),
+      ),
+    };
+  }
+
+  async getMemberContributionSummary(
+    familyId: string,
+    memberId: string,
+    query: FinanceReportQueryDto,
+  ) {
+    const requester = await this.getMemberInFamilyOrThrow(familyId, memberId);
+    const context = await this.resolveReportContext(familyId, query);
+    const visibleMemberWhere = this.isFinanceManager(requester.familyRole)
+      ? {}
+      : { id: memberId };
+    const monthFilters = this.monthFiltersBetween(context.start, context.end);
+
+    const [members, monthlyFinances, goalAllocations, ledgerContributions] =
+      await Promise.all([
+        this.prisma.familyMember.findMany({
+          where: {
+            familyId,
+            status: MemberStatus.ACTIVE,
+            ...visibleMemberWhere,
+          },
+          select: {
+            id: true,
+            displayName: true,
+            user: { select: { id: true, fullName: true, avatarUrl: true } },
+          },
+          orderBy: [{ displayName: 'asc' }, { createdAt: 'asc' }],
+        }),
+        this.prisma.memberMonthlyFinance.findMany({
+          where: {
+            member: {
+              familyId,
+              status: MemberStatus.ACTIVE,
+              ...visibleMemberWhere,
+            },
+            OR: monthFilters,
+          },
+          include: {
+            member: {
+              select: {
+                id: true,
+                displayName: true,
+                user: { select: { id: true, fullName: true, avatarUrl: true } },
+              },
+            },
+          },
+        }),
+        this.prisma.goalAllocation.findMany({
+          where: {
+            goal: {
+              familyId,
+              relatedJar: this.isFinanceManager(requester.familyRole)
+                ? undefined
+                : { is: null },
+            },
+            ledgerEntry: {
+              ledger: { familyId },
+              status: LedgerEntryStatus.ACTIVE,
+              entryType: LedgerEntryType.CONTRIBUTION,
+              createdByMemberId: this.isFinanceManager(requester.familyRole)
+                ? undefined
+                : memberId,
+              entryDate: {
+                gte: context.start,
+                lt: this.nextUtcDay(context.end),
+              },
+            },
+          },
+          select: {
+            amount: true,
+            ledgerEntry: {
+              select: {
+                createdByMemberId: true,
+              },
+            },
+          },
+        }),
+        this.prisma.ledgerEntry.findMany({
+          where: {
+            ledger: { familyId },
+            status: LedgerEntryStatus.ACTIVE,
+            entryType: LedgerEntryType.CONTRIBUTION,
+            createdByMemberId: this.isFinanceManager(requester.familyRole)
+              ? undefined
+              : memberId,
+            entryDate: { gte: context.start, lt: this.nextUtcDay(context.end) },
+          },
+          select: { createdByMemberId: true, amount: true },
+        }),
+      ]);
+
+    const zero = new Prisma.Decimal(0);
+    const rows = new Map<
+      string,
+      {
+        member: (typeof members)[number];
+        sharedContribution: Prisma.Decimal;
+        goalContribution: Prisma.Decimal;
+        ledgerContributionTotal: Prisma.Decimal;
+        totalContribution: Prisma.Decimal;
+      }
+    >();
+
+    for (const member of members) {
+      rows.set(member.id, {
+        member,
+        sharedContribution: zero,
+        goalContribution: zero,
+        ledgerContributionTotal: zero,
+        totalContribution: zero,
+      });
+    }
+
+    for (const finance of monthlyFinances) {
+      const row = rows.get(finance.memberId);
+      if (row) {
+        row.sharedContribution = row.sharedContribution.plus(
+          finance.actualSharedContribution ?? zero,
+        );
+      }
+    }
+
+    for (const allocation of goalAllocations) {
+      const row = rows.get(allocation.ledgerEntry.createdByMemberId);
+      if (row) {
+        row.goalContribution = row.goalContribution.plus(allocation.amount);
+      }
+    }
+
+    for (const contribution of ledgerContributions) {
+      const row = rows.get(contribution.createdByMemberId);
+      if (row) {
+        row.ledgerContributionTotal = row.ledgerContributionTotal.plus(
+          contribution.amount,
+        );
+      }
+    }
+
+    for (const row of rows.values()) {
+      row.totalContribution = row.sharedContribution.plus(row.goalContribution);
+    }
+
+    const items = [...rows.values()].sort((a, b) =>
+      b.totalContribution.comparedTo(a.totalContribution),
+    );
+    return {
+      period: { periodStart: context.start, periodEnd: context.end },
+      totals: {
+        sharedContribution: items.reduce(
+          (sum, row) => sum.plus(row.sharedContribution),
+          zero,
+        ),
+        goalContribution: items.reduce(
+          (sum, row) => sum.plus(row.goalContribution),
+          zero,
+        ),
+        ledgerContributionTotal: items.reduce(
+          (sum, row) => sum.plus(row.ledgerContributionTotal),
+          zero,
+        ),
+        totalContribution: items.reduce(
+          (sum, row) => sum.plus(row.totalContribution),
+          zero,
+        ),
+      },
+      members: items,
+    };
+  }
+
   private visibleFinancialGoalWhere(
     familyId: string,
     familyRole: FamilyRole,
@@ -330,6 +611,41 @@ export class FinanceReportService {
       familyRole === FamilyRole.FAMILY_MANAGER ||
       familyRole === FamilyRole.DEPUTY_MEMBER
     );
+  }
+
+  private cashInTypes(): LedgerEntryType[] {
+    return [LedgerEntryType.INCOME, LedgerEntryType.CONTRIBUTION];
+  }
+
+  private cashOutTypes(): LedgerEntryType[] {
+    return [
+      LedgerEntryType.EXPENSE,
+      LedgerEntryType.SUPPORT,
+      LedgerEntryType.ALLOWANCE,
+      LedgerEntryType.REWARD,
+    ];
+  }
+
+  private monthKey(date: Date) {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+
+  private monthFiltersBetween(start: Date, end: Date) {
+    const filters: Array<{ periodMonth: number; periodYear: number }> = [];
+    const cursor = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1),
+    );
+    const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+    while (cursor.getTime() <= last.getTime()) {
+      filters.push({
+        periodMonth: cursor.getUTCMonth() + 1,
+        periodYear: cursor.getUTCFullYear(),
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    return filters;
   }
 
   private visibleAlertWhere(
