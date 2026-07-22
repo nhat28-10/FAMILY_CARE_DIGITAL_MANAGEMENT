@@ -28,6 +28,7 @@ import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { EmailVerificationService } from './email-verification.service';
 import { FirebaseAuthService } from './firebase-auth.service';
 import { PasswordResetService } from './password-reset.service';
@@ -279,6 +280,43 @@ export class AuthService {
   }
 
   /** Xác thực email bằng mã OTP; trả về user đã được cập nhật trạng thái. */
+  async updateProfile(
+    userId: string,
+    dto: UpdateMyProfileDto,
+  ): Promise<SafeUser> {
+    if (dto.phone !== undefined && dto.phone !== null) {
+      const existing = await this.usersService.findByPhone(dto.phone);
+      if (existing && existing.id !== userId) {
+        throw new ConflictException(
+          'Sá»‘ Ä‘iá»‡n thoáº¡i Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng',
+        );
+      }
+    }
+
+    try {
+      const updated = await this.usersService.updateProfile(userId, {
+        fullName: this.profileString(dto.fullName),
+        phone: this.profileString(dto.phone),
+        avatarUrl: this.profileString(dto.avatarUrl),
+      });
+      return sanitizeUser(updated);
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const target = err.meta?.target;
+        const field = Array.isArray(target) ? target.join(',') : String(target);
+        throw new ConflictException(
+          field.includes('phone')
+            ? 'Sá»‘ Ä‘iá»‡n thoáº¡i Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng'
+            : 'ThÃ´ng tin há»“ sÆ¡ Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng',
+        );
+      }
+      throw err;
+    }
+  }
+
   async verifyEmail(userId: string, code: string): Promise<SafeUser> {
     await this.emailVerificationService.verify(userId, code);
     return this.getProfile(userId);
@@ -367,5 +405,12 @@ export class AuthService {
 
   private get saltRounds(): number {
     return this.config.get<number>('bcrypt.saltRounds', 10);
+  }
+
+  private profileString(value: string | null | undefined) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? null : trimmed;
   }
 }

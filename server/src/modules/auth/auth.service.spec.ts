@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -47,6 +48,7 @@ describe('AuthService', () => {
     findByPhone: jest.Mock;
     findById: jest.Mock;
     create: jest.Mock;
+    updateProfile: jest.Mock;
     updateLastLogin: jest.Mock;
     findByFirebaseUid: jest.Mock;
     linkFirebaseUid: jest.Mock;
@@ -62,6 +64,7 @@ describe('AuthService', () => {
       findByPhone: jest.fn(),
       findById: jest.fn(),
       create: jest.fn(),
+      updateProfile: jest.fn(),
       updateLastLogin: jest.fn(),
       findByFirebaseUid: jest.fn(),
       linkFirebaseUid: jest.fn(),
@@ -257,6 +260,81 @@ describe('AuthService', () => {
       await expect(service.loginWithFirebase({ idToken: 't' })).rejects.toThrow(
         ServiceUnavailableException,
       );
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('updates the authenticated user profile and strips passwordHash', async () => {
+      usersService.findByPhone.mockResolvedValue(null);
+      usersService.updateProfile.mockResolvedValue({
+        ...baseUser,
+        fullName: 'New Name',
+        phone: '+84901234567',
+        avatarUrl: 'https://cdn.example.com/avatar.png',
+      });
+
+      const result = await service.updateProfile(baseUser.id, {
+        fullName: '  New Name  ',
+        phone: '+84901234567',
+        avatarUrl: 'https://cdn.example.com/avatar.png',
+      });
+
+      expect(usersService.updateProfile).toHaveBeenCalledWith(baseUser.id, {
+        fullName: 'New Name',
+        phone: '+84901234567',
+        avatarUrl: 'https://cdn.example.com/avatar.png',
+      });
+      expect(result.fullName).toBe('New Name');
+      expect('passwordHash' in result).toBe(false);
+    });
+
+    it('allows clearing nullable profile fields', async () => {
+      usersService.updateProfile.mockResolvedValue({
+        ...baseUser,
+        fullName: null,
+        phone: null,
+        avatarUrl: null,
+      });
+
+      await service.updateProfile(baseUser.id, {
+        fullName: '',
+        phone: null,
+        avatarUrl: null,
+      });
+
+      expect(usersService.findByPhone).not.toHaveBeenCalled();
+      expect(usersService.updateProfile).toHaveBeenCalledWith(baseUser.id, {
+        fullName: null,
+        phone: null,
+        avatarUrl: null,
+      });
+    });
+
+    it('rejects a phone number used by another user', async () => {
+      usersService.findByPhone.mockResolvedValue({
+        ...baseUser,
+        id: 'other-user',
+      });
+
+      await expect(
+        service.updateProfile(baseUser.id, { phone: '+84901234567' }),
+      ).rejects.toThrow(ConflictException);
+      expect(usersService.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('maps a phone unique race to ConflictException', async () => {
+      usersService.findByPhone.mockResolvedValue(null);
+      usersService.updateProfile.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['phone'] },
+        }),
+      );
+
+      await expect(
+        service.updateProfile(baseUser.id, { phone: '+84901234567' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });
