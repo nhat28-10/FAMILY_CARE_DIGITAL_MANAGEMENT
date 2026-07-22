@@ -233,3 +233,84 @@ describe('FamiliesService.changeMemberRole', () => {
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 });
+
+describe('FamiliesService.transferOwnership', () => {
+  const familyId = 'family-id';
+  const managerUserId = 'manager-user-id';
+  const targetUserId = 'target-user-id';
+  const newManagerMemberId = 'new-manager-member-id';
+  const oldManagerMemberId = 'old-manager-member-id';
+  let prisma: {
+    familyMember: Record<string, jest.Mock>;
+    family: Record<string, jest.Mock>;
+    $transaction: jest.Mock;
+  };
+  let familyMembers: { findByFamilyAndUser: jest.Mock };
+  let notifications: { notify: jest.Mock };
+  let service: FamiliesService;
+
+  beforeEach(() => {
+    prisma = {
+      familyMember: { update: jest.fn() },
+      family: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: familyId, members: [] }),
+      },
+      $transaction: jest
+        .fn()
+        .mockResolvedValue([
+          { id: newManagerMemberId },
+          { id: oldManagerMemberId },
+        ]),
+    };
+    familyMembers = { findByFamilyAndUser: jest.fn() };
+    notifications = { notify: jest.fn().mockResolvedValue({ ids: [] }) };
+    service = new FamiliesService(
+      prisma as unknown as PrismaService,
+      familyMembers as unknown as FamilyMembersService,
+      {} as unknown as SosGateway,
+      {} as unknown as SubscriptionsService,
+      notifications as unknown as NotificationsService,
+      { get: jest.fn() } as unknown as ConfigService,
+    );
+  });
+
+  it('swaps roles atomically and notifies both parties', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: newManagerMemberId,
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await service.transferOwnership(familyId, managerUserId, targetUserId);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [newManagerMemberId],
+      expect.objectContaining({ type: NotificationType.MEMBER }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [oldManagerMemberId],
+      expect.objectContaining({ type: NotificationType.MEMBER }),
+    );
+  });
+
+  it('throws BadRequest when transferring to self', async () => {
+    await expect(
+      service.transferOwnership(familyId, managerUserId, managerUserId),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFound when target is missing or not ACTIVE', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue(null);
+
+    await expect(
+      service.transferOwnership(familyId, managerUserId, targetUserId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});

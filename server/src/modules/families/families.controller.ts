@@ -26,6 +26,7 @@ import { FamilyRoles } from '../family-members/decorators/family-roles.decorator
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
+import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { FamiliesService } from './families.service';
 
@@ -114,6 +115,29 @@ export class FamiliesController {
       familyId,
       userId,
       dto.familyRole,
+    );
+  }
+
+  @Post(':familyId/transfer-ownership')
+  @UseGuards(FamilyPermissionGuard)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Trao quyền trưởng nhóm thành công')
+  @ApiOperation({
+    summary: 'Trao quyền trưởng nhóm cho thành viên khác (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({ status: 400, description: 'Trao cho chính mình hoặc thiếu xác nhận' })
+  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  @ApiResponse({ status: 404, description: 'Member not found in this family' })
+  transferOwnership(
+    @Param('familyId') familyId: string,
+    @CurrentUser('id') currentUserId: string,
+    @Body() dto: TransferOwnershipDto,
+  ) {
+    return this.familiesService.transferOwnership(
+      familyId,
+      currentUserId,
+      dto.targetUserId,
     );
   }
 

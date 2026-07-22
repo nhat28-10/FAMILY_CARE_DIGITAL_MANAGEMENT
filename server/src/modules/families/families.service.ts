@@ -287,6 +287,69 @@ export class FamiliesService {
     return updated;
   }
 
+  /**
+   * Trao quyền trưởng nhóm: target lên FAMILY_MANAGER, manager cũ tụt xuống
+   * FAMILY_MEMBER. Swap trong 1 transaction để không bao giờ rơi vào trạng
+   * thái 0 hoặc 2 trưởng nhóm. Manager cũ KHÔNG tính vào giới hạn phó nhóm.
+   */
+  async transferOwnership(
+    familyId: string,
+    currentManagerUserId: string,
+    targetUserId: string,
+  ) {
+    if (targetUserId === currentManagerUserId) {
+      throw new BadRequestException('Không thể trao quyền cho chính mình');
+    }
+    const target = await this.familyMembersService.findByFamilyAndUser(
+      familyId,
+      targetUserId,
+    );
+    if (!target || target.status !== MemberStatus.ACTIVE) {
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
+    }
+
+    const [newManager, oldManager] = await this.prisma.$transaction([
+      this.prisma.familyMember.update({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        data: { familyRole: FamilyRole.FAMILY_MANAGER },
+      }),
+      this.prisma.familyMember.update({
+        where: {
+          familyId_userId: { familyId, userId: currentManagerUserId },
+        },
+        data: { familyRole: FamilyRole.FAMILY_MEMBER },
+      }),
+    ]);
+
+    // Role đã swap thành công — lỗi thông báo không được biến thành 5xx.
+    try {
+      await this.notificationsService.notify(familyId, [newManager.id], {
+        type: NotificationType.MEMBER,
+        priority: NotificationPriority.NORMAL,
+        title: 'Bạn đã trở thành trưởng nhóm',
+        body: 'Bạn đã được trao quyền trưởng nhóm gia đình.',
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: newManager.id,
+      });
+      await this.notificationsService.notify(familyId, [oldManager.id], {
+        type: NotificationType.MEMBER,
+        priority: NotificationPriority.NORMAL,
+        title: 'Bạn đã trao quyền trưởng nhóm',
+        body: 'Bạn đã trao quyền trưởng nhóm cho thành viên khác.',
+        referenceType: 'FAMILY_MEMBER',
+        referenceId: oldManager.id,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo trao quyền: ${(err as Error).message}`,
+      );
+    }
+
+    return this.getById(familyId);
+  }
+
   /** Mã mời hiện tại của family — null nếu manager chưa tạo. */
   async getInviteCode(
     familyId: string,
