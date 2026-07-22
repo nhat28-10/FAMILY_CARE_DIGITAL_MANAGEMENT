@@ -13,6 +13,8 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 export const ADMIN_AUDIT_ACTIONS = [
   'ADMIN_USER_LOCK',
   'ADMIN_USER_UNLOCK',
+  'ADMIN_USER_UPDATE',
+  'ADMIN_USER_DELETE',
   'ADMIN_SUBSCRIPTION_MANUAL_RENEW',
   'ADMIN_SUBSCRIPTION_STATUS_UPDATE',
   'ADMIN_SUBSCRIPTION_STRIPE_SYNC',

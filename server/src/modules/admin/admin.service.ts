@@ -12,9 +12,11 @@ import {
   Prisma,
   ProvisioningActionType,
   ProvisioningStatus,
+  UserType,
   VerificationStatus,
   WorkspaceStatus,
 } from '@prisma/client';
+import type { User } from '@prisma/client';
 
 import {
   buildPaginated,
@@ -764,16 +766,74 @@ export class AdminService {
     return sanitizeUser(user);
   }
 
-  async updateUser(id: string, dto: AdminUpdateUserDto): Promise<SafeUser> {
-    await this.getUser(id);
+  async updateUser(
+    id: string,
+    dto: AdminUpdateUserDto,
+    actorAdminId?: string,
+  ): Promise<SafeUser> {
+    this.assertNoUserTypeUpdate(dto);
+    const target = await this.getUserRowOrThrow(id);
+    this.assertCanUpdateUser(target, dto, actorAdminId);
     const user = await this.prisma.user.update({ where: { id }, data: dto });
     return sanitizeUser(user);
   }
 
-  async deleteUser(id: string): Promise<null> {
-    await this.getUser(id);
+  async deleteUser(id: string, actorAdminId?: string): Promise<null> {
+    const target = await this.getUserRowOrThrow(id);
+    this.assertCanDeleteUser(target, actorAdminId);
     await this.prisma.user.delete({ where: { id } });
     return null;
+  }
+
+  private async getUserRowOrThrow(id: string): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Khong tim thay nguoi dung');
+    return user;
+  }
+
+  private assertNoUserTypeUpdate(dto: AdminUpdateUserDto): void {
+    if ('userType' in (dto as Record<string, unknown>)) {
+      throw new BadRequestException(
+        'Khong the cap nhat quyen admin qua API nay',
+      );
+    }
+  }
+
+  private assertCanUpdateUser(
+    target: User,
+    dto: AdminUpdateUserDto,
+    actorAdminId?: string,
+  ): void {
+    const isLocking =
+      dto.accountStatus === AccountStatus.SUSPENDED ||
+      dto.accountStatus === AccountStatus.INACTIVE;
+    if (!isLocking) return;
+
+    if (actorAdminId && target.id === actorAdminId) {
+      throw new BadRequestException(
+        'Admin khong the khoa tai khoan dang dang nhap',
+      );
+    }
+
+    if (target.userType === UserType.SYSTEM_ADMIN) {
+      throw new BadRequestException(
+        'Khong the khoa tai khoan SYSTEM_ADMIN qua API nay',
+      );
+    }
+  }
+
+  private assertCanDeleteUser(target: User, actorAdminId?: string): void {
+    if (actorAdminId && target.id === actorAdminId) {
+      throw new BadRequestException(
+        'Admin khong the xoa tai khoan dang dang nhap',
+      );
+    }
+
+    if (target.userType === UserType.SYSTEM_ADMIN) {
+      throw new BadRequestException(
+        'Khong the xoa tai khoan SYSTEM_ADMIN qua API nay',
+      );
+    }
   }
 
   // --------------------------------------------------------------------------

@@ -31,6 +31,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import type { SafeUser } from '../../users/users.types';
 import { AdminAuditLogsService } from '../admin-audit-logs.service';
 import { AdminService } from '../admin.service';
+import type { AdminAuditAction } from '../dto/list-admin-audit-logs-query.dto';
 import { ListUsersQueryDto } from '../dto/list-users-query.dto';
 import { AdminUpdateUserDto } from '../dto/update-user.dto';
 
@@ -79,44 +80,40 @@ export class AdminUsersController {
     @Req() request: Request,
     @Body() dto: AdminUpdateUserDto,
   ) {
-    const action = this.auditActionForAccountStatus(dto.accountStatus);
+    const action = this.auditActionForUpdate(dto);
     try {
-      const result = await this.admin.updateUser(id, dto);
-      if (action) {
-        await this.auditLogs.record({
-          adminUserId: adminUser.id,
-          adminEmail: adminUser.email,
-          adminName: adminUser.fullName,
-          action,
-          targetType: 'USER',
-          targetId: id,
-          result: 'SUCCESS',
-          ...this.auditLogs.requestContext(request),
-          metadata: {
-            accountStatus: dto.accountStatus,
-            changedFields: Object.keys(dto),
-          },
-        });
-      }
+      const result = await this.admin.updateUser(id, dto, adminUser.id);
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action,
+        targetType: 'USER',
+        targetId: id,
+        result: 'SUCCESS',
+        ...this.auditLogs.requestContext(request),
+        metadata: {
+          accountStatus: dto.accountStatus,
+          changedFields: Object.keys(dto),
+        },
+      });
       return result;
     } catch (error) {
-      if (action) {
-        await this.auditLogs.record({
-          adminUserId: adminUser.id,
-          adminEmail: adminUser.email,
-          adminName: adminUser.fullName,
-          action,
-          targetType: 'USER',
-          targetId: id,
-          result: 'FAILED',
-          ...this.auditLogs.requestContext(request),
-          metadata: {
-            accountStatus: dto.accountStatus,
-            changedFields: Object.keys(dto),
-          },
-          errorMessage: this.auditLogs.errorMessage(error),
-        });
-      }
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action,
+        targetType: 'USER',
+        targetId: id,
+        result: 'FAILED',
+        ...this.auditLogs.requestContext(request),
+        metadata: {
+          accountStatus: dto.accountStatus,
+          changedFields: Object.keys(dto),
+        },
+        errorMessage: this.auditLogs.errorMessage(error),
+      });
       throw error;
     }
   }
@@ -127,11 +124,48 @@ export class AdminUsersController {
   @ApiOperation({ summary: 'Delete a user' })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  remove(@Param('id') id: string) {
-    return this.admin.deleteUser(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() adminUser: SafeUser,
+    @Req() request: Request,
+  ) {
+    try {
+      const result = await this.admin.deleteUser(id, adminUser.id);
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action: 'ADMIN_USER_DELETE',
+        targetType: 'USER',
+        targetId: id,
+        result: 'SUCCESS',
+        ...this.auditLogs.requestContext(request),
+      });
+      return result;
+    } catch (error) {
+      await this.auditLogs.record({
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email,
+        adminName: adminUser.fullName,
+        action: 'ADMIN_USER_DELETE',
+        targetType: 'USER',
+        targetId: id,
+        result: 'FAILED',
+        ...this.auditLogs.requestContext(request),
+        errorMessage: this.auditLogs.errorMessage(error),
+      });
+      throw error;
+    }
   }
 
-  private auditActionForAccountStatus(accountStatus?: AccountStatus) {
+  private auditActionForUpdate(dto: AdminUpdateUserDto): AdminAuditAction {
+    const statusAction = this.auditActionForAccountStatus(dto.accountStatus);
+    return statusAction ?? 'ADMIN_USER_UPDATE';
+  }
+
+  private auditActionForAccountStatus(
+    accountStatus?: AccountStatus,
+  ): AdminAuditAction | null {
     if (accountStatus === AccountStatus.ACTIVE) return 'ADMIN_USER_UNLOCK';
     if (
       accountStatus === AccountStatus.SUSPENDED ||
