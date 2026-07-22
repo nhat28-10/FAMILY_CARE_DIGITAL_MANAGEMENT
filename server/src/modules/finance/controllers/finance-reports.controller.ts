@@ -1,6 +1,9 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -13,6 +16,18 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentFamilyMember } from '../../family-members/decorators/current-family-member.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
+import {
+  CASH_FLOW_SUMMARY_RESPONSE_EXAMPLE,
+  CATEGORY_SPENDING_SUMMARY_RESPONSE_EXAMPLE,
+  CashFlowSummaryApiResponseDto,
+  CategorySpendingSummaryApiResponseDto,
+  FINANCE_SUMMARY_RESPONSE_EXAMPLE,
+  FinanceBadRequestResponseDto,
+  FinanceForbiddenResponseDto,
+  FinanceSummaryApiResponseDto,
+  MEMBER_CONTRIBUTION_SUMMARY_RESPONSE_EXAMPLE,
+  MemberContributionSummaryApiResponseDto,
+} from '../dto/finance-summary-response.dto';
 import { FinanceReportService } from '../services/finance-report.service';
 
 @ApiTags('Finance - Báo cáo tài chính')
@@ -38,6 +53,26 @@ export class FinanceReportsController {
     format: 'uuid',
     description: 'ID kế hoạch ngân sách cần phân tích',
   })
+  @ApiOkResponse({
+    description:
+      'Envelope chuẩn. data chứa period, currency=VND, budget/goals/spending/alerts. goals/alerts có thể null theo query include*. Các mảng rỗng trả [].',
+    type: FinanceSummaryApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Finance summary sample',
+        value: FINANCE_SUMMARY_RESPONSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description:
+      'periodStart/periodEnd không hợp lệ hoặc budgetPlanId không hợp lệ',
+    type: FinanceBadRequestResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Không có quyền truy cập family workspace',
+    type: FinanceForbiddenResponseDto,
+  })
   getFamilyFinanceSummary(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -54,6 +89,25 @@ export class FinanceReportsController {
   @ResponseMessage('Lấy tóm tắt dòng tiền gia đình thành công')
   @ApiOperation({
     summary: 'Lấy tóm tắt dòng tiền vào/ra theo tháng',
+  })
+  @ApiOkResponse({
+    description:
+      'Envelope chuẩn. data.totals và data.byMonth dùng VND; byMonth là [] khi không có giao dịch.',
+    type: CashFlowSummaryApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Cash flow summary sample',
+        value: CASH_FLOW_SUMMARY_RESPONSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'periodStart/periodEnd hoặc budgetPlanId không hợp lệ',
+    type: FinanceBadRequestResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Không có quyền truy cập family workspace',
+    type: FinanceForbiddenResponseDto,
   })
   getCashFlowSummary(
     @Param('familyId') familyId: string,
@@ -72,6 +126,25 @@ export class FinanceReportsController {
   @ApiOperation({
     summary: 'Lấy thống kê chi tiêu theo danh mục',
   })
+  @ApiOkResponse({
+    description:
+      'Envelope chuẩn. data.byCategory là [] khi không có chi tiêu; amount/totals dùng VND; ratio là phần trăm.',
+    type: CategorySpendingSummaryApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Category spending summary sample',
+        value: CATEGORY_SPENDING_SUMMARY_RESPONSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'periodStart/periodEnd hoặc budgetPlanId không hợp lệ',
+    type: FinanceBadRequestResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Không có quyền truy cập family workspace',
+    type: FinanceForbiddenResponseDto,
+  })
   getCategorySpendingSummary(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -88,6 +161,25 @@ export class FinanceReportsController {
   @ResponseMessage('Lấy tóm tắt đóng góp theo thành viên thành công')
   @ApiOperation({
     summary: 'Lấy thống kê đóng góp quỹ chung và mục tiêu theo thành viên',
+  })
+  @ApiOkResponse({
+    description:
+      'Envelope chuẩn. Manager/deputy thấy mọi active member; member thường chỉ thấy chính mình. members là [] nếu không có member khả kiến.',
+    type: MemberContributionSummaryApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Member contribution summary sample',
+        value: MEMBER_CONTRIBUTION_SUMMARY_RESPONSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'periodStart/periodEnd hoặc budgetPlanId không hợp lệ',
+    type: FinanceBadRequestResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Không có quyền truy cập family workspace',
+    type: FinanceForbiddenResponseDto,
   })
   getMemberContributionSummary(
     @Param('familyId') familyId: string,

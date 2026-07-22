@@ -379,22 +379,11 @@ export class FinancialGoalService {
       }
 
       const dueDate = this.toDateOnly(dto.dueDate);
-      const actualAmounts = await this.calculateGoalContributionActualAmounts(
-        tx,
-        familyId,
-        goalId,
-        dto.periodMonth,
-        dto.periodYear,
-        requestedMemberIds,
-      );
-
       for (const planMember of dto.members) {
         const plannedAmount = new Prisma.Decimal(planMember.plannedAmount);
-        const actualAmount =
-          actualAmounts.get(planMember.memberId) ?? new Prisma.Decimal(0);
         const status = this.computeContributionPlanStatus(
           plannedAmount,
-          actualAmount,
+          new Prisma.Decimal(0),
           dueDate,
         );
         await tx.goalContributionPlan.upsert({
@@ -580,7 +569,7 @@ export class FinancialGoalService {
             description: `Goal contribution: ${goal.goalName}`,
             note: plan.submittedNote,
             entryDate: this.resolveContributionEntryDate(plan),
-            sourceType: 'MANUAL',
+            sourceType: 'GOAL_CONTRIBUTION_PLAN',
             sourceId: plan.id,
             status: LedgerEntryStatus.ACTIVE,
           },
@@ -629,6 +618,7 @@ export class FinancialGoalService {
           plan.periodMonth,
           plan.periodYear,
           [plan.memberId],
+          [plan.id],
         );
         const actualAmount =
           actualAmounts.get(plan.memberId) ?? new Prisma.Decimal(0);
@@ -1249,6 +1239,7 @@ export class FinancialGoalService {
       periodMonth,
       periodYear,
       plans.map((plan) => plan.memberId),
+      plans.map((plan) => plan.id),
     );
 
     const rows: GoalContributionPlanRow[] = [];
@@ -1330,8 +1321,12 @@ export class FinancialGoalService {
     periodMonth: number,
     periodYear: number,
     memberIds?: string[],
+    contributionPlanIds?: string[],
   ) {
     if (memberIds && memberIds.length === 0) {
+      return new Map<string, Prisma.Decimal>();
+    }
+    if (contributionPlanIds && contributionPlanIds.length === 0) {
       return new Map<string, Prisma.Decimal>();
     }
     const { start, end } = this.periodRange(periodMonth, periodYear);
@@ -1344,6 +1339,9 @@ export class FinancialGoalService {
           status: LedgerEntryStatus.ACTIVE,
           createdByMemberId: memberIds ? { in: memberIds } : undefined,
           entryDate: { gte: start, lt: end },
+          sourceId: contributionPlanIds
+            ? { in: contributionPlanIds }
+            : undefined,
         },
       },
       select: {

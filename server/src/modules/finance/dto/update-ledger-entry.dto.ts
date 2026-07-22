@@ -10,8 +10,12 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
 } from 'class-validator';
+
+const ISO_DATE_TIME_WITH_TIMEZONE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export class UpdateLedgerEntryDto {
   @ApiPropertyOptional({ enum: LedgerEntryType })
@@ -42,6 +46,10 @@ export class UpdateLedgerEntryDto {
   @ApiPropertyOptional({ example: '2026-06-10T08:30:00.000Z' })
   @IsOptional()
   @IsDateString()
+  @Matches(ISO_DATE_TIME_WITH_TIMEZONE, {
+    message:
+      'entryDate phải là ISO datetime có timezone, ví dụ 2026-06-10T08:30:00.000Z hoặc 2026-06-10T15:30:00+07:00',
+  })
   entryDate?: string;
 
   @ApiPropertyOptional({ format: 'uuid', nullable: true })
