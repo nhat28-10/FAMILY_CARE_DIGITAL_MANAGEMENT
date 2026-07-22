@@ -28,6 +28,16 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  updateProfile(
+    id: string,
+    data: Pick<Prisma.UserUpdateInput, 'fullName' | 'phone' | 'avatarUrl'>,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+    });
+  }
+
   /** Records a successful login by stamping `lastLoginAt`. */
   updateLastLogin(id: string): Promise<User> {
     return this.prisma.user.update({

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -27,6 +28,7 @@ import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -120,6 +122,19 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
   me(@CurrentUser() user: SafeUser) {
     return this.authService.getProfile(user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ResponseMessage('Cáº­p nháº­t thÃ´ng tin ngÆ°á»i dÃ¹ng thÃ nh cÃ´ng')
+  @ApiOperation({ summary: 'Update the currently authenticated user profile' })
+  @ApiBody({ type: UpdateMyProfileDto })
+  @ApiResponse({ status: 200, description: 'Current user profile updated' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  @ApiResponse({ status: 409, description: 'Phone is already registered' })
+  updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateMyProfileDto) {
+    return this.authService.updateProfile(userId, dto);
   }
 
   @Post('verify-email')
