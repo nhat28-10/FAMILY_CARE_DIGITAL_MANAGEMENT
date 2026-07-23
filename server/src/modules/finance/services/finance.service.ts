@@ -35,6 +35,7 @@ import { CreateBudgetPlanDto } from '../dto/create-budget-plan.dto';
 import { CreateFinanceCategoryDto } from '../dto/create-finance-category.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
 import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
+import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { CreateMemberMonthlyFinanceDto } from '../dto/create-member-monthly-finance.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
@@ -64,6 +65,8 @@ type MonthlyGoalContributionSummaryItem = {
   reviewedAt: Date | null;
   status: GoalContributionPlanStatus | null;
 };
+
+const MODEL_FUND_ALLOCATION_SOURCE = 'MODEL_FUND_ALLOCATION';
 
 @Injectable()
 export class FinanceService {
@@ -441,6 +444,149 @@ export class FinanceService {
           data: { status: FinanceModelStatus.ACTIVE },
           include: { jars: { orderBy: { createdAt: 'asc' } } },
         });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  allocateFundByModel(
+    familyId: string,
+    memberId: string,
+    dto: CreateFundAllocationDto,
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const model = await tx.financeModel.findFirst({
+          where: {
+            familyId,
+            id: dto.modelId,
+            status: FinanceModelStatus.ACTIVE,
+          },
+          include: {
+            jars: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+        if (!model) {
+          throw new NotFoundException(
+            'Khong tim thay mo hinh tai chinh dang hoat dong trong gia dinh nay',
+          );
+        }
+        if (model.jars.length === 0) {
+          throw new BadRequestException(
+            'Mo hinh tai chinh dang hoat dong chua co hu de chia quy',
+          );
+        }
+
+        const totalPercentage = model.jars.reduce(
+          (sum, jar) => sum.plus(jar.allocationPercentage),
+          new Prisma.Decimal(0),
+        );
+        if (!totalPercentage.equals(100)) {
+          throw new BadRequestException(
+            'Tong ty le phan bo cua cac hu hoat dong phai bang 100% de chia quy',
+          );
+        }
+
+        const sourceId = `${model.id}:${this.periodKey(
+          dto.periodMonth,
+          dto.periodYear,
+        )}`;
+        const existingAllocation = await tx.ledgerEntry.findFirst({
+          where: {
+            ledger: { familyId },
+            sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+            sourceId,
+            status: LedgerEntryStatus.ACTIVE,
+          },
+          select: { id: true },
+        });
+        if (existingAllocation) {
+          throw new ConflictException(
+            'Ky nay da co lan chia quy theo mo hinh tai chinh nay',
+          );
+        }
+
+        const ledger = await tx.financeLedger.upsert({
+          where: { familyId },
+          create: {
+            familyId,
+            ledgerName: 'Shared Family Ledger',
+            status: FinanceLedgerStatus.ACTIVE,
+          },
+          update: {},
+        });
+
+        const totalAmount = new Prisma.Decimal(dto.amount).toDecimalPlaces(2);
+        const entryDate = this.monthEndDate(dto.periodMonth, dto.periodYear);
+        let allocatedAmount = new Prisma.Decimal(0);
+        const entries: Prisma.LedgerEntryGetPayload<{
+          include: { jar: true };
+        }>[] = [];
+        const items: Array<{
+          jarId: string;
+          jarName: string;
+          jarCode: string;
+          allocationPercentage: number;
+          amount: number;
+          ledgerEntryId: string;
+        }> = [];
+        for (let index = 0; index < model.jars.length; index += 1) {
+          const jar = model.jars[index];
+          const isLastJar = index === model.jars.length - 1;
+          const amount = isLastJar
+            ? totalAmount.minus(allocatedAmount).toDecimalPlaces(2)
+            : totalAmount
+                .times(jar.allocationPercentage)
+                .dividedBy(100)
+                .toDecimalPlaces(2);
+          allocatedAmount = allocatedAmount.plus(amount);
+
+          const entry = await tx.ledgerEntry.create({
+            data: {
+              ledgerId: ledger.id,
+              jarId: jar.id,
+              createdByMemberId: memberId,
+              entryType: LedgerEntryType.ADJUSTMENT,
+              amount,
+              description: `Allocate fund to ${jar.name}`,
+              note: dto.note?.trim(),
+              entryDate,
+              sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+              sourceId,
+              status: LedgerEntryStatus.ACTIVE,
+            },
+            include: { jar: true },
+          });
+          entries.push(entry);
+          items.push({
+            jarId: jar.id,
+            jarName: jar.name,
+            jarCode: jar.jarCode,
+            allocationPercentage: this.decimalToNumber(
+              jar.allocationPercentage,
+            ),
+            amount: this.decimalToNumber(amount),
+            ledgerEntryId: entry.id,
+          });
+        }
+
+        return {
+          model: {
+            id: model.id,
+            name: model.name,
+            modelType: model.modelType,
+          },
+          period: { month: dto.periodMonth, year: dto.periodYear },
+          totalAmount: this.decimalToNumber(totalAmount),
+          sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+          sourceId,
+          items,
+          entries,
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -1210,6 +1356,14 @@ export class FinanceService {
       start: new Date(Date.UTC(year, month - 1, 1)),
       end: new Date(Date.UTC(year, month, 1)),
     };
+  }
+
+  private periodKey(month: number, year: number) {
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  private monthEndDate(month: number, year: number) {
+    return new Date(Date.UTC(year, month, 0));
   }
 
   private visibleFinancialGoalWhere(
