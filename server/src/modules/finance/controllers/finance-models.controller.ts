@@ -25,6 +25,7 @@ import { CurrentFamilyMember } from '../../family-members/decorators/current-fam
 import { FamilyRoles } from '../../family-members/decorators/family-roles.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
+import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
 import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
 import { UpdateFinanceJarDto } from '../dto/update-finance-jar.dto';
@@ -110,6 +111,33 @@ export class FinanceModelsController {
     @Param('modelId') modelId: string,
   ) {
     return this.financeService.activateFinanceModel(familyId, modelId);
+  }
+
+  @Post('fund-allocations')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Chia quy theo mo hinh tai chinh thanh cong')
+  @ApiOperation({
+    summary: 'Chia quy gia dinh theo ty le cac hu cua mo hinh tai chinh',
+    description:
+      'Neu khong truyen modelId, he thong dung mo hinh ACTIVE cua gia dinh. Moi hu duoc ghi thanh mot ledger entry co jarId.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Mo hinh khong co hu hoat dong hoac tong ty le hu khong bang 100%',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Ky nay da co lan chia quy theo mo hinh nay',
+  })
+  allocateFundByModel(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Body() dto: CreateFundAllocationDto,
+  ) {
+    return this.financeService.allocateFundByModel(familyId, memberId, dto);
   }
 
   @Get('jars')

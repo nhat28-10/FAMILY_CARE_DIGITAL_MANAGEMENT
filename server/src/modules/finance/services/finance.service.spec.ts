@@ -9,12 +9,14 @@ import {
   BudgetPeriodType,
   BudgetPlanStatus,
   FinanceCategoryType,
+  FinanceModelStatus,
   LedgerEntryStatus,
   LedgerEntryType,
   Prisma,
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
 import { FinanceReportService } from './finance-report.service';
 import { FinanceService } from './finance.service';
@@ -45,6 +47,12 @@ describe('FinanceService budget planning', () => {
       },
       financeCategory: { findFirst: jest.fn() },
       financeJar: { findFirst: jest.fn() },
+      financeLedger: { upsert: jest.fn() },
+      financeModel: { findFirst: jest.fn() },
+      ledgerEntry: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+      },
     };
     prisma = {
       $transaction: jest.fn(
@@ -397,5 +405,147 @@ describe('FinanceService budget planning', () => {
     expect(
       (prisma.ledgerEntry as { count: jest.Mock }).count,
     ).not.toHaveBeenCalled();
+  });
+
+  it('allocates a fund across active jars by model percentages', async () => {
+    const modelId = 'model-id';
+    const memberId = 'member-id';
+    tx.financeModel.findFirst.mockResolvedValue({
+      id: modelId,
+      name: 'Five Jars',
+      modelType: 'FIVE_JARS',
+      status: FinanceModelStatus.ACTIVE,
+      jars: [
+        {
+          id: 'necessities-jar',
+          name: 'Necessities',
+          jarCode: 'NECESSITIES',
+          allocationPercentage: new Prisma.Decimal(50),
+        },
+        {
+          id: 'savings-jar',
+          name: 'Savings',
+          jarCode: 'SAVINGS',
+          allocationPercentage: new Prisma.Decimal(20),
+        },
+        {
+          id: 'education-jar',
+          name: 'Education',
+          jarCode: 'EDUCATION',
+          allocationPercentage: new Prisma.Decimal(10),
+        },
+        {
+          id: 'enjoyment-jar',
+          name: 'Enjoyment',
+          jarCode: 'ENJOYMENT',
+          allocationPercentage: new Prisma.Decimal(10),
+        },
+        {
+          id: 'giving-jar',
+          name: 'Giving',
+          jarCode: 'GIVING',
+          allocationPercentage: new Prisma.Decimal(10),
+        },
+      ],
+    });
+    tx.ledgerEntry.findFirst.mockResolvedValue(null);
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    const createLedgerEntryMock = tx.ledgerEntry.create as jest.Mock<
+      Promise<{ id: string; jar: { id: string | null } }>,
+      [Prisma.LedgerEntryCreateArgs]
+    >;
+    createLedgerEntryMock.mockImplementation((args) =>
+      Promise.resolve({
+        id: `entry-${String(args.data.jarId)}`,
+        jar: {
+          id: typeof args.data.jarId === 'string' ? args.data.jarId : null,
+        },
+      }),
+    );
+
+    const result = await service.allocateFundByModel(familyId, memberId, {
+      modelId,
+      amount: 10000000,
+      periodMonth: 7,
+      periodYear: 2026,
+      note: 'Chia quy thang 7',
+    });
+
+    expect(result.totalAmount).toBe(10000000);
+    expect(result.sourceType).toBe('MODEL_FUND_ALLOCATION');
+    expect(result.sourceId).toBe(`${modelId}:2026-07`);
+    expect(result.items.map((item) => item.amount)).toEqual([
+      5000000, 2000000, 1000000, 1000000, 1000000,
+    ]);
+    expect(createLedgerEntryMock).toHaveBeenCalledTimes(5);
+    const createdAmounts = createLedgerEntryMock.mock.calls.map(([args]) => {
+      const { amount } = args.data;
+      if (amount instanceof Prisma.Decimal) {
+        return amount.toString();
+      }
+      if (typeof amount === 'number' || typeof amount === 'string') {
+        return amount.toString();
+      }
+      return 'unsupported-amount';
+    });
+    expect(createdAmounts).toEqual([
+      '5000000',
+      '2000000',
+      '1000000',
+      '1000000',
+      '1000000',
+    ]);
+    expect(createLedgerEntryMock.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        ledgerId: 'ledger-id',
+        jarId: 'necessities-jar',
+        createdByMemberId: memberId,
+        entryType: LedgerEntryType.ADJUSTMENT,
+        sourceType: 'MODEL_FUND_ALLOCATION',
+        sourceId: `${modelId}:2026-07`,
+        status: LedgerEntryStatus.ACTIVE,
+      }),
+    );
+  });
+
+  it('rejects fund allocation when active jar percentages do not total 100', async () => {
+    tx.financeModel.findFirst.mockResolvedValue({
+      id: 'model-id',
+      name: 'Custom',
+      modelType: 'CUSTOM',
+      status: FinanceModelStatus.ACTIVE,
+      jars: [
+        {
+          id: 'jar-id',
+          name: 'Savings',
+          jarCode: 'SAVINGS',
+          allocationPercentage: new Prisma.Decimal(80),
+        },
+      ],
+    });
+
+    await expect(
+      service.allocateFundByModel(familyId, 'member-id', {
+        amount: 10000000,
+        periodMonth: 7,
+        periodYear: 2026,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid fund allocation DTO', async () => {
+    const dto = plainToInstance(CreateFundAllocationDto, {
+      modelId: '51e6dd2e-75dc-4de0-9369-6c8cbd06d0a1',
+      amount: '10000000',
+      periodMonth: '7',
+      periodYear: '2026',
+      note: 'Chia quy thang 7',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.amount).toBe(10000000);
+    expect(dto.periodMonth).toBe(7);
+    expect(dto.periodYear).toBe(2026);
   });
 });
