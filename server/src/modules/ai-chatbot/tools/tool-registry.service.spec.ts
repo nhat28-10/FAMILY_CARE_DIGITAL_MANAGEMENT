@@ -4,6 +4,7 @@ import { AiRelatedModule, FamilyRole } from '@prisma/client';
 import { AiActionType } from '../types/ai-chatbot.types';
 import { ToolRegistryService } from './tool-registry.service';
 import type { AiToolDefinition } from './tool.types';
+import type { CalendarAiTools } from './calendar.tools';
 import type { FinanceAiTools } from './finance.tools';
 import type { SafetyAiTools } from './safety.tools';
 import type { TasksAiTools } from './tasks.tools';
@@ -57,6 +58,7 @@ describe('ToolRegistryService', () => {
     registry = new ToolRegistryService(
       provider([readTool, writeTool]) as unknown as FinanceAiTools,
       provider([openTool]) as unknown as TasksAiTools,
+      provider([]) as unknown as CalendarAiTools,
       provider([]) as unknown as SafetyAiTools,
     );
   });

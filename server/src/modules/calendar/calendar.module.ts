@@ -10,5 +10,6 @@ import { CalendarService } from './calendar.service';
   imports: [FamilyMembersModule, NotificationsModule, SubscriptionsModule],
   controllers: [CalendarController],
   providers: [CalendarService],
+  exports: [CalendarService],
 })
 export class CalendarModule {}
