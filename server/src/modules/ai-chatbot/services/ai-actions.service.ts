@@ -10,6 +10,8 @@ import { AiRelatedModule, AiSenderType, Prisma } from '@prisma/client';
 import type { AIMessage, FamilyMember } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import type { CreateCalendarEventDto } from '../../calendar/dto/create-calendar-event.dto';
+import { CalendarService } from '../../calendar/calendar.service';
 import type { CreateLedgerEntryDto } from '../../finance/dto/create-ledger-entry.dto';
 import { FinanceService } from '../../finance/services/finance.service';
 import type { CreateTaskAssignmentDto } from '../../tasks/dto/create-task-assignment.dto';
@@ -34,6 +36,7 @@ export class AiActionsService {
     private readonly toolRegistry: ToolRegistryService,
     private readonly financeService: FinanceService,
     private readonly tasksService: TasksService,
+    private readonly calendarService: CalendarService,
   ) {}
 
   async confirm(
@@ -225,6 +228,7 @@ export class AiActionsService {
     return [
       this.toolRegistry.getTool('propose_create_ledger_entry'),
       this.toolRegistry.getTool('propose_create_task'),
+      this.toolRegistry.getTool('propose_create_calendar_event'),
     ].find((tool) => tool?.actionType === actionType);
   }
 
@@ -288,6 +292,19 @@ export class AiActionsService {
           result: { id: task.id },
           summary,
           relatedModule: AiRelatedModule.TASK,
+        };
+      }
+      case AiActionType.CREATE_CALENDAR_EVENT: {
+        const dto = action.payload as unknown as CreateCalendarEventDto;
+        const event = await this.calendarService.createEvent(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: event.id },
+          summary: `Đã tạo sự kiện lịch "${dto.title}" thành công.`,
+          relatedModule: AiRelatedModule.CALENDAR,
         };
       }
       default:

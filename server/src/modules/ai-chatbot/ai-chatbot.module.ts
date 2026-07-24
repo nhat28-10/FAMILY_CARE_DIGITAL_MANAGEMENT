@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { CalendarModule } from '../calendar/calendar.module';
 import { FamilyMembersModule } from '../family-members/family-members.module';
 import { FinanceModule } from '../finance/finance.module';
 import { LocationsModule } from '../locations/locations.module';
@@ -10,6 +11,7 @@ import { AiActionsService } from './services/ai-actions.service';
 import { AiChatService } from './services/ai-chat.service';
 import { AiConversationsService } from './services/ai-conversations.service';
 import { OpenAiClientService } from './services/openai-client.service';
+import { CalendarAiTools } from './tools/calendar.tools';
 import { FinanceAiTools } from './tools/finance.tools';
 import { SafetyAiTools } from './tools/safety.tools';
 import { TasksAiTools } from './tools/tasks.tools';
@@ -22,6 +24,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 @Module({
   imports: [
     FamilyMembersModule,
+    CalendarModule,
     FinanceModule,
     TasksModule,
     SosModule,
@@ -34,6 +37,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     AiActionsService,
     OpenAiClientService,
     ToolRegistryService,
+    CalendarAiTools,
     FinanceAiTools,
     TasksAiTools,
     SafetyAiTools,

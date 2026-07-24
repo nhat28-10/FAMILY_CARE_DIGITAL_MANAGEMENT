@@ -8,6 +8,7 @@ import { AiSenderType, FamilyRole } from '@prisma/client';
 import type { FamilyMember } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { CalendarService } from '../../calendar/calendar.service';
 import { FinanceService } from '../../finance/services/finance.service';
 import { TasksService } from '../../tasks/services/tasks.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
@@ -65,6 +66,7 @@ describe('AiActionsService', () => {
   let toolRegistry: { getTool: jest.Mock };
   let financeService: { createLedgerEntry: jest.Mock };
   let tasksService: { createTask: jest.Mock; createTaskAssignment: jest.Mock };
+  let calendarService: { createEvent: jest.Mock };
   let service: AiActionsService;
 
   beforeEach(() => {
@@ -89,6 +91,12 @@ describe('AiActionsService', () => {
             allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
           };
         }
+        if (name === 'propose_create_calendar_event') {
+          return {
+            actionType: AiActionType.CREATE_CALENDAR_EVENT,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
         return {
           actionType: AiActionType.CREATE_TASK,
           allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
@@ -102,12 +110,16 @@ describe('AiActionsService', () => {
       createTask: jest.fn().mockResolvedValue({ id: 'task-1' }),
       createTaskAssignment: jest.fn().mockResolvedValue({ id: 'assign-1' }),
     };
+    calendarService = {
+      createEvent: jest.fn().mockResolvedValue({ id: 'event-1' }),
+    };
     service = new AiActionsService(
       prisma as unknown as PrismaService,
       conversations as unknown as AiConversationsService,
       toolRegistry as unknown as ToolRegistryService,
       financeService as unknown as FinanceService,
       tasksService as unknown as TasksService,
+      calendarService as unknown as CalendarService,
     );
   });
 
@@ -176,6 +188,49 @@ describe('AiActionsService', () => {
       member.id,
       { assignedToMemberId: 'member-2' },
     );
+  });
+
+  it('confirm CREATE_CALENDAR_EVENT gọi CalendarService', async () => {
+    const calendarPayload = {
+      title: 'Khám sức khỏe',
+      startTime: '2026-08-01T02:00:00.000Z',
+      endTime: '2026-08-01T03:00:00.000Z',
+      location: 'Bệnh viện Gia Định',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_CALENDAR_EVENT,
+            payload: calendarPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(calendarService.createEvent).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      calendarPayload,
+    );
+    expect(prisma.aIMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          relatedModule: 'CALENDAR',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      result: { id: 'event-1' },
+    });
   });
 
   it('double-confirm: claim trượt (count 0) → 409, không thực thi', async () => {

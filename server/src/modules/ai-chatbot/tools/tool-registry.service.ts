@@ -4,6 +4,7 @@ import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 
 import type { AiToolContext } from '../types/ai-chatbot.types';
 import type { AiToolDefinition } from './tool.types';
+import { CalendarAiTools } from './calendar.tools';
 import { FinanceAiTools } from './finance.tools';
 import { SafetyAiTools } from './safety.tools';
 import { TasksAiTools } from './tasks.tools';
@@ -19,9 +20,15 @@ export class ToolRegistryService {
   constructor(
     financeTools: FinanceAiTools,
     tasksTools: TasksAiTools,
+    calendarTools: CalendarAiTools,
     safetyTools: SafetyAiTools,
   ) {
-    for (const provider of [financeTools, tasksTools, safetyTools]) {
+    for (const provider of [
+      financeTools,
+      tasksTools,
+      calendarTools,
+      safetyTools,
+    ]) {
       for (const tool of provider.getTools()) {
         this.tools.set(tool.name, tool);
       }

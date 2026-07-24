@@ -58,6 +58,7 @@ export class CalendarService {
     createdByMemberId: string,
     dto: CreateCalendarEventDto,
   ) {
+    await this.assertFeature(familyId, FEATURE_ACCESS_KEYS.CALENDAR_EVENTS);
     const startTime = new Date(dto.startTime);
     const endTime = dto.endTime ? new Date(dto.endTime) : null;
     this.assertValidEventTime(startTime, endTime);

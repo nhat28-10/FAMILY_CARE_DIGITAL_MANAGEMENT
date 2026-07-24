@@ -4,6 +4,7 @@ import type { AiRelatedModule, FamilyRole } from '@prisma/client';
 export enum AiActionType {
   CREATE_LEDGER_ENTRY = 'CREATE_LEDGER_ENTRY',
   CREATE_TASK = 'CREATE_TASK',
+  CREATE_CALENDAR_EVENT = 'CREATE_CALENDAR_EVENT',
 }
 
 export enum AiActionStatus {
