@@ -82,6 +82,39 @@ export class FaceProfilesController {
     return this.faceProfiles.enroll(familyId, memberId, requester, files);
   }
 
+  @Post(':memberId/validate')
+  @UseInterceptors(
+    FilesInterceptor('files', FACE_ENROLLMENT_MAX_FILES, {
+      limits: { fileSize: FACE_ENROLLMENT_MAX_FILE_SIZE },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
+  @ApiOperation({ summary: 'Validate face profile images without saving data' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          minItems: 3,
+          maxItems: 5,
+          items: { type: 'string', format: 'binary' },
+        },
+      },
+    },
+  })
+  @ResponseMessage('Kiem tra anh khuon mat thanh cong')
+  validate(
+    @Param('familyId') familyId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+    @CurrentFamilyMember() requester: FamilyMember,
+    @UploadedFiles() files: UploadedFilePayload[] | undefined,
+  ) {
+    return this.faceProfiles.validate(familyId, memberId, requester, files);
+  }
+
   @Get(':memberId')
   @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
   @ApiOperation({ summary: 'Get face profile status' })

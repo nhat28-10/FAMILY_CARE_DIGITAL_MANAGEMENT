@@ -60,14 +60,21 @@ function file(overrides: Record<string, unknown> = {}) {
 
 function aiResult(overrides: Record<string, unknown> = {}) {
   return {
-    faceCount: 1,
+    faceIndex: 0,
+    boundingBox: { x: 0.25, y: 0.2, width: 0.4, height: 0.5 },
     embedding: [1, 0, 0],
     embeddingDimension: 3,
     detectionScore: 0.98,
     qualityScore: 0.9,
+    ...overrides,
+  };
+}
+
+function detectResponse(faces: Record<string, unknown>[] = [aiResult()]) {
+  return {
+    faces,
     modelName: 'mock-face',
     modelVersion: 'mock-v1',
-    ...overrides,
   };
 }
 
@@ -106,7 +113,7 @@ describe('FaceProfilesService', () => {
     $executeRaw: jest.Mock;
     $transaction: jest.Mock;
   };
-  let faceAi: { extractEmbedding: jest.Mock };
+  let faceAi: { extractEmbedding: jest.Mock; detectFaces: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -128,7 +135,8 @@ describe('FaceProfilesService', () => {
       ),
     };
     faceAi = {
-      extractEmbedding: jest.fn().mockResolvedValue(aiResult()),
+      extractEmbedding: jest.fn(),
+      detectFaces: jest.fn().mockResolvedValue(detectResponse()),
     };
     const crypto = new FaceEmbeddingCryptoService({
       get: jest.fn(() => 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='),
@@ -155,7 +163,7 @@ describe('FaceProfilesService', () => {
       status: FaceProfileStatus.ACTIVE,
       sampleCount: 3,
     });
-    expect(faceAi.extractEmbedding).toHaveBeenCalledTimes(3);
+    expect(faceAi.detectFaces).toHaveBeenCalledTimes(3);
     const rows = prisma.memberFaceEmbedding.createMany.mock.calls[0][0].data;
     expect(rows[0].encryptedEmbedding).toBeInstanceOf(Uint8Array);
     expect(rows[0]).not.toHaveProperty('embedding');
@@ -188,7 +196,7 @@ describe('FaceProfilesService', () => {
         file(),
       ]),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(faceAi.extractEmbedding).not.toHaveBeenCalled();
+    expect(faceAi.detectFaces).not.toHaveBeenCalled();
   });
 
   it('returns 404 for cross-family target lookup', async () => {
@@ -240,7 +248,13 @@ describe('FaceProfilesService', () => {
     'rejects AI faceCount %s and does not mutate profile',
     async (faceCount) => {
       prisma.familyMember.findFirst.mockResolvedValue(member('target'));
-      faceAi.extractEmbedding.mockResolvedValue(aiResult({ faceCount }));
+      faceAi.detectFaces.mockResolvedValue(
+        detectResponse(
+          Array.from({ length: faceCount }, (_, index) =>
+            aiResult({ faceIndex: index }),
+          ),
+        ),
+      );
 
       await expect(
         service.enroll('family-1', 'target', member('target'), [
@@ -253,9 +267,89 @@ describe('FaceProfilesService', () => {
     },
   );
 
+  it('validates images without mutating profile data', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    faceAi.detectFaces
+      .mockResolvedValueOnce(detectResponse())
+      .mockResolvedValueOnce(detectResponse([]))
+      .mockResolvedValueOnce(detectResponse([aiResult(), aiResult()]));
+
+    const result = await service.validate(
+      'family-1',
+      'target',
+      member('target'),
+      [file({ originalname: 'ok.png' }), file(), file()],
+    );
+
+    expect(result).toMatchObject({
+      total: 3,
+      passCount: 1,
+      canEnroll: false,
+      minRequired: 3,
+      maxAllowed: 5,
+    });
+    expect(result.results).toEqual([
+      expect.objectContaining({
+        index: 0,
+        fileName: 'ok.png',
+        ok: true,
+        faceCount: 1,
+        boundingBox: expect.any(Object),
+      }),
+      expect.objectContaining({
+        index: 1,
+        ok: false,
+        faceCount: 0,
+        reasonCode: 'NO_FACE_DETECTED',
+      }),
+      expect.objectContaining({
+        index: 2,
+        ok: false,
+        faceCount: 2,
+        reasonCode: 'MULTIPLE_FACES_DETECTED',
+      }),
+    ]);
+    expect(prisma.memberFaceProfile.upsert).not.toHaveBeenCalled();
+    expect(prisma.memberFaceEmbedding.createMany).not.toHaveBeenCalled();
+  });
+
+  it('returns per-file enrollment errors for invalid images', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    faceAi.detectFaces
+      .mockResolvedValueOnce(detectResponse())
+      .mockResolvedValueOnce(detectResponse([]));
+
+    await expect(
+      service.enroll('family-1', 'target', member('target'), [
+        file({ originalname: 'ok.png' }),
+        file({ originalname: 'empty-face.png' }),
+        file({ originalname: 'bad.jpg', mimetype: 'image/jpeg' }),
+      ]),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Some face images are not enrollable',
+        code: 'FACE_IMAGES_NOT_ENROLLABLE',
+        errors: [
+          expect.objectContaining({
+            index: 1,
+            fileName: 'empty-face.png',
+            reasonCode: 'NO_FACE_DETECTED',
+            faceCount: 0,
+          }),
+          expect.objectContaining({
+            index: 2,
+            fileName: 'bad.jpg',
+            reasonCode: 'MIME_MISMATCH',
+          }),
+        ],
+      },
+    });
+    expect(prisma.memberFaceProfile.upsert).not.toHaveBeenCalled();
+  });
+
   it('does not mutate existing profile when Face AI times out', async () => {
     prisma.familyMember.findFirst.mockResolvedValue(member('target'));
-    faceAi.extractEmbedding.mockRejectedValue(
+    faceAi.detectFaces.mockRejectedValue(
       new ServiceUnavailableException('Face AI service timeout'),
     );
 
@@ -287,10 +381,12 @@ describe('FaceProfilesService', () => {
 
   it('fails re-enroll with inconsistent dimensions and preserves old embeddings', async () => {
     prisma.familyMember.findFirst.mockResolvedValue(member('target'));
-    faceAi.extractEmbedding
-      .mockResolvedValueOnce(aiResult())
-      .mockResolvedValueOnce(aiResult({ embeddingDimension: 4 }))
-      .mockResolvedValueOnce(aiResult());
+    faceAi.detectFaces
+      .mockResolvedValueOnce(detectResponse())
+      .mockResolvedValueOnce(
+        detectResponse([aiResult({ embeddingDimension: 4 })]),
+      )
+      .mockResolvedValueOnce(detectResponse());
 
     await expect(
       service.enroll('family-1', 'target', member('target'), [

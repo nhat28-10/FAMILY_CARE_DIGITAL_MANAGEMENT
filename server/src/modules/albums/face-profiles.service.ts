@@ -17,10 +17,51 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { UploadedFilePayload } from '../storage/storage.service';
 import {
   FaceAiClientService,
+  FaceDetectionBoundingBox,
   FaceEmbeddingExtractResult,
 } from './face-ai-client.service';
 import { FaceEmbeddingCryptoService } from './face-embedding-crypto.service';
-import { validateFaceEnrollmentFiles } from './face-enrollment.validator';
+import {
+  FACE_ENROLLMENT_MAX_FILES,
+  FACE_ENROLLMENT_MIN_FILES,
+  getFaceEnrollmentFileIssue,
+} from './face-enrollment.validator';
+
+const FACE_ENROLLMENT_NOT_ENROLLABLE_CODE = 'FACE_IMAGES_NOT_ENROLLABLE';
+
+export interface FaceEnrollmentValidationError {
+  index: number;
+  fileName: string;
+  reason: string;
+  reasonCode: string;
+  faceCount?: number;
+}
+
+export interface FaceEnrollmentValidationResult {
+  index: number;
+  fileName: string;
+  ok: boolean;
+  faceCount?: number;
+  detectionScore?: number;
+  qualityScore?: number | null;
+  boundingBox?: FaceDetectionBoundingBox;
+  reason?: string;
+  reasonCode?: string;
+}
+
+export interface FaceEnrollmentValidationResponse {
+  total: number;
+  passCount: number;
+  canEnroll: boolean;
+  minRequired: number;
+  maxAllowed: number;
+  results: FaceEnrollmentValidationResult[];
+}
+
+interface FaceEnrollmentAnalysis {
+  result: FaceEnrollmentValidationResult;
+  embedding?: FaceEmbeddingExtractResult;
+}
 
 @Injectable()
 export class FaceProfilesService {
@@ -38,8 +79,12 @@ export class FaceProfilesService {
   ) {
     const target = await this.getActiveTarget(workspaceId, memberId);
     this.assertCanManageProfile(requester, target);
-    const validatedFiles = validateFaceEnrollmentFiles(files);
-    const extracted = await this.extractAll(validatedFiles);
+    const validatedFiles = this.assertFaceEnrollmentFileCount(files);
+    const analyses = await this.analyzeEnrollmentFiles(validatedFiles);
+    this.throwIfNotEnoughEnrollable(analyses, true);
+    const extracted = analyses
+      .map((item) => item.embedding)
+      .filter((item): item is FaceEmbeddingExtractResult => Boolean(item));
     const prepared = this.prepareEmbeddings(extracted);
     const now = new Date();
 
@@ -88,6 +133,28 @@ export class FaceProfilesService {
     });
 
     return this.toSummary(profile, prepared.length);
+  }
+
+  async validate(
+    workspaceId: string,
+    memberId: string,
+    requester: FamilyMember,
+    files: UploadedFilePayload[] | undefined,
+  ): Promise<FaceEnrollmentValidationResponse> {
+    const target = await this.getActiveTarget(workspaceId, memberId);
+    this.assertCanManageProfile(requester, target);
+    const validatedFiles = this.assertFaceEnrollmentFileCount(files);
+    const analyses = await this.analyzeEnrollmentFiles(validatedFiles);
+    const results = analyses.map((item) => item.result);
+    const passCount = results.filter((item) => item.ok).length;
+    return {
+      total: results.length,
+      passCount,
+      canEnroll: passCount >= FACE_ENROLLMENT_MIN_FILES,
+      minRequired: FACE_ENROLLMENT_MIN_FILES,
+      maxAllowed: FACE_ENROLLMENT_MAX_FILES,
+      results,
+    };
   }
 
   async getProfile(
@@ -229,19 +296,6 @@ export class FaceProfilesService {
     throw new ForbiddenException('You cannot manage this face profile');
   }
 
-  private async extractAll(files: UploadedFilePayload[]) {
-    const results: FaceEmbeddingExtractResult[] = [];
-    for (let index = 0; index < files.length; index += 2) {
-      const chunk = files.slice(index, index + 2);
-      results.push(
-        ...(await Promise.all(
-          chunk.map((file) => this.faceAi.extractEmbedding(file)),
-        )),
-      );
-    }
-    return results;
-  }
-
   private prepareEmbeddings(results: FaceEmbeddingExtractResult[]) {
     const dimension = results[0]?.embeddingDimension;
     const modelName = results[0]?.modelName;
@@ -306,6 +360,135 @@ export class FaceProfilesService {
 
   private score(value: number) {
     return Math.round(Math.min(1, Math.max(0, value)) * 10000) / 10000;
+  }
+
+  private async analyzeEnrollmentFiles(
+    files: UploadedFilePayload[],
+  ): Promise<FaceEnrollmentAnalysis[]> {
+    const analyses: FaceEnrollmentAnalysis[] = [];
+    for (const [index, file] of files.entries()) {
+      const fileName = file.originalname || `image-${index + 1}`;
+      const issue = getFaceEnrollmentFileIssue(file);
+      if (issue) {
+        analyses.push({
+          result: {
+            index,
+            fileName,
+            ok: false,
+            reason: issue.reason,
+            reasonCode: issue.reasonCode,
+          },
+        });
+        continue;
+      }
+
+      try {
+        const detection = await this.faceAi.detectFaces(file);
+        if (detection.faces.length !== 1) {
+          analyses.push({
+            result: {
+              index,
+              fileName,
+              ok: false,
+              faceCount: detection.faces.length,
+              reason:
+                detection.faces.length === 0
+                  ? 'No face detected'
+                  : 'Multiple faces detected',
+              reasonCode:
+                detection.faces.length === 0
+                  ? 'NO_FACE_DETECTED'
+                  : 'MULTIPLE_FACES_DETECTED',
+            },
+          });
+          continue;
+        }
+
+        const face = detection.faces[0];
+        const detectionScore = this.score(face.detectionScore);
+        const qualityScore =
+          face.qualityScore === null || face.qualityScore === undefined
+            ? null
+            : this.score(face.qualityScore);
+        analyses.push({
+          result: {
+            index,
+            fileName,
+            ok: true,
+            faceCount: 1,
+            detectionScore,
+            qualityScore,
+            boundingBox: face.boundingBox,
+          },
+          embedding: {
+            faceCount: 1,
+            embedding: face.embedding,
+            embeddingDimension: face.embeddingDimension,
+            detectionScore,
+            qualityScore,
+            modelName: detection.modelName,
+            modelVersion: detection.modelVersion,
+          },
+        });
+      } catch (error) {
+        if (error instanceof ServiceUnavailableException) {
+          throw error;
+        }
+        analyses.push({
+          result: {
+            index,
+            fileName,
+            ok: false,
+            reason: 'Face image cannot be scanned',
+            reasonCode: 'FACE_IMAGE_CANNOT_BE_SCANNED',
+          },
+        });
+      }
+    }
+    return analyses;
+  }
+
+  private assertFaceEnrollmentFileCount(
+    files: UploadedFilePayload[] | undefined,
+  ) {
+    if (
+      !files ||
+      files.length < FACE_ENROLLMENT_MIN_FILES ||
+      files.length > FACE_ENROLLMENT_MAX_FILES
+    ) {
+      throw new BadRequestException('Face enrollment requires 3 to 5 images');
+    }
+    return files;
+  }
+
+  private throwIfNotEnoughEnrollable(
+    analyses: FaceEnrollmentAnalysis[],
+    includeErrors: boolean,
+  ) {
+    const errors = analyses
+      .filter((item) => !item.result.ok)
+      .map((item) => this.toValidationError(item.result));
+    if (errors.length === 0) return;
+
+    throw new BadRequestException({
+      message: 'Some face images are not enrollable',
+      code: FACE_ENROLLMENT_NOT_ENROLLABLE_CODE,
+      ...(includeErrors ? { errors } : {}),
+    });
+  }
+
+  private toValidationError(
+    result: FaceEnrollmentValidationResult,
+  ): FaceEnrollmentValidationError {
+    return {
+      index: result.index,
+      fileName: result.fileName,
+      reason: result.reason ?? 'Face image is not enrollable',
+      reasonCode: result.reasonCode ?? 'FACE_IMAGE_NOT_ENROLLABLE',
+      ...(typeof result.faceCount === 'number'
+        ? { faceCount: result.faceCount }
+        : {}),
+    };
   }
 
   private toSummary(

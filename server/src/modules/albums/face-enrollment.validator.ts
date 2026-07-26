@@ -12,6 +12,11 @@ export const FACE_ENROLLMENT_MIME_TO_EXT: Record<string, string> = {
   'image/webp': '.webp',
 };
 
+export interface FaceEnrollmentFileIssue {
+  reason: string;
+  reasonCode: string;
+}
+
 export function validateFaceEnrollmentFiles(
   files: UploadedFilePayload[] | undefined,
 ) {
@@ -24,19 +29,36 @@ export function validateFaceEnrollmentFiles(
   }
 
   for (const file of files) {
-    if (!Object.hasOwn(FACE_ENROLLMENT_MIME_TO_EXT, file.mimetype)) {
-      throw new BadRequestException('Unsupported face enrollment image type');
-    }
-    if (file.size > FACE_ENROLLMENT_MAX_FILE_SIZE) {
-      throw new BadRequestException('Face enrollment image exceeds 5MB');
-    }
-    const detectedMime = detectAlbumMime(file.buffer);
-    if (!detectedMime || detectedMime !== file.mimetype) {
-      throw new BadRequestException(
-        'Declared MIME does not match face enrollment image content',
-      );
+    const issue = getFaceEnrollmentFileIssue(file);
+    if (issue) {
+      throw new BadRequestException(issue.reason);
     }
   }
 
   return files;
+}
+
+export function getFaceEnrollmentFileIssue(
+  file: UploadedFilePayload,
+): FaceEnrollmentFileIssue | null {
+  if (!Object.hasOwn(FACE_ENROLLMENT_MIME_TO_EXT, file.mimetype)) {
+    return {
+      reason: 'Unsupported face enrollment image type',
+      reasonCode: 'UNSUPPORTED_IMAGE_TYPE',
+    };
+  }
+  if (file.size > FACE_ENROLLMENT_MAX_FILE_SIZE) {
+    return {
+      reason: 'Face enrollment image exceeds 5MB',
+      reasonCode: 'IMAGE_TOO_LARGE',
+    };
+  }
+  const detectedMime = detectAlbumMime(file.buffer);
+  if (!detectedMime || detectedMime !== file.mimetype) {
+    return {
+      reason: 'Declared MIME does not match face enrollment image content',
+      reasonCode: 'MIME_MISMATCH',
+    };
+  }
+  return null;
 }
