@@ -15,6 +15,7 @@ export interface ApiErrorResponse {
   statusCode: number;
   code?: string;
   feature?: string;
+  errors?: unknown;
 }
 
 /**
@@ -36,6 +37,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let message = 'Lỗi hệ thống';
     let code: string | undefined;
     let feature: string | undefined;
+    let errors: unknown;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -56,6 +58,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         if (typeof body.code === 'string') code = body.code;
         if (typeof body.feature === 'string') feature = body.feature;
+        if ('errors' in body) errors = body.errors;
       }
     } else if (exception instanceof Error) {
       // Unexpected error: log the stack but never leak internals to clients.
@@ -72,6 +75,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode,
       ...(code ? { code } : {}),
       ...(feature ? { feature } : {}),
+      ...(errors !== undefined ? { errors } : {}),
     };
     response.status(statusCode).json(body);
   }
