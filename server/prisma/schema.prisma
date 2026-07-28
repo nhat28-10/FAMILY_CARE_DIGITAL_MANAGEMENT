@@ -676,6 +676,7 @@ model LedgerEntry {
   status            LedgerEntryStatus @default(ACTIVE)
   sourceType        String?
   sourceId          String?
+  metadata          Json?             @db.JsonB
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 

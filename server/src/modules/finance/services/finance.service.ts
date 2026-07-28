@@ -38,6 +38,7 @@ import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
 import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { CreateMemberMonthlyFinanceDto } from '../dto/create-member-monthly-finance.dto';
+import { FundAllocationQueryDto } from '../dto/fund-allocation-query.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
 import {
   OptionalFinancePeriodDto,
@@ -66,7 +67,81 @@ type MonthlyGoalContributionSummaryItem = {
   status: GoalContributionPlanStatus | null;
 };
 
+type FundAllocationModelSummary = {
+  id: string;
+  name: string;
+  modelType: FinanceModelType;
+};
+
+type FundAllocationEntryRow = {
+  id: string;
+  ledgerId: string;
+  categoryId: string | null;
+  jarId: string | null;
+  createdByMemberId: string;
+  entryType: LedgerEntryType;
+  amount: Prisma.Decimal;
+  description: string;
+  note: string | null;
+  entryDate: Date;
+  status: LedgerEntryStatus;
+  sourceType: string | null;
+  sourceId: string | null;
+  metadata: Prisma.JsonValue | null;
+  createdAt: Date;
+  updatedAt: Date;
+  jar: {
+    id: string;
+    financeModelId: string;
+    name: string;
+    jarCode: string;
+    allocationPercentage: Prisma.Decimal;
+    description: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    financeModel?: FundAllocationModelSummary;
+  } | null;
+};
+
+type FundAllocationSnapshot = {
+  model: FundAllocationModelSummary;
+  period: { month: number; year: number };
+  sourceType: typeof MODEL_FUND_ALLOCATION_SOURCE;
+  sourceId: string;
+  jar: {
+    id: string;
+    financeModelId: string;
+    name: string;
+    jarCode: string;
+    allocationPercentage: number;
+    description: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  amount: number;
+};
+
 const MODEL_FUND_ALLOCATION_SOURCE = 'MODEL_FUND_ALLOCATION';
+const MONTHLY_SURPLUS_TO_GOAL_SOURCE = 'MONTHLY_SURPLUS_TO_GOAL';
+const FUND_ALLOCATION_ERROR_CODES = {
+  ALREADY_EXISTS: 'FUND_ALLOCATION_ALREADY_EXISTS',
+  NO_ACTIVE_FINANCE_MODEL: 'NO_ACTIVE_FINANCE_MODEL',
+  INVALID_FINANCE_MODEL: 'INVALID_FINANCE_MODEL',
+  INVALID_JAR_PERCENTAGE: 'INVALID_JAR_PERCENTAGE',
+  INSUFFICIENT_AVAILABLE_FUND: 'INSUFFICIENT_AVAILABLE_FUND',
+} as const;
+const FAMILY_FUND_CASH_IN_TYPES = [
+  LedgerEntryType.INCOME,
+  LedgerEntryType.CONTRIBUTION,
+] as const;
+const FAMILY_FUND_CASH_OUT_TYPES = [
+  LedgerEntryType.EXPENSE,
+  LedgerEntryType.SUPPORT,
+  LedgerEntryType.ALLOWANCE,
+  LedgerEntryType.REWARD,
+] as const;
 
 @Injectable()
 export class FinanceService {
@@ -471,14 +546,19 @@ export class FinanceService {
           orderBy: { updatedAt: 'desc' },
         });
         if (!model) {
-          throw new NotFoundException(
-            'Khong tim thay mo hinh tai chinh dang hoat dong trong gia dinh nay',
-          );
+          throw new NotFoundException({
+            message:
+              'Không tìm thấy mô hình tài chính đang hoạt động trong gia đình này',
+            code: dto.modelId
+              ? FUND_ALLOCATION_ERROR_CODES.INVALID_FINANCE_MODEL
+              : FUND_ALLOCATION_ERROR_CODES.NO_ACTIVE_FINANCE_MODEL,
+          });
         }
         if (model.jars.length === 0) {
-          throw new BadRequestException(
-            'Mo hinh tai chinh dang hoat dong chua co hu de chia quy',
-          );
+          throw new BadRequestException({
+            message: 'Mô hình tài chính đang hoạt động chưa có hũ để chia quỹ',
+            code: FUND_ALLOCATION_ERROR_CODES.INVALID_FINANCE_MODEL,
+          });
         }
 
         const totalPercentage = model.jars.reduce(
@@ -486,9 +566,11 @@ export class FinanceService {
           new Prisma.Decimal(0),
         );
         if (!totalPercentage.equals(100)) {
-          throw new BadRequestException(
-            'Tong ty le phan bo cua cac hu hoat dong phai bang 100% de chia quy',
-          );
+          throw new BadRequestException({
+            message:
+              'Tổng tỷ lệ phân bổ của các hũ hoạt động phải bằng 100% để chia quỹ',
+            code: FUND_ALLOCATION_ERROR_CODES.INVALID_JAR_PERCENTAGE,
+          });
         }
 
         const sourceId = `${model.id}:${this.periodKey(
@@ -505,9 +587,10 @@ export class FinanceService {
           select: { id: true },
         });
         if (existingAllocation) {
-          throw new ConflictException(
-            'Ky nay da co lan chia quy theo mo hinh tai chinh nay',
-          );
+          throw new ConflictException({
+            message: 'Kỳ này đã có lần chia quỹ theo mô hình tài chính này',
+            code: FUND_ALLOCATION_ERROR_CODES.ALREADY_EXISTS,
+          });
         }
 
         const ledger = await tx.financeLedger.upsert({
@@ -521,6 +604,19 @@ export class FinanceService {
         });
 
         const totalAmount = new Prisma.Decimal(dto.amount).toDecimalPlaces(2);
+        const availableFund = await this.calculateAvailableFamilyFund(
+          tx,
+          ledger.id,
+          dto.periodMonth,
+          dto.periodYear,
+        );
+        if (totalAmount.greaterThan(availableFund)) {
+          throw new BadRequestException({
+            message: 'Số tiền chia quỹ vượt quá quỹ khả dụng của kỳ này',
+            code: FUND_ALLOCATION_ERROR_CODES.INSUFFICIENT_AVAILABLE_FUND,
+          });
+        }
+
         const entryDate = this.monthEndDate(dto.periodMonth, dto.periodYear);
         let allocatedAmount = new Prisma.Decimal(0);
         const entries: Prisma.LedgerEntryGetPayload<{
@@ -545,6 +641,29 @@ export class FinanceService {
                 .toDecimalPlaces(2);
           allocatedAmount = allocatedAmount.plus(amount);
 
+          const snapshot = this.buildFundAllocationSnapshot({
+            model: {
+              id: model.id,
+              name: model.name,
+              modelType: model.modelType,
+            },
+            period: { month: dto.periodMonth, year: dto.periodYear },
+            sourceId,
+            jar: {
+              id: jar.id,
+              financeModelId: jar.financeModelId,
+              name: jar.name,
+              jarCode: jar.jarCode,
+              allocationPercentage: this.decimalToNumber(
+                jar.allocationPercentage,
+              ),
+              description: jar.description,
+              isActive: jar.isActive,
+              createdAt: jar.createdAt,
+              updatedAt: jar.updatedAt,
+            },
+            amount,
+          });
           const entry = await tx.ledgerEntry.create({
             data: {
               ledgerId: ledger.id,
@@ -552,11 +671,12 @@ export class FinanceService {
               createdByMemberId: memberId,
               entryType: LedgerEntryType.ADJUSTMENT,
               amount,
-              description: `Allocate fund to ${jar.name}`,
+              description: `Chia quỹ vào hũ ${jar.name}`,
               note: dto.note?.trim(),
               entryDate,
               sourceType: MODEL_FUND_ALLOCATION_SOURCE,
               sourceId,
+              metadata: { fundAllocationSnapshot: snapshot },
               status: LedgerEntryStatus.ACTIVE,
             },
             include: { jar: true },
@@ -589,6 +709,74 @@ export class FinanceService {
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  async listFundAllocations(familyId: string, query: FundAllocationQueryDto) {
+    const hasPeriodMonth = query.periodMonth !== undefined;
+    const hasPeriodYear = query.periodYear !== undefined;
+    if (hasPeriodMonth !== hasPeriodYear) {
+      throw new BadRequestException(
+        'Vui lòng truyền đồng thời periodMonth và periodYear khi lọc theo kỳ chia quỹ',
+      );
+    }
+
+    const sourceIdFilter: Prisma.StringNullableFilter = { not: null };
+    if (query.modelId && hasPeriodMonth && hasPeriodYear) {
+      sourceIdFilter.equals = `${query.modelId}:${this.periodKey(
+        query.periodMonth!,
+        query.periodYear!,
+      )}`;
+    } else if (query.modelId) {
+      sourceIdFilter.startsWith = `${query.modelId}:`;
+    } else if (hasPeriodMonth && hasPeriodYear) {
+      sourceIdFilter.endsWith = `:${this.periodKey(
+        query.periodMonth!,
+        query.periodYear!,
+      )}`;
+    }
+
+    const entries = (await this.prisma.ledgerEntry.findMany({
+      where: {
+        ledger: { familyId },
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+        sourceId: sourceIdFilter,
+      },
+      include: {
+        jar: {
+          include: {
+            financeModel: {
+              select: { id: true, name: true, modelType: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+    })) as FundAllocationEntryRow[];
+
+    const grouped = new Map<string, FundAllocationEntryRow[]>();
+    for (const entry of entries) {
+      if (!entry.sourceId) continue;
+      const group = grouped.get(entry.sourceId) ?? [];
+      group.push(entry);
+      grouped.set(entry.sourceId, group);
+    }
+
+    const allocations = [...grouped.entries()]
+      .map(([sourceId, group]) =>
+        this.buildFundAllocationHistoryItem(sourceId, group),
+      )
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    return buildPaginated(
+      allocations.slice(
+        skipFor(query.page, query.limit),
+        query.page * query.limit,
+      ),
+      allocations.length,
+      query.page,
+      query.limit,
     );
   }
 
@@ -1364,6 +1552,227 @@ export class FinanceService {
 
   private monthEndDate(month: number, year: number) {
     return new Date(Date.UTC(year, month, 0));
+  }
+
+  private async calculateAvailableFamilyFund(
+    tx: Prisma.TransactionClient,
+    ledgerId: string,
+    month: number,
+    year: number,
+  ) {
+    const { start, end } = this.periodRange(month, year);
+    const entries = await tx.ledgerEntry.findMany({
+      where: {
+        ledgerId,
+        status: LedgerEntryStatus.ACTIVE,
+        entryDate: { gte: start, lt: end },
+      },
+      select: { entryType: true, amount: true, sourceType: true },
+    });
+
+    return entries.reduce((sum, entry) => {
+      if (FAMILY_FUND_CASH_IN_TYPES.includes(entry.entryType as never)) {
+        return sum.plus(entry.amount);
+      }
+      if (FAMILY_FUND_CASH_OUT_TYPES.includes(entry.entryType as never)) {
+        return sum.minus(entry.amount);
+      }
+      if (
+        entry.entryType === LedgerEntryType.ADJUSTMENT &&
+        entry.sourceType !== MODEL_FUND_ALLOCATION_SOURCE &&
+        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE
+      ) {
+        return sum.plus(entry.amount);
+      }
+      return sum;
+    }, new Prisma.Decimal(0));
+  }
+
+  private buildFundAllocationSnapshot(input: {
+    model: FundAllocationModelSummary;
+    period: { month: number; year: number };
+    sourceId: string;
+    jar: {
+      id: string;
+      financeModelId: string;
+      name: string;
+      jarCode: string;
+      allocationPercentage: number;
+      description: string | null;
+      isActive: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    amount: Prisma.Decimal;
+  }): FundAllocationSnapshot {
+    return {
+      model: input.model,
+      period: input.period,
+      sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+      sourceId: input.sourceId,
+      jar: {
+        ...input.jar,
+        createdAt:
+          input.jar.createdAt?.toISOString() ?? new Date().toISOString(),
+        updatedAt:
+          input.jar.updatedAt?.toISOString() ?? new Date().toISOString(),
+      },
+      amount: this.decimalToNumber(input.amount),
+    };
+  }
+
+  private readFundAllocationSnapshot(
+    entry: FundAllocationEntryRow,
+  ): FundAllocationSnapshot | null {
+    if (!entry.metadata || typeof entry.metadata !== 'object') return null;
+    if (Array.isArray(entry.metadata)) return null;
+
+    const raw = entry.metadata as Record<string, unknown>;
+    const snapshot = raw.fundAllocationSnapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return null;
+    }
+
+    const candidate = snapshot as Partial<FundAllocationSnapshot>;
+    if (
+      !candidate.model ||
+      !candidate.period ||
+      !candidate.jar ||
+      candidate.sourceType !== MODEL_FUND_ALLOCATION_SOURCE ||
+      typeof candidate.sourceId !== 'string' ||
+      typeof candidate.amount !== 'number'
+    ) {
+      return null;
+    }
+
+    return candidate as FundAllocationSnapshot;
+  }
+
+  private parseFundAllocationSourceId(sourceId: string) {
+    const separatorIndex = sourceId.lastIndexOf(':');
+    if (separatorIndex < 1) return null;
+
+    const modelId = sourceId.slice(0, separatorIndex);
+    const period = sourceId.slice(separatorIndex + 1);
+    const match = /^(\d{4})-(\d{2})$/.exec(period);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) return null;
+
+    return { modelId, period: { month, year } };
+  }
+
+  private buildFundAllocationHistoryItem(
+    sourceId: string,
+    entries: FundAllocationEntryRow[],
+  ) {
+    const parsed = this.parseFundAllocationSourceId(sourceId);
+    const entriesWithData = entries.filter(
+      (entry) => this.readFundAllocationSnapshot(entry) || entry.jar,
+    );
+    const firstSnapshot = entriesWithData
+      .map((entry) => this.readFundAllocationSnapshot(entry))
+      .find((snapshot): snapshot is FundAllocationSnapshot =>
+        Boolean(snapshot),
+      );
+    const model =
+      firstSnapshot?.model ??
+      entriesWithData.find((entry) => entry.jar?.financeModel)?.jar
+        ?.financeModel;
+    if (!parsed || !model || entriesWithData.length === 0) return null;
+
+    const sortedEntries = [...entriesWithData].sort((left, right) => {
+      const leftSnapshot = this.readFundAllocationSnapshot(left);
+      const rightSnapshot = this.readFundAllocationSnapshot(right);
+      const leftJarCreatedAt = leftSnapshot
+        ? new Date(leftSnapshot.jar.createdAt).getTime()
+        : (left.jar?.createdAt.getTime() ?? 0);
+      const rightJarCreatedAt = rightSnapshot
+        ? new Date(rightSnapshot.jar.createdAt).getTime()
+        : (right.jar?.createdAt.getTime() ?? 0);
+      return leftJarCreatedAt - rightJarCreatedAt;
+    });
+    const totalAmount = sortedEntries.reduce(
+      (sum, entry) =>
+        sum.plus(
+          this.readFundAllocationSnapshot(entry)?.amount ?? entry.amount,
+        ),
+      new Prisma.Decimal(0),
+    );
+    const mappedEntries = sortedEntries
+      .map((entry) => this.mapFundAllocationLedgerEntry(entry))
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    return {
+      model: {
+        id: model.id,
+        name: model.name,
+        modelType: model.modelType,
+      },
+      period: parsed.period,
+      totalAmount: this.decimalToNumber(totalAmount),
+      sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+      sourceId,
+      items: sortedEntries.flatMap((entry) => {
+        const snapshot = this.readFundAllocationSnapshot(entry);
+        const jar = snapshot?.jar ?? entry.jar;
+        if (!jar) return [];
+        return [
+          {
+            jarId: jar.id,
+            jarName: jar.name,
+            jarCode: jar.jarCode,
+            allocationPercentage: snapshot
+              ? snapshot.jar.allocationPercentage
+              : this.decimalToNumber(entry.jar!.allocationPercentage),
+            amount: snapshot
+              ? snapshot.amount
+              : this.decimalToNumber(entry.amount),
+            ledgerEntryId: entry.id,
+          },
+        ];
+      }),
+      entries: mappedEntries,
+    };
+  }
+
+  private mapFundAllocationLedgerEntry(entry: FundAllocationEntryRow) {
+    const snapshot = this.readFundAllocationSnapshot(entry);
+    const jar = snapshot?.jar ?? entry.jar;
+    if (!jar) return null;
+
+    return {
+      id: entry.id,
+      ledgerId: entry.ledgerId,
+      categoryId: entry.categoryId,
+      jarId: entry.jarId,
+      createdByMemberId: entry.createdByMemberId,
+      entryType: entry.entryType,
+      amount: snapshot ? snapshot.amount : this.decimalToNumber(entry.amount),
+      description: entry.description,
+      note: entry.note,
+      entryDate: entry.entryDate,
+      status: entry.status,
+      sourceType: entry.sourceType,
+      sourceId: entry.sourceId,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      jar: {
+        id: jar.id,
+        financeModelId: jar.financeModelId,
+        name: jar.name,
+        jarCode: jar.jarCode,
+        allocationPercentage: snapshot
+          ? snapshot.jar.allocationPercentage
+          : this.decimalToNumber(entry.jar!.allocationPercentage),
+        description: jar.description,
+        isActive: jar.isActive,
+        createdAt: snapshot ? new Date(snapshot.jar.createdAt) : jar.createdAt,
+        updatedAt: snapshot ? new Date(snapshot.jar.updatedAt) : jar.updatedAt,
+      },
+    };
   }
 
   private visibleFinancialGoalWhere(

@@ -21,6 +21,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { FinanceReportQueryDto } from '../dto/finance-report-query.dto';
 
 const MONTHLY_SURPLUS_TO_GOAL_SOURCE = 'MONTHLY_SURPLUS_TO_GOAL';
+const MODEL_FUND_ALLOCATION_SOURCE = 'MODEL_FUND_ALLOCATION';
 
 type FinancialGoalWithJar = Prisma.FinancialGoalGetPayload<{
   include: { relatedJar: true };
@@ -387,7 +388,8 @@ export class FinanceReportService {
         totalExpense = totalExpense.plus(entry.amount);
       } else if (
         entry.entryType === LedgerEntryType.ADJUSTMENT &&
-        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE
+        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE &&
+        entry.sourceType !== MODEL_FUND_ALLOCATION_SOURCE
       ) {
         bucket.adjustmentAmount = bucket.adjustmentAmount.plus(entry.amount);
         totalAdjustment = totalAdjustment.plus(entry.amount);

@@ -67,6 +67,7 @@ const GOAL_ELIGIBLE_ENTRY_TYPES = [
   LedgerEntryType.REWARD,
 ] as const;
 const MONTHLY_SURPLUS_TO_GOAL_SOURCE = 'MONTHLY_SURPLUS_TO_GOAL';
+const MODEL_FUND_ALLOCATION_SOURCE = 'MODEL_FUND_ALLOCATION';
 const FAMILY_FUND_CASH_IN_TYPES = [
   LedgerEntryType.INCOME,
   LedgerEntryType.CONTRIBUTION,
@@ -1351,7 +1352,8 @@ export class FinancialGoalService {
       }
       if (
         entry.entryType === LedgerEntryType.ADJUSTMENT &&
-        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE
+        entry.sourceType !== MONTHLY_SURPLUS_TO_GOAL_SOURCE &&
+        entry.sourceType !== MODEL_FUND_ALLOCATION_SOURCE
       ) {
         return sum.plus(entry.amount);
       }
