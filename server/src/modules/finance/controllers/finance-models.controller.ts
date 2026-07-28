@@ -7,15 +7,21 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { FamilyRole } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
 import { ResponseMessage } from '../../../common/decorators/response-message.decorator';
@@ -28,6 +34,15 @@ import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
 import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
+import { FundAllocationQueryDto } from '../dto/fund-allocation-query.dto';
+import {
+  FUND_ALLOCATION_RESPONSE_EXAMPLE,
+  FundAllocationApiResponseDto,
+  FundAllocationBadRequestResponseDto,
+  FundAllocationConflictResponseDto,
+  FundAllocationListApiResponseDto,
+  FundAllocationNotFoundResponseDto,
+} from '../dto/fund-allocation-response.dto';
 import { UpdateFinanceJarDto } from '../dto/update-finance-jar.dto';
 import { FinanceService } from '../services/finance.service';
 
@@ -104,7 +119,11 @@ export class FinanceModelsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Không có quyền quản lý tài chính gia đình',
+    description:
+      'Chỉ FAMILY_MANAGER hoặc DEPUTY_MEMBER đã xác thực tài khoản mới được kích hoạt mô hình tài chính. FAMILY_MEMBER hoặc tài khoản chưa verified nhận 403.',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Thiếu token, token không hợp lệ hoặc token đã hết hạn.',
   })
   activateFinanceModel(
     @Param('familyId') familyId: string,
@@ -113,24 +132,150 @@ export class FinanceModelsController {
     return this.financeService.activateFinanceModel(familyId, modelId);
   }
 
-  @Post('fund-allocations')
-  @UseGuards(VerifiedGuard)
+  @Get('fund-allocations')
   @FamilyRoles(...FINANCE_MANAGER_ROLES)
-  @HttpCode(HttpStatus.CREATED)
-  @ResponseMessage('Chia quy theo mo hinh tai chinh thanh cong')
+  @ResponseMessage('Lấy lịch sử chia quỹ thành công')
   @ApiOperation({
-    summary: 'Chia quy gia dinh theo ty le cac hu cua mo hinh tai chinh',
+    summary: 'Xem lại lịch sử chia quỹ theo mô hình và kỳ',
     description:
-      'Neu khong truyen modelId, he thong dung mo hinh ACTIVE cua gia dinh. Moi hu duoc ghi thanh mot ledger entry co jarId.',
+      'Trả danh sách các lần chia quỹ đã được ghi nhận từ ledger entries có sourceType MODEL_FUND_ALLOCATION. Có thể lọc theo modelId, hoặc lọc chi tiết một kỳ bằng periodMonth + periodYear. Nếu truyền modelId cùng periodMonth + periodYear, API trả đúng lần chia quỹ của mô hình đó trong kỳ đó. Kết quả được group theo sourceId = modelId:YYYY-MM để FE xem lại tháng trước, sau khi mở lại ứng dụng hoặc trên thiết bị khác. Với dữ liệu tạo sau migration metadata, lịch sử dùng snapshot tên hũ, mã hũ, tỷ lệ, tên mô hình và số tiền tại thời điểm chia quỹ; việc đổi tên hũ, đổi tỷ lệ hoặc kích hoạt mô hình khác sau đó không làm thay đổi lịch sử cũ.',
+  })
+  @ApiOkResponse({
+    description:
+      'Danh sách phân trang các lần chia quỹ. Mỗi item có cùng cấu trúc data của POST /fund-allocations.',
+    type: FundAllocationListApiResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Thiếu token, token không hợp lệ hoặc token đã hết hạn.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Chỉ FAMILY_MANAGER hoặc DEPUTY_MEMBER được xem lịch sử chia quỹ. FAMILY_MEMBER hoặc user không thuộc gia đình nhận 403.',
   })
   @ApiResponse({
     status: 400,
     description:
-      'Mo hinh khong co hu hoat dong hoac tong ty le hu khong bang 100%',
+      'periodMonth và periodYear phải được truyền đồng thời khi lọc theo kỳ chia quỹ',
+  })
+  listFundAllocations(
+    @Param('familyId') familyId: string,
+    @Query() query: FundAllocationQueryDto,
+  ) {
+    return this.financeService.listFundAllocations(familyId, query);
+  }
+
+  @Post('fund-allocations')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Chia quỹ theo mô hình tài chính thành công')
+  @ApiOperation({
+    summary: 'Chia quỹ gia đình theo tỷ lệ các hũ của mô hình tài chính',
+    description:
+      'Nếu không truyền modelId, hệ thống dùng mô hình ACTIVE của gia đình. Đây là thao tác phân loại nội bộ số tiền hiện có vào các hũ, không tự tạo tiền mới và không làm tăng tổng số dư gia đình. Mỗi hũ được ghi thành một ledger entry ADJUSTMENT có jarId và sourceType MODEL_FUND_ALLOCATION để audit, đồng thời lưu snapshot tên hũ, mã hũ, tỷ lệ, tên mô hình và số tiền tại thời điểm chia quỹ trong metadata. Toàn bộ quá trình chia quỹ chạy trong một database transaction; nếu tạo bất kỳ ledger entry nào thất bại thì rollback toàn bộ, không có trạng thái chỉ một phần hũ được ghi. Các entry này có thể xuất hiện trong lịch sử ledger, nhưng không được tính như thu nhập mới. FE nên dùng data.items để hiển thị kết quả chia quỹ; data.entries trả về để đối soát/audit khi cần.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Mô hình không có hũ hoạt động hoặc tổng tỷ lệ hũ không bằng 100%',
+    type: FundAllocationBadRequestResponseDto,
+    examples: {
+      invalidFinanceModel: {
+        summary: 'Mô hình không hợp lệ',
+        value: {
+          success: false,
+          message: 'Mô hình tài chính đang hoạt động chưa có hũ để chia quỹ',
+          statusCode: 400,
+          code: 'INVALID_FINANCE_MODEL',
+        },
+      },
+      invalidJarPercentage: {
+        summary: 'Tổng tỷ lệ hũ không bằng 100%',
+        value: {
+          success: false,
+          message:
+            'Tổng tỷ lệ phân bổ của các hũ hoạt động phải bằng 100% để chia quỹ',
+          statusCode: 400,
+          code: 'INVALID_JAR_PERCENTAGE',
+        },
+      },
+      insufficientAvailableFund: {
+        summary: 'Số tiền chia vượt quỹ khả dụng',
+        value: {
+          success: false,
+          message: 'Số tiền chia quỹ vượt quá quỹ khả dụng của kỳ này',
+          statusCode: 400,
+          code: 'INSUFFICIENT_AVAILABLE_FUND',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 409,
-    description: 'Ky nay da co lan chia quy theo mo hinh nay',
+    description:
+      'Đã có lần chia quỹ ACTIVE cho cùng familyId + modelId + periodMonth + periodYear. Do mỗi gia đình chỉ có một mô hình ACTIVE tại một thời điểm, thông thường một kỳ chỉ chia theo model đang ACTIVE; nếu sau đó đổi ACTIVE sang mô hình khác, khóa chống trùng vẫn tách theo modelId.',
+    type: FundAllocationConflictResponseDto,
+    example: {
+      success: false,
+      message: 'Kỳ này đã có lần chia quỹ theo mô hình tài chính này',
+      statusCode: 409,
+      code: 'FUND_ALLOCATION_ALREADY_EXISTS',
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Thiếu token, token không hợp lệ hoặc token đã hết hạn.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Chỉ FAMILY_MANAGER hoặc DEPUTY_MEMBER đã xác thực tài khoản mới được chia quỹ. FAMILY_MEMBER, user không thuộc gia đình hoặc tài khoản chưa verified nhận 403.',
+  })
+  @ApiNotFoundResponse({
+    description:
+      'Không tìm thấy mô hình ACTIVE để chia quỹ. Xảy ra khi gia đình không có model ACTIVE, modelId không tồn tại, hoặc modelId không thuộc gia đình hiện tại.',
+    type: FundAllocationNotFoundResponseDto,
+    examples: {
+      noActiveModel: {
+        summary: 'Gia đình không có mô hình ACTIVE',
+        value: {
+          success: false,
+          message:
+            'Không tìm thấy mô hình tài chính đang hoạt động trong gia đình này',
+          statusCode: 404,
+          code: 'NO_ACTIVE_FINANCE_MODEL',
+        },
+      },
+      modelIdNotFound: {
+        summary: 'modelId không tồn tại',
+        value: {
+          success: false,
+          message:
+            'Không tìm thấy mô hình tài chính đang hoạt động trong gia đình này',
+          statusCode: 404,
+          code: 'INVALID_FINANCE_MODEL',
+        },
+      },
+      modelIdOutsideFamily: {
+        summary: 'modelId không thuộc gia đình hiện tại',
+        value: {
+          success: false,
+          message:
+            'Không tìm thấy mô hình tài chính đang hoạt động trong gia đình này',
+          statusCode: 404,
+          code: 'INVALID_FINANCE_MODEL',
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    description:
+      'Envelope chuẩn. data gồm model, period, totalAmount, sourceType, sourceId, items và entries đã tạo. Chia quỹ là phân loại nội bộ, không làm tăng tổng quỹ gia đình. Response chỉ được trả sau khi transaction tạo đủ ledger entries thành công.',
+    type: FundAllocationApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Chia quỹ thành công',
+        value: FUND_ALLOCATION_RESPONSE_EXAMPLE,
+      },
+    },
   })
   allocateFundByModel(
     @Param('familyId') familyId: string,

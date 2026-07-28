@@ -489,6 +489,11 @@ describe('FinancialGoalService financial goals', () => {
         amount: new Prisma.Decimal(500000),
         sourceType: 'MONTHLY_SURPLUS_TO_GOAL',
       },
+      {
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(10000000),
+        sourceType: 'MODEL_FUND_ALLOCATION',
+      },
     ]);
     (
       prisma.goalAllocation as { aggregate: jest.Mock }
