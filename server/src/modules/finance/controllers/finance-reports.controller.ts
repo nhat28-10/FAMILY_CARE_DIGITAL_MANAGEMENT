@@ -157,6 +157,34 @@ export class FinanceReportsController {
     );
   }
 
+  @Get('reports/jar-target-actual')
+  @ResponseMessage('Lấy báo cáo tỷ trọng hũ tài chính thành công')
+  @ApiOperation({
+    summary:
+      'So sánh tỷ trọng thực tế theo hũ với target percentage của mô hình tài chính',
+    description:
+      'Mặc định dùng mô hình ACTIVE; có thể truyền financeModelId để xem theo mô hình cụ thể.',
+  })
+  @ApiQuery({
+    name: 'financeModelId',
+    required: false,
+    format: 'uuid',
+    description:
+      'ID mô hình tài chính cần phân tích; bỏ trống để dùng ACTIVE model.',
+  })
+  @ApiResponse({ status: 200, description: 'Báo cáo target-vs-actual theo hũ' })
+  getJarTargetActualReport(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @Query() query: FinanceReportQueryDto,
+  ) {
+    return this.financeReportService.getJarTargetActualReport(
+      familyId,
+      memberId,
+      query,
+    );
+  }
+
   @Get('member-contribution-summary')
   @ResponseMessage('Lấy tóm tắt đóng góp theo thành viên thành công')
   @ApiOperation({

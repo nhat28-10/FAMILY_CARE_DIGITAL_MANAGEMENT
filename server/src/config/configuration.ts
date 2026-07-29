@@ -197,6 +197,9 @@ export default () => ({
   faceScan: {
     maxFaces: parseInt(process.env.FACE_SCAN_MAX_FACES || '20', 10),
     minSimilarity: parseFloat(process.env.FACE_MATCH_MIN_SIMILARITY || '0.55'),
+    singleCandidateMinSimilarity: parseFloat(
+      process.env.FACE_MATCH_SINGLE_CANDIDATE_MIN_SIMILARITY || '0.75',
+    ),
     minMargin: parseFloat(process.env.FACE_MATCH_MIN_MARGIN || '0.08'),
     maxAttempts: parseInt(process.env.FACE_SCAN_MAX_ATTEMPTS || '3', 10),
     staleMinutes: parseInt(process.env.FACE_SCAN_STALE_MINUTES || '10', 10),

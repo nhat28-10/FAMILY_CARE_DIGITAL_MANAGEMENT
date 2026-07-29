@@ -38,6 +38,10 @@ import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
 import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { CreateMemberMonthlyFinanceDto } from '../dto/create-member-monthly-finance.dto';
+import {
+  FinanceCategoryJarMappingQueryDto,
+  UpsertFinanceCategoryJarMappingDto,
+} from '../dto/finance-category-jar-mapping.dto';
 import { FundAllocationQueryDto } from '../dto/fund-allocation-query.dto';
 import { LedgerEntryQueryDto } from '../dto/ledger-entry-query.dto';
 import {
@@ -807,6 +811,105 @@ export class FinanceService {
     });
   }
 
+  async listCategoryJarMappings(
+    familyId: string,
+    query: FinanceCategoryJarMappingQueryDto,
+  ) {
+    const model = query.financeModelId
+      ? await this.prisma.financeModel.findFirst({
+          where: { id: query.financeModelId, familyId },
+        })
+      : await this.prisma.financeModel.findFirst({
+          where: { familyId, status: FinanceModelStatus.ACTIVE },
+          orderBy: { updatedAt: 'desc' },
+        });
+    if (!model) {
+      return { financeModel: null, items: [] };
+    }
+
+    const items = await this.prisma.financeCategoryJarMapping.findMany({
+      where: { familyId, financeModelId: model.id },
+      include: { category: true, jar: true, financeModel: true },
+      orderBy: [
+        { category: { categoryType: 'asc' } },
+        { category: { name: 'asc' } },
+      ],
+    });
+    return { financeModel: model, items };
+  }
+
+  upsertCategoryJarMapping(
+    familyId: string,
+    dto: UpsertFinanceCategoryJarMappingDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const model = await tx.financeModel.findFirst({
+        where: { id: dto.financeModelId, familyId },
+      });
+      if (!model) {
+        throw new NotFoundException(
+          'Không tìm thấy mô hình tài chính trong gia đình này',
+        );
+      }
+      const category = await tx.financeCategory.findFirst({
+        where: {
+          id: dto.categoryId,
+          familyId,
+          status: FinanceCategoryStatus.ACTIVE,
+        },
+      });
+      if (!category) {
+        throw new NotFoundException(
+          'Không tìm thấy danh mục tài chính đang hoạt động trong gia đình này',
+        );
+      }
+      const jar = await tx.financeJar.findFirst({
+        where: {
+          id: dto.jarId,
+          financeModelId: model.id,
+          financeModel: { familyId },
+          isActive: true,
+        },
+      });
+      if (!jar) {
+        throw new NotFoundException(
+          'Không tìm thấy hũ tài chính đang hoạt động trong mô hình này',
+        );
+      }
+
+      return tx.financeCategoryJarMapping.upsert({
+        where: {
+          financeModelId_categoryId: {
+            financeModelId: model.id,
+            categoryId: category.id,
+          },
+        },
+        create: {
+          familyId,
+          financeModelId: model.id,
+          categoryId: category.id,
+          jarId: jar.id,
+        },
+        update: { jarId: jar.id },
+        include: { category: true, jar: true, financeModel: true },
+      });
+    });
+  }
+
+  async deleteCategoryJarMapping(familyId: string, mappingId: string) {
+    const mapping = await this.prisma.financeCategoryJarMapping.findFirst({
+      where: { id: mappingId, familyId },
+    });
+    if (!mapping) {
+      throw new NotFoundException(
+        'Không tìm thấy mapping danh mục - hũ trong gia đình này',
+      );
+    }
+    return this.prisma.financeCategoryJarMapping.delete({
+      where: { id: mapping.id },
+    });
+  }
+
   createFinanceJar(familyId: string, dto: CreateFinanceJarDto) {
     return this.prisma.$transaction(
       async (tx) => {
@@ -1097,15 +1200,22 @@ export class FinanceService {
         }
       }
 
-      if (dto.jarId) {
-        await this.assertJarBelongsToFamily(tx, familyId, dto.jarId);
+      let jarId = dto.jarId;
+      if (jarId) {
+        await this.assertJarBelongsToFamily(tx, familyId, jarId);
+      } else if (dto.categoryId) {
+        jarId = await this.resolveMappedJarIdForActiveModel(
+          tx,
+          familyId,
+          dto.categoryId,
+        );
       }
 
       return tx.ledgerEntry.create({
         data: {
           ledgerId: ledger.id,
           categoryId: dto.categoryId,
-          jarId: dto.jarId,
+          jarId,
           createdByMemberId: memberId,
           entryType: dto.entryType,
           amount: new Prisma.Decimal(dto.amount),
@@ -1171,15 +1281,24 @@ export class FinanceService {
         }
       }
 
-      if (dto.jarId) {
-        await this.assertJarBelongsToFamily(tx, familyId, dto.jarId);
+      let jarId: string | null | undefined = dto.jarId;
+      if (jarId) {
+        await this.assertJarBelongsToFamily(tx, familyId, jarId);
+      } else if (dto.jarId === undefined && dto.categoryId !== undefined) {
+        jarId = dto.categoryId
+          ? await this.resolveMappedJarIdForActiveModel(
+              tx,
+              familyId,
+              dto.categoryId,
+            )
+          : null;
       }
 
       return tx.ledgerEntry.update({
         where: { id: entry.id },
         data: {
           categoryId: dto.categoryId,
-          jarId: dto.jarId,
+          jarId,
           entryType: dto.entryType,
           amount:
             dto.amount === undefined
@@ -1684,8 +1803,7 @@ export class FinanceService {
       .find((snapshot): snapshot is FundAllocationSnapshot =>
         Boolean(snapshot),
       );
-    const model =
-      firstSnapshot?.model ??
+    const model = firstSnapshot?.model ??
       entries.find((entry) => entry.jar?.financeModel)?.jar?.financeModel ?? {
         id: parsed.modelId,
         name: null,
@@ -1936,6 +2054,24 @@ export class FinanceService {
         'Không tìm thấy hũ tài chính trong gia đình này',
       );
     }
+  }
+
+  private async resolveMappedJarIdForActiveModel(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    categoryId: string,
+  ) {
+    const mapping = await tx.financeCategoryJarMapping.findFirst({
+      where: {
+        familyId,
+        categoryId,
+        financeModel: { status: FinanceModelStatus.ACTIVE },
+        jar: { isActive: true },
+      },
+      select: { jarId: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return mapping?.jarId;
   }
 
   private async requireFinancialGoal(

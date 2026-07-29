@@ -10,6 +10,7 @@ import {
   EssentialType,
   FamilyRole,
   FinanceCategoryType,
+  FinanceModelStatus,
   FinancialGoalStatus,
   LedgerEntryStatus,
   LedgerEntryType,
@@ -444,6 +445,167 @@ export class FinanceReportService {
     };
   }
 
+  async getJarTargetActualReport(
+    familyId: string,
+    memberId: string,
+    query: FinanceReportQueryDto,
+  ) {
+    await this.getMemberInFamilyOrThrow(familyId, memberId);
+    const context = await this.resolveReportContext(familyId, query);
+    const model = query.financeModelId
+      ? await this.prisma.financeModel.findFirst({
+          where: { id: query.financeModelId, familyId },
+          include: {
+            jars: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        })
+      : await this.prisma.financeModel.findFirst({
+          where: { familyId, status: FinanceModelStatus.ACTIVE },
+          include: {
+            jars: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+
+    if (!model) {
+      return {
+        period: { periodStart: context.start, periodEnd: context.end },
+        currency: 'VND',
+        financeModel: null,
+        totals: {
+          trackedAmount: new Prisma.Decimal(0),
+          mappedAmount: new Prisma.Decimal(0),
+          unmappedAmount: new Prisma.Decimal(0),
+        },
+        items: [],
+        unmapped: { amount: new Prisma.Decimal(0), entryCount: 0 },
+      };
+    }
+
+    const jarIds = new Set(model.jars.map((jar) => jar.id));
+    const entries = await this.prisma.ledgerEntry.findMany({
+      where: {
+        ledger: { familyId },
+        status: LedgerEntryStatus.ACTIVE,
+        entryType: { in: this.jarTargetActualTypes() },
+        entryDate: { gte: context.start, lt: this.nextUtcDay(context.end) },
+        sourceType: { not: MODEL_FUND_ALLOCATION_SOURCE },
+      },
+      include: { category: true, jar: true },
+    });
+
+    const zero = new Prisma.Decimal(0);
+    const totalsByJar = new Map<string, Prisma.Decimal>();
+    const categoryTotalsByJar = new Map<
+      string,
+      Map<
+        string,
+        {
+          categoryId: string | null;
+          name: string;
+          amount: Prisma.Decimal;
+          entryCount: number;
+        }
+      >
+    >();
+    let mappedAmount = zero;
+    let unmappedAmount = zero;
+    let unmappedEntryCount = 0;
+
+    for (const entry of entries) {
+      if (entry.jarId && jarIds.has(entry.jarId)) {
+        mappedAmount = mappedAmount.plus(entry.amount);
+        totalsByJar.set(
+          entry.jarId,
+          (totalsByJar.get(entry.jarId) ?? zero).plus(entry.amount),
+        );
+        const categoryKey = entry.categoryId ?? 'UNCATEGORIZED';
+        const categoryMap =
+          categoryTotalsByJar.get(entry.jarId) ??
+          new Map<
+            string,
+            {
+              categoryId: string | null;
+              name: string;
+              amount: Prisma.Decimal;
+              entryCount: number;
+            }
+          >();
+        const current = categoryMap.get(categoryKey);
+        categoryMap.set(categoryKey, {
+          categoryId: entry.categoryId,
+          name: entry.category?.name ?? 'Chưa phân loại',
+          amount: (current?.amount ?? zero).plus(entry.amount),
+          entryCount: (current?.entryCount ?? 0) + 1,
+        });
+        categoryTotalsByJar.set(entry.jarId, categoryMap);
+      } else {
+        unmappedAmount = unmappedAmount.plus(entry.amount);
+        unmappedEntryCount += 1;
+      }
+    }
+
+    const trackedAmount = mappedAmount.plus(unmappedAmount);
+    const items = model.jars.map((jar) => {
+      const actualAmount = totalsByJar.get(jar.id) ?? zero;
+      const targetPercentage = jar.allocationPercentage;
+      const actualPercentage = mappedAmount.equals(0)
+        ? zero
+        : actualAmount.dividedBy(mappedAmount).times(100);
+      const targetAmount = mappedAmount.times(targetPercentage).dividedBy(100);
+      const varianceAmount = actualAmount.minus(targetAmount);
+      const variancePercentage = actualPercentage.minus(targetPercentage);
+      const absVariancePercentage = variancePercentage.abs();
+      const status = absVariancePercentage.lessThanOrEqualTo(5)
+        ? 'ON_TRACK'
+        : variancePercentage.greaterThan(0)
+          ? 'OVER_TARGET'
+          : 'UNDER_TARGET';
+      const categories = [
+        ...(categoryTotalsByJar.get(jar.id)?.values() ?? []),
+      ].sort((left, right) => right.amount.comparedTo(left.amount));
+
+      return {
+        jar: {
+          id: jar.id,
+          financeModelId: jar.financeModelId,
+          name: jar.name,
+          jarCode: jar.jarCode,
+          allocationPercentage: targetPercentage,
+          description: jar.description,
+        },
+        targetPercentage,
+        actualPercentage,
+        targetAmount,
+        actualAmount,
+        varianceAmount,
+        variancePercentage,
+        status,
+        categories,
+      };
+    });
+
+    return {
+      period: { periodStart: context.start, periodEnd: context.end },
+      currency: 'VND',
+      financeModel: {
+        id: model.id,
+        name: model.name,
+        modelType: model.modelType,
+        status: model.status,
+      },
+      totals: { trackedAmount, mappedAmount, unmappedAmount },
+      items,
+      unmapped: { amount: unmappedAmount, entryCount: unmappedEntryCount },
+    };
+  }
+
   async getMemberContributionSummary(
     familyId: string,
     memberId: string,
@@ -641,6 +803,10 @@ export class FinanceReportService {
       LedgerEntryType.ALLOWANCE,
       LedgerEntryType.REWARD,
     ];
+  }
+
+  private jarTargetActualTypes(): LedgerEntryType[] {
+    return [...this.cashOutTypes(), LedgerEntryType.CONTRIBUTION];
   }
 
   private monthKey(date: Date) {

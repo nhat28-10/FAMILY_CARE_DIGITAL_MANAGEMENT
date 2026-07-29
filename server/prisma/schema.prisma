@@ -416,36 +416,37 @@ model Family {
   updatedAt        DateTime         @updatedAt
 
   // Relations
-  members                 FamilyMember[]
-  joinRequests            JoinRequest[]
-  financeLedger           FinanceLedger?
-  financeCategories       FinanceCategory[]
-  financeModels           FinanceModel[]
-  budgetPlans             BudgetPlan[]
-  financialGoals          FinancialGoal[]
-  goalContributionPlans   GoalContributionPlan[]
-  budgetAlerts            BudgetAlert[]
-  spendingSupportRequests SpendingSupportRequest[]
-  taskCategories          TaskCategory[]
-  tasks                   Task[]
-  sosSetting              SosSetting?
-  wearableDevices         WearableDevice[]
-  sosAlerts               SosAlert[]
-  memberLocationPoints    MemberLocationPoint[]
-  notifications           Notification[]
-  subscription            FamilySubscription?
-  paymentTransactions     PaymentTransaction[]
-  provisioningLogs        WorkspaceProvisioningLog[]
-  conversations           Conversation[]
-  familyAnnouncements     FamilyAnnouncement[]
-  calendarEvents          CalendarEvent[]
-  albumMedia              AlbumMedia[]
-  storageCleanupJobs      StorageCleanupJob[]
-  memberFaceProfiles      MemberFaceProfile[]
-  faceScanJobs            FaceScanJob[]
-  albumFaceDetections     AlbumFaceDetection[]
-  albumTagSuggestions     AlbumTagSuggestion[]
-  aiConversations         AIConversation[]
+  members                    FamilyMember[]
+  joinRequests               JoinRequest[]
+  financeLedger              FinanceLedger?
+  financeCategories          FinanceCategory[]
+  financeModels              FinanceModel[]
+  financeCategoryJarMappings FinanceCategoryJarMapping[]
+  budgetPlans                BudgetPlan[]
+  financialGoals             FinancialGoal[]
+  goalContributionPlans      GoalContributionPlan[]
+  budgetAlerts               BudgetAlert[]
+  spendingSupportRequests    SpendingSupportRequest[]
+  taskCategories             TaskCategory[]
+  tasks                      Task[]
+  sosSetting                 SosSetting?
+  wearableDevices            WearableDevice[]
+  sosAlerts                  SosAlert[]
+  memberLocationPoints       MemberLocationPoint[]
+  notifications              Notification[]
+  subscription               FamilySubscription?
+  paymentTransactions        PaymentTransaction[]
+  provisioningLogs           WorkspaceProvisioningLog[]
+  conversations              Conversation[]
+  familyAnnouncements        FamilyAnnouncement[]
+  calendarEvents             CalendarEvent[]
+  albumMedia                 AlbumMedia[]
+  storageCleanupJobs         StorageCleanupJob[]
+  memberFaceProfiles         MemberFaceProfile[]
+  faceScanJobs               FaceScanJob[]
+  albumFaceDetections        AlbumFaceDetection[]
+  albumTagSuggestions        AlbumTagSuggestion[]
+  aiConversations            AIConversation[]
 
   @@map("families")
 }
@@ -609,10 +610,11 @@ model FinanceCategory {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
-  family                  Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family                  Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
   entries                 LedgerEntry[]
   budgetLines             BudgetLine[]
   budgetAlerts            BudgetAlert[]
+  jarMappings             FinanceCategoryJarMapping[]
   spendingSupportRequests SpendingSupportRequest[]
 
   @@unique([familyId, name, categoryType])
@@ -630,8 +632,9 @@ model FinanceModel {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  family Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  jars   FinanceJar[]
+  family              Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  jars                FinanceJar[]
+  categoryJarMappings FinanceCategoryJarMapping[]
 
   @@index([familyId, status])
   @@map("finance_models")
@@ -649,16 +652,41 @@ model FinanceJar {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  financeModel      FinanceModel       @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  financeModel      FinanceModel                @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
   budgetLines       BudgetLine[]
   financialGoals    FinancialGoal[]
   ledgerEntries     LedgerEntry[]
   budgetAlerts      BudgetAlert[]
   rewardAllocations RewardAllocation[]
+  categoryMappings  FinanceCategoryJarMapping[]
 
   @@unique([financeModelId, jarCode])
   @@index([financeModelId, isActive])
   @@map("finance_jars")
+}
+
+/// Default jar assignment for a category inside one finance model.
+/// The same category can point to different jars in FIVE_JARS vs EIGHTY_TWENTY.
+model FinanceCategoryJarMapping {
+  id             String   @id @default(uuid())
+  familyId       String
+  financeModelId String
+  categoryId     String
+  jarId          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  family       Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  financeModel FinanceModel    @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  category     FinanceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  jar          FinanceJar      @relation(fields: [jarId], references: [id], onDelete: Cascade)
+
+  @@unique([financeModelId, categoryId])
+  @@index([familyId])
+  @@index([financeModelId])
+  @@index([categoryId])
+  @@index([jarId])
+  @@map("finance_category_jar_mappings")
 }
 
 /// Immutable-style record in the shared family ledger. Corrections should be represented by voiding or adjustment entries rather than deleting history.

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -34,6 +35,10 @@ import { FINANCE_MANAGER_ROLES } from './finance-controller.constants';
 import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
 import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
+import {
+  FinanceCategoryJarMappingQueryDto,
+  UpsertFinanceCategoryJarMappingDto,
+} from '../dto/finance-category-jar-mapping.dto';
 import { FundAllocationQueryDto } from '../dto/fund-allocation-query.dto';
 import {
   FUND_ALLOCATION_RESPONSE_EXAMPLE,
@@ -296,6 +301,53 @@ export class FinanceModelsController {
     @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
     return this.financeService.listFinanceJars(familyId, familyRole);
+  }
+
+  @Get('category-jar-mappings')
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Lấy mapping danh mục - hũ tài chính thành công')
+  @ApiOperation({
+    summary:
+      'Lấy cấu hình category thuộc hũ nào theo mô hình tài chính active hoặc modelId cụ thể',
+  })
+  listCategoryJarMappings(
+    @Param('familyId') familyId: string,
+    @Query() query: FinanceCategoryJarMappingQueryDto,
+  ) {
+    return this.financeService.listCategoryJarMappings(familyId, query);
+  }
+
+  @Post('category-jar-mappings')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @HttpCode(HttpStatus.CREATED)
+  @ResponseMessage('Cấu hình mapping danh mục - hũ tài chính thành công')
+  @ApiOperation({
+    summary:
+      'Tạo hoặc cập nhật mapping category -> jar cho một mô hình tài chính',
+  })
+  upsertCategoryJarMapping(
+    @Param('familyId') familyId: string,
+    @Body() dto: UpsertFinanceCategoryJarMappingDto,
+  ) {
+    return this.financeService.upsertCategoryJarMapping(familyId, dto);
+  }
+
+  @Delete('category-jar-mappings/:mappingId')
+  @UseGuards(VerifiedGuard)
+  @FamilyRoles(...FINANCE_MANAGER_ROLES)
+  @ResponseMessage('Xóa mapping danh mục - hũ tài chính thành công')
+  @ApiOperation({ summary: 'Xóa mapping category -> jar' })
+  @ApiParam({
+    name: 'mappingId',
+    description: 'ID mapping cần xóa',
+    format: 'uuid',
+  })
+  deleteCategoryJarMapping(
+    @Param('familyId') familyId: string,
+    @Param('mappingId') mappingId: string,
+  ) {
+    return this.financeService.deleteCategoryJarMapping(familyId, mappingId);
   }
 
   @Post('jars')

@@ -8,10 +8,13 @@ import { validate } from 'class-validator';
 import {
   BudgetPeriodType,
   BudgetPlanStatus,
+  FamilyRole,
   FinanceCategoryType,
   FinanceModelStatus,
+  FinanceModelType,
   LedgerEntryStatus,
   LedgerEntryType,
+  MemberStatus,
   Prisma,
 } from '@prisma/client';
 
@@ -46,6 +49,12 @@ describe('FinanceService budget planning', () => {
         count: jest.fn(),
       },
       financeCategory: { findFirst: jest.fn() },
+      financeCategoryJarMapping: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
       financeJar: { findFirst: jest.fn() },
       financeLedger: { upsert: jest.fn() },
       financeModel: { findFirst: jest.fn() },
@@ -60,7 +69,10 @@ describe('FinanceService budget planning', () => {
         (operation: ((client: typeof tx) => unknown) | unknown[]) =>
           Array.isArray(operation) ? Promise.all(operation) : operation(tx),
       ),
+      familyMember: { findFirst: jest.fn() },
       budgetPlan: { findFirst: jest.fn() },
+      financeModel: { findFirst: jest.fn() },
+      financeCategoryJarMapping: { findMany: jest.fn() },
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn(), count: jest.fn() },
     };
@@ -406,6 +418,133 @@ describe('FinanceService budget planning', () => {
     expect(
       (prisma.ledgerEntry as { count: jest.Mock }).count,
     ).not.toHaveBeenCalled();
+  });
+
+  it('auto-assigns a jar from the active model category mapping when creating a ledger entry', async () => {
+    tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
+    tx.financeCategory.findFirst.mockResolvedValue({
+      id: 'category-id',
+      familyId,
+      status: 'ACTIVE',
+    });
+    tx.financeCategoryJarMapping.findFirst.mockResolvedValue({
+      jarId: 'education-jar',
+    });
+    tx.ledgerEntry.create.mockResolvedValue({
+      id: 'entry-id',
+      categoryId: 'category-id',
+      jarId: 'education-jar',
+    });
+
+    const result = await service.createLedgerEntry(familyId, 'member-id', {
+      entryType: LedgerEntryType.EXPENSE,
+      amount: 250000,
+      description: 'Khóa học tiếng Anh',
+      entryDate: '2026-06-10T08:30:00.000Z',
+      categoryId: 'category-id',
+    });
+
+    expect(result.jarId).toBe('education-jar');
+    expect(tx.financeCategoryJarMapping.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          familyId,
+          categoryId: 'category-id',
+          financeModel: { status: FinanceModelStatus.ACTIVE },
+        }),
+      }),
+    );
+    expect(tx.ledgerEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          categoryId: 'category-id',
+          jarId: 'education-jar',
+        }),
+      }),
+    );
+  });
+
+  it('reports jar actual percentages against model target percentages', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: 'member-id',
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (prisma.budgetPlan as { findFirst: jest.Mock }).findFirst.mockResolvedValue(
+      null,
+    );
+    (
+      prisma.financeModel as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: 'model-id',
+      familyId,
+      name: '80/20',
+      modelType: FinanceModelType.EIGHTY_TWENTY,
+      status: FinanceModelStatus.ACTIVE,
+      jars: [
+        {
+          id: 'spending-jar',
+          financeModelId: 'model-id',
+          name: 'Spending',
+          jarCode: 'SPENDING',
+          allocationPercentage: new Prisma.Decimal(80),
+          description: null,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'savings-jar',
+          financeModelId: 'model-id',
+          name: 'Savings',
+          jarCode: 'SAVINGS',
+          allocationPercentage: new Prisma.Decimal(20),
+          description: null,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
+      {
+        jarId: 'spending-jar',
+        categoryId: 'food-category',
+        amount: new Prisma.Decimal(90),
+        category: { name: 'Food' },
+      },
+      {
+        jarId: 'savings-jar',
+        categoryId: 'saving-category',
+        amount: new Prisma.Decimal(10),
+        category: { name: 'Saving' },
+      },
+      {
+        jarId: null,
+        categoryId: null,
+        amount: new Prisma.Decimal(15),
+        category: null,
+      },
+    ]);
+
+    const report = await reportService.getJarTargetActualReport(
+      familyId,
+      'member-id',
+      {
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+      },
+    );
+
+    expect(report.totals.mappedAmount.toString()).toBe('100');
+    expect(report.totals.unmappedAmount.toString()).toBe('15');
+    expect(report.items[0].actualPercentage.toString()).toBe('90');
+    expect(report.items[0].variancePercentage.toString()).toBe('10');
+    expect(report.items[0].status).toBe('OVER_TARGET');
+    expect(report.items[1].status).toBe('UNDER_TARGET');
   });
 
   it('allocates a fund across active jars by model percentages', async () => {
