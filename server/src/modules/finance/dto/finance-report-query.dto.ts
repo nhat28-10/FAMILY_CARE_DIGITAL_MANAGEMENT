@@ -21,6 +21,11 @@ export class FinanceReportQueryDto {
   @IsUUID()
   budgetPlanId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  financeModelId?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @Transform(booleanTransform)

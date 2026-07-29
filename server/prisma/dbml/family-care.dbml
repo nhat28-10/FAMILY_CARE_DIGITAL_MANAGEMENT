@@ -101,6 +101,7 @@ Table families {
   financeLedger finance_ledgers
   financeCategories finance_categories [not null]
   financeModels finance_models [not null]
+  financeCategoryJarMappings finance_category_jar_mappings [not null]
   budgetPlans budget_plans [not null]
   financialGoals financial_goals [not null]
   goalContributionPlans goal_contribution_plans [not null]
@@ -267,6 +268,7 @@ Table finance_categories {
   entries ledger_entries [not null]
   budgetLines budget_lines [not null]
   budgetAlerts budget_alerts [not null]
+  jarMappings finance_category_jar_mappings [not null]
   spendingSupportRequests spending_support_requests [not null]
 
   indexes {
@@ -286,6 +288,7 @@ Table finance_models {
   updatedAt DateTime [not null]
   family families [not null]
   jars finance_jars [not null]
+  categoryJarMappings finance_category_jar_mappings [not null]
 
   Note: 'Historical finance allocation configuration for a family. Only one model may be active for a family at a time.'
 }
@@ -306,12 +309,34 @@ Table finance_jars {
   ledgerEntries ledger_entries [not null]
   budgetAlerts budget_alerts [not null]
   rewardAllocations reward_allocations [not null]
+  categoryMappings finance_category_jar_mappings [not null]
 
   indexes {
     (financeModelId, jarCode) [unique]
   }
 
   Note: 'Jar/fund allocation belonging to one finance model. Percentages are planning values only and never represent stored real money.'
+}
+
+Table finance_category_jar_mappings {
+  id String [pk]
+  familyId String [not null]
+  financeModelId String [not null]
+  categoryId String [not null]
+  jarId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  financeModel finance_models [not null]
+  category finance_categories [not null]
+  jar finance_jars [not null]
+
+  indexes {
+    (financeModelId, categoryId) [unique]
+  }
+
+  Note: 'Default jar assignment for a category inside one finance model.
+The same category can point to different jars in FIVE_JARS vs EIGHTY_TWENTY.'
 }
 
 Table ledger_entries {
@@ -1810,6 +1835,14 @@ Ref: finance_categories.familyId > families.id [delete: Cascade]
 Ref: finance_models.familyId > families.id [delete: Cascade]
 
 Ref: finance_jars.financeModelId > finance_models.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.familyId > families.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.financeModelId > finance_models.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.categoryId > finance_categories.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.jarId > finance_jars.id [delete: Cascade]
 
 Ref: ledger_entries.ledgerId > finance_ledgers.id [delete: Cascade]
 

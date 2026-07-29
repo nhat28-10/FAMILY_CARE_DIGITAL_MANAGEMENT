@@ -241,6 +241,7 @@ describe('AlbumFaceSuggestionsService', () => {
         get: jest.fn((key: string, fallback: unknown) => {
           const values: Record<string, unknown> = {
             'faceScan.minSimilarity': 0.55,
+            'faceScan.singleCandidateMinSimilarity': 0.75,
             'faceScan.minMargin': 0.08,
             'faceScan.maxAttempts': 3,
             'faceScan.staleMinutes': 10,
@@ -381,6 +382,79 @@ describe('AlbumFaceSuggestionsService', () => {
         data: expect.objectContaining({ status: FaceScanJobStatus.COMPLETED }),
       }),
     );
+  });
+
+  it('uses a stricter threshold for the only active face profile candidate', async () => {
+    const encrypted = crypto.encryptEmbedding([1, 0, 0]);
+    faceAi.detectFaces.mockResolvedValue({
+      faces: [
+        {
+          faceIndex: 0,
+          boundingBox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+          embedding: [1, 0, 0],
+          embeddingDimension: 3,
+          detectionScore: 0.99,
+          qualityScore: 0.9,
+        },
+        {
+          faceIndex: 1,
+          boundingBox: { x: 0.55, y: 0.25, width: 0.2, height: 0.3 },
+          embedding: [0.6, 0.8, 0],
+          embeddingDimension: 3,
+          detectionScore: 0.98,
+          qualityScore: 0.86,
+        },
+      ],
+      modelName: 'mock-face',
+      modelVersion: 'mock-v1',
+    });
+    prisma.faceScanJob.findFirst.mockResolvedValue({
+      ...scanJob(),
+      media: media(),
+    });
+    prisma.memberFaceProfile.findMany.mockResolvedValue([
+      {
+        profileId: 'profile-1',
+        workspaceId: 'family-1',
+        memberId: 'target',
+        status: FaceProfileStatus.ACTIVE,
+        deletedAt: null,
+        member: selectedMember('target'),
+        embeddings: [encrypted, encrypted, encrypted].map((item) => ({
+          ...item,
+          embeddingDimension: 3,
+        })),
+      },
+    ]);
+
+    await service.processJob({
+      version: 1,
+      type: FACE_SCAN_JOB_TYPE,
+      scanJobId: '11111111-1111-4111-8111-111111111111',
+      mediaId: 'media-1',
+      workspaceId: 'family-1',
+      requestedAt: now.toISOString(),
+    });
+
+    expect(prisma.albumFaceDetection.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          faceIndex: 0,
+          status: AlbumFaceDetectionStatus.MATCHED,
+        }),
+      }),
+    );
+    expect(prisma.albumFaceDetection.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          faceIndex: 1,
+          status: AlbumFaceDetectionStatus.UNMATCHED,
+        }),
+      }),
+    );
+    expect(prisma.albumTagSuggestion.create).toHaveBeenCalledTimes(1);
   });
 
   it('stores UNMATCHED when score or margin does not pass', async () => {

@@ -103,6 +103,7 @@ interface FaceMatch {
 export class AlbumFaceSuggestionsService {
   private readonly logger = new Logger(AlbumFaceSuggestionsService.name);
   private readonly minSimilarity: number;
+  private readonly singleCandidateMinSimilarity: number;
   private readonly minMargin: number;
   private readonly maxAttempts: number;
   private readonly staleMinutes: number;
@@ -119,6 +120,10 @@ export class AlbumFaceSuggestionsService {
     config: ConfigService,
   ) {
     this.minSimilarity = config.get<number>('faceScan.minSimilarity', 0.55);
+    this.singleCandidateMinSimilarity = config.get<number>(
+      'faceScan.singleCandidateMinSimilarity',
+      0.75,
+    );
     this.minMargin = config.get<number>('faceScan.minMargin', 0.08);
     this.maxAttempts = Math.max(
       1,
@@ -570,8 +575,12 @@ export class AlbumFaceSuggestionsService {
     if (!top1) return null;
     const top2Score = scores[1]?.score ?? null;
     const margin = top2Score === null ? top1.score : top1.score - top2Score;
+    const requiredSimilarity =
+      scores.length === 1
+        ? Math.max(this.minSimilarity, this.singleCandidateMinSimilarity)
+        : this.minSimilarity;
     if (
-      top1.score < this.minSimilarity ||
+      top1.score < requiredSimilarity ||
       margin < this.minMargin ||
       !this.policy.canMemberAccessMedia(media, top1.member)
     ) {
