@@ -411,6 +411,7 @@ describe('FinanceService budget planning', () => {
   it('allocates a fund across active jars by model percentages', async () => {
     const modelId = 'model-id';
     const memberId = 'member-id';
+    const createdAt = new Date('2026-07-28T00:00:00.000Z');
     tx.financeModel.findFirst.mockResolvedValue({
       id: modelId,
       name: 'Five Jars',
@@ -459,12 +460,17 @@ describe('FinanceService budget planning', () => {
     ]);
     tx.financeLedger.upsert.mockResolvedValue({ id: 'ledger-id' });
     const createLedgerEntryMock = tx.ledgerEntry.create as jest.Mock<
-      Promise<{ id: string; jar: { id: string | null } }>,
+      Promise<{
+        id: string;
+        createdAt: Date;
+        jar: { id: string | null };
+      }>,
       [Prisma.LedgerEntryCreateArgs]
     >;
     createLedgerEntryMock.mockImplementation((args) =>
       Promise.resolve({
         id: `entry-${String(args.data.jarId)}`,
+        createdAt,
         jar: {
           id: typeof args.data.jarId === 'string' ? args.data.jarId : null,
         },
@@ -480,6 +486,9 @@ describe('FinanceService budget planning', () => {
     });
 
     expect(result.totalAmount).toBe(10000000);
+    expect(result.createdAt).toBe(createdAt);
+    expect(result.createdByMemberId).toBe(memberId);
+    expect(result.note).toBe('Chia quy thang 7');
     expect(result.sourceType).toBe('MODEL_FUND_ALLOCATION');
     expect(result.sourceId).toBe(`${modelId}:2026-07`);
     expect(result.items.map((item) => item.amount)).toEqual([
@@ -514,6 +523,53 @@ describe('FinanceService budget planning', () => {
         status: LedgerEntryStatus.ACTIVE,
       }),
     );
+  });
+
+  it('rejects fund allocation when the family already allocated the same period with another model', async () => {
+    const modelId = 'model-b-id';
+    tx.financeModel.findFirst.mockResolvedValue({
+      id: modelId,
+      name: '80/20',
+      modelType: 'EIGHTY_TWENTY',
+      status: FinanceModelStatus.ACTIVE,
+      jars: [
+        {
+          id: 'jar-id',
+          financeModelId: modelId,
+          name: 'Needs',
+          jarCode: 'NEEDS',
+          allocationPercentage: new Prisma.Decimal(100),
+          description: null,
+          isActive: true,
+          createdAt: new Date('2026-07-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-07-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    tx.ledgerEntry.findFirst.mockResolvedValue({ id: 'entry-from-model-a' });
+
+    await expect(
+      service.allocateFundByModel(familyId, 'member-id', {
+        modelId,
+        amount: 10000000,
+        periodMonth: 7,
+        periodYear: 2026,
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'FUND_ALLOCATION_ALREADY_EXISTS',
+      }),
+    });
+    expect(tx.ledgerEntry.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: 'MODEL_FUND_ALLOCATION',
+          sourceId: { endsWith: ':2026-07' },
+        }),
+      }),
+    );
+    expect(tx.financeLedger.upsert).not.toHaveBeenCalled();
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
   });
 
   it('rejects fund allocation when active jar percentages do not total 100', async () => {
@@ -799,6 +855,9 @@ describe('FinanceService budget planning', () => {
       model: { id: modelId, name: 'Five Jars', modelType: 'FIVE_JARS' },
       period: { month: 7, year: 2026 },
       totalAmount: 10000000,
+      createdAt,
+      createdByMemberId: 'member-id',
+      note: 'Chia quỹ tháng 7',
       sourceType: 'MODEL_FUND_ALLOCATION',
       sourceId: `${modelId}:2026-07`,
     });
@@ -827,6 +886,154 @@ describe('FinanceService budget planning', () => {
         }),
       }),
     );
+  });
+
+  it('sorts fund allocation history by allocation createdAt descending', async () => {
+    const olderCreatedAt = new Date('2026-07-01T00:00:00.000Z');
+    const newerCreatedAt = new Date('2026-07-28T00:00:00.000Z');
+    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
+      {
+        id: 'old-entry',
+        ledgerId: 'ledger-id',
+        categoryId: null,
+        jarId: 'old-jar',
+        createdByMemberId: 'member-id',
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(1000000),
+        description: 'Old allocation',
+        note: null,
+        entryDate: new Date('2026-07-31T00:00:00.000Z'),
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: 'MODEL_FUND_ALLOCATION',
+        sourceId: 'old-model:2026-07',
+        metadata: null,
+        createdAt: olderCreatedAt,
+        updatedAt: olderCreatedAt,
+        jar: {
+          id: 'old-jar',
+          financeModelId: 'old-model',
+          name: 'Old Jar',
+          jarCode: 'OLD',
+          allocationPercentage: new Prisma.Decimal(100),
+          description: null,
+          isActive: true,
+          createdAt: olderCreatedAt,
+          updatedAt: olderCreatedAt,
+          financeModel: {
+            id: 'old-model',
+            name: 'Old Model',
+            modelType: 'FIVE_JARS',
+          },
+        },
+      },
+      {
+        id: 'new-entry',
+        ledgerId: 'ledger-id',
+        categoryId: null,
+        jarId: 'new-jar',
+        createdByMemberId: 'member-id',
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(2000000),
+        description: 'New allocation',
+        note: 'Latest',
+        entryDate: new Date('2026-08-31T00:00:00.000Z'),
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: 'MODEL_FUND_ALLOCATION',
+        sourceId: 'new-model:2026-08',
+        metadata: null,
+        createdAt: newerCreatedAt,
+        updatedAt: newerCreatedAt,
+        jar: {
+          id: 'new-jar',
+          financeModelId: 'new-model',
+          name: 'New Jar',
+          jarCode: 'NEW',
+          allocationPercentage: new Prisma.Decimal(100),
+          description: null,
+          isActive: true,
+          createdAt: newerCreatedAt,
+          updatedAt: newerCreatedAt,
+          financeModel: {
+            id: 'new-model',
+            name: 'New Model',
+            modelType: 'EIGHTY_TWENTY',
+          },
+        },
+      },
+    ]);
+
+    const result = await service.listFundAllocations(familyId, {
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.items.map((item) => item.sourceId)).toEqual([
+      'new-model:2026-08',
+      'old-model:2026-07',
+    ]);
+    expect(result.items[0]).toMatchObject({
+      createdAt: newerCreatedAt,
+      createdByMemberId: 'member-id',
+      note: 'Latest',
+    });
+  });
+
+  it('keeps legacy fund allocation history when snapshot and jar data are missing', async () => {
+    const createdAt = new Date('2026-10-05T00:00:00.000Z');
+    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
+      {
+        id: 'legacy-entry',
+        ledgerId: 'ledger-id',
+        categoryId: null,
+        jarId: null,
+        createdByMemberId: 'member-id',
+        entryType: LedgerEntryType.ADJUSTMENT,
+        amount: new Prisma.Decimal(1234567),
+        description: 'Legacy allocation',
+        note: null,
+        entryDate: new Date('2026-10-31T00:00:00.000Z'),
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: 'MODEL_FUND_ALLOCATION',
+        sourceId: 'legacy-model:2026-10',
+        metadata: null,
+        createdAt,
+        updatedAt: createdAt,
+        jar: null,
+      },
+    ]);
+
+    const result = await service.listFundAllocations(familyId, {
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      model: { id: 'legacy-model', name: null, modelType: null },
+      period: { month: 10, year: 2026 },
+      totalAmount: 1234567,
+      createdAt,
+      createdByMemberId: 'member-id',
+      note: null,
+      sourceType: 'MODEL_FUND_ALLOCATION',
+      sourceId: 'legacy-model:2026-10',
+      items: [
+        {
+          jarId: null,
+          jarName: null,
+          jarCode: null,
+          allocationPercentage: null,
+          amount: 1234567,
+          ledgerEntryId: 'legacy-entry',
+        },
+      ],
+      entries: [
+        expect.objectContaining({
+          id: 'legacy-entry',
+          jar: null,
+        }),
+      ],
+    });
   });
 
   it('rejects fund allocation history period filters without both month and year', async () => {
