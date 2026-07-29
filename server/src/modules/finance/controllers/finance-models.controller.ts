@@ -213,11 +213,11 @@ export class FinanceModelsController {
   @ApiResponse({
     status: 409,
     description:
-      'Đã có lần chia quỹ ACTIVE cho cùng familyId + modelId + periodMonth + periodYear. Do mỗi gia đình chỉ có một mô hình ACTIVE tại một thời điểm, thông thường một kỳ chỉ chia theo model đang ACTIVE; nếu sau đó đổi ACTIVE sang mô hình khác, khóa chống trùng vẫn tách theo modelId.',
+      'Da co lan chia quy ACTIVE cho cung familyId + periodMonth + periodYear, bat ke modelId. Doi ACTIVE sang model khac khong thay doi lich su chia quy cu.',
     type: FundAllocationConflictResponseDto,
     example: {
       success: false,
-      message: 'Kỳ này đã có lần chia quỹ theo mô hình tài chính này',
+      message: 'Ky nay da co lan chia quy',
       statusCode: 409,
       code: 'FUND_ALLOCATION_ALREADY_EXISTS',
     },

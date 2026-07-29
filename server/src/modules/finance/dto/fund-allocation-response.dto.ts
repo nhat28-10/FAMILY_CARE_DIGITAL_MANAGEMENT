@@ -9,14 +9,22 @@ class FundAllocationModelResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ example: 'Five Jars' })
-  name!: string;
+  @ApiProperty({
+    example: 'Five Jars',
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows that cannot reconstruct the original model name.',
+  })
+  name!: string | null;
 
   @ApiProperty({
     enum: FinanceModelType,
     example: FinanceModelType.FIVE_JARS,
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows that cannot reconstruct the original model type.',
   })
-  modelType!: FinanceModelType;
+  modelType!: FinanceModelType | null;
 }
 
 class FundAllocationPeriodResponseDto {
@@ -28,17 +36,37 @@ class FundAllocationPeriodResponseDto {
 }
 
 class FundAllocationItemResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  jarId!: string;
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows where the original jar reference was removed.',
+  })
+  jarId!: string | null;
 
-  @ApiProperty({ example: 'Necessities' })
-  jarName!: string;
+  @ApiProperty({
+    example: 'Necessities',
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows without snapshot or current jar data.',
+  })
+  jarName!: string | null;
 
-  @ApiProperty({ example: 'NECESSITIES' })
-  jarCode!: string;
+  @ApiProperty({
+    example: 'NECESSITIES',
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows without snapshot or current jar data.',
+  })
+  jarCode!: string | null;
 
-  @ApiProperty({ example: 50, description: 'Percent of totalAmount' })
-  allocationPercentage!: number;
+  @ApiProperty({
+    example: 50,
+    nullable: true,
+    description:
+      'Percent of totalAmount. Nullable only for legacy history rows without snapshot or current jar data.',
+  })
+  allocationPercentage!: number | null;
 
   @ApiProperty({
     example: 5000000,
@@ -103,8 +131,8 @@ class FundAllocationLedgerEntryResponseDto {
   @ApiProperty({ format: 'uuid', nullable: true })
   categoryId!: string | null;
 
-  @ApiProperty({ format: 'uuid' })
-  jarId!: string;
+  @ApiProperty({ format: 'uuid', nullable: true })
+  jarId!: string | null;
 
   @ApiProperty({ format: 'uuid' })
   createdByMemberId!: string;
@@ -164,8 +192,13 @@ class FundAllocationLedgerEntryResponseDto {
   })
   updatedAt!: string;
 
-  @ApiProperty({ type: () => FundAllocationEntryJarResponseDto })
-  jar!: FundAllocationEntryJarResponseDto;
+  @ApiProperty({
+    type: () => FundAllocationEntryJarResponseDto,
+    nullable: true,
+    description:
+      'Nullable only for legacy history rows where jar data cannot be reconstructed.',
+  })
+  jar!: FundAllocationEntryJarResponseDto | null;
 }
 
 export class FundAllocationDataResponseDto {
@@ -181,6 +214,23 @@ export class FundAllocationDataResponseDto {
       'VND dùng để phân loại vào các hũ. Đây là số tiền hiện có/được người dùng chọn để phân bổ, không làm tăng tổng số dư gia đình.',
   })
   totalAmount!: number;
+
+  @ApiProperty({
+    example: '2026-07-28T00:00:00.000Z',
+    format: 'date-time',
+    description:
+      'Timestamp of the allocation group, derived from its ledger entries. FE can use this to sort or display history.',
+  })
+  createdAt!: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Family member who created this fund allocation.',
+  })
+  createdByMemberId!: string;
+
+  @ApiProperty({ example: 'Chia quỹ tháng 7', nullable: true })
+  note!: string | null;
 
   @ApiProperty({ example: 'MODEL_FUND_ALLOCATION' })
   sourceType!: string;
@@ -294,7 +344,7 @@ export class FundAllocationConflictResponseDto {
   success!: false;
 
   @ApiProperty({
-    example: 'Kỳ này đã có lần chia quỹ theo mô hình tài chính này',
+    example: 'Ky nay da co lan chia quy',
   })
   message!: string;
 
@@ -318,6 +368,9 @@ export const FUND_ALLOCATION_RESPONSE_EXAMPLE = {
     },
     period: { month: 7, year: 2026 },
     totalAmount: 10000000,
+    createdAt: '2026-07-28T00:00:00.000Z',
+    createdByMemberId: 'b6bd9e92-2332-4c15-b0cf-40e846922a65',
+    note: 'Chia quy thang 7',
     sourceType: 'MODEL_FUND_ALLOCATION',
     sourceId: '8ae51f17-14f9-4adc-936b-4f55392cd64e:2026-07',
     items: [

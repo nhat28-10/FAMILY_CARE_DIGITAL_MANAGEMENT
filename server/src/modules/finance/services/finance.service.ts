@@ -69,8 +69,8 @@ type MonthlyGoalContributionSummaryItem = {
 
 type FundAllocationModelSummary = {
   id: string;
-  name: string;
-  modelType: FinanceModelType;
+  name: string | null;
+  modelType: FinanceModelType | null;
 };
 
 type FundAllocationEntryRow = {
@@ -581,14 +581,16 @@ export class FinanceService {
           where: {
             ledger: { familyId },
             sourceType: MODEL_FUND_ALLOCATION_SOURCE,
-            sourceId,
+            sourceId: {
+              endsWith: `:${this.periodKey(dto.periodMonth, dto.periodYear)}`,
+            },
             status: LedgerEntryStatus.ACTIVE,
           },
           select: { id: true },
         });
         if (existingAllocation) {
           throw new ConflictException({
-            message: 'Kỳ này đã có lần chia quỹ theo mô hình tài chính này',
+            message: 'Ky nay da co lan chia quy',
             code: FUND_ALLOCATION_ERROR_CODES.ALREADY_EXISTS,
           });
         }
@@ -702,6 +704,9 @@ export class FinanceService {
           },
           period: { month: dto.periodMonth, year: dto.periodYear },
           totalAmount: this.decimalToNumber(totalAmount),
+          createdAt: entries[0]?.createdAt ?? new Date(),
+          createdByMemberId: memberId,
+          note: dto.note?.trim() ?? null,
           sourceType: MODEL_FUND_ALLOCATION_SOURCE,
           sourceId,
           items,
@@ -767,7 +772,10 @@ export class FinanceService {
       .map(([sourceId, group]) =>
         this.buildFundAllocationHistoryItem(sourceId, group),
       )
-      .filter((item): item is NonNullable<typeof item> => item !== null);
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+      );
 
     return buildPaginated(
       allocations.slice(
@@ -1669,29 +1677,38 @@ export class FinanceService {
     entries: FundAllocationEntryRow[],
   ) {
     const parsed = this.parseFundAllocationSourceId(sourceId);
-    const entriesWithData = entries.filter(
-      (entry) => this.readFundAllocationSnapshot(entry) || entry.jar,
-    );
-    const firstSnapshot = entriesWithData
+    if (!parsed || entries.length === 0) return null;
+
+    const firstSnapshot = entries
       .map((entry) => this.readFundAllocationSnapshot(entry))
       .find((snapshot): snapshot is FundAllocationSnapshot =>
         Boolean(snapshot),
       );
     const model =
       firstSnapshot?.model ??
-      entriesWithData.find((entry) => entry.jar?.financeModel)?.jar
-        ?.financeModel;
-    if (!parsed || !model || entriesWithData.length === 0) return null;
+      entries.find((entry) => entry.jar?.financeModel)?.jar?.financeModel ?? {
+        id: parsed.modelId,
+        name: null,
+        modelType: null,
+      };
 
-    const sortedEntries = [...entriesWithData].sort((left, right) => {
+    const createdAt = entries.reduce(
+      (latest, entry) =>
+        entry.createdAt.getTime() > latest.getTime() ? entry.createdAt : latest,
+      entries[0].createdAt,
+    );
+    const newestEntry = [...entries].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    )[0];
+    const sortedEntries = [...entries].sort((left, right) => {
       const leftSnapshot = this.readFundAllocationSnapshot(left);
       const rightSnapshot = this.readFundAllocationSnapshot(right);
       const leftJarCreatedAt = leftSnapshot
         ? new Date(leftSnapshot.jar.createdAt).getTime()
-        : (left.jar?.createdAt.getTime() ?? 0);
+        : (left.jar?.createdAt.getTime() ?? left.createdAt.getTime());
       const rightJarCreatedAt = rightSnapshot
         ? new Date(rightSnapshot.jar.createdAt).getTime()
-        : (right.jar?.createdAt.getTime() ?? 0);
+        : (right.jar?.createdAt.getTime() ?? right.createdAt.getTime());
       return leftJarCreatedAt - rightJarCreatedAt;
     });
     const totalAmount = sortedEntries.reduce(
@@ -1713,20 +1730,24 @@ export class FinanceService {
       },
       period: parsed.period,
       totalAmount: this.decimalToNumber(totalAmount),
+      createdAt,
+      createdByMemberId: newestEntry.createdByMemberId,
+      note: newestEntry.note,
       sourceType: MODEL_FUND_ALLOCATION_SOURCE,
       sourceId,
       items: sortedEntries.flatMap((entry) => {
         const snapshot = this.readFundAllocationSnapshot(entry);
         const jar = snapshot?.jar ?? entry.jar;
-        if (!jar) return [];
         return [
           {
-            jarId: jar.id,
-            jarName: jar.name,
-            jarCode: jar.jarCode,
+            jarId: jar?.id ?? entry.jarId,
+            jarName: jar?.name ?? null,
+            jarCode: jar?.jarCode ?? null,
             allocationPercentage: snapshot
               ? snapshot.jar.allocationPercentage
-              : this.decimalToNumber(entry.jar!.allocationPercentage),
+              : entry.jar
+                ? this.decimalToNumber(entry.jar.allocationPercentage)
+                : null,
             amount: snapshot
               ? snapshot.amount
               : this.decimalToNumber(entry.amount),
@@ -1741,7 +1762,6 @@ export class FinanceService {
   private mapFundAllocationLedgerEntry(entry: FundAllocationEntryRow) {
     const snapshot = this.readFundAllocationSnapshot(entry);
     const jar = snapshot?.jar ?? entry.jar;
-    if (!jar) return null;
 
     return {
       id: entry.id,
@@ -1759,19 +1779,25 @@ export class FinanceService {
       sourceId: entry.sourceId,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
-      jar: {
-        id: jar.id,
-        financeModelId: jar.financeModelId,
-        name: jar.name,
-        jarCode: jar.jarCode,
-        allocationPercentage: snapshot
-          ? snapshot.jar.allocationPercentage
-          : this.decimalToNumber(entry.jar!.allocationPercentage),
-        description: jar.description,
-        isActive: jar.isActive,
-        createdAt: snapshot ? new Date(snapshot.jar.createdAt) : jar.createdAt,
-        updatedAt: snapshot ? new Date(snapshot.jar.updatedAt) : jar.updatedAt,
-      },
+      jar: jar
+        ? {
+            id: jar.id,
+            financeModelId: jar.financeModelId,
+            name: jar.name,
+            jarCode: jar.jarCode,
+            allocationPercentage: snapshot
+              ? snapshot.jar.allocationPercentage
+              : this.decimalToNumber(entry.jar!.allocationPercentage),
+            description: jar.description,
+            isActive: jar.isActive,
+            createdAt: snapshot
+              ? new Date(snapshot.jar.createdAt)
+              : jar.createdAt,
+            updatedAt: snapshot
+              ? new Date(snapshot.jar.updatedAt)
+              : jar.updatedAt,
+          }
+        : null,
     };
   }
 
