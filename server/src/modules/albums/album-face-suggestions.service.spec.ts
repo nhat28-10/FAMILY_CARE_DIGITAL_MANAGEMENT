@@ -127,6 +127,7 @@ function suggestion(overrides: Record<string, unknown> = {}) {
     suggestedMember: selectedMember('target'),
     detection: {
       detectionId: '33333333-3333-4333-8333-333333333333',
+      faceIndex: 0,
       boundingBox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
     },
     ...overrides,
@@ -146,6 +147,7 @@ describe('AlbumFaceSuggestionsService', () => {
     albumFaceDetection: {
       count: jest.Mock;
       create: jest.Mock;
+      findMany: jest.Mock;
       updateMany: jest.Mock;
     };
     albumTagSuggestion: {
@@ -180,6 +182,7 @@ describe('AlbumFaceSuggestionsService', () => {
         create: jest.fn().mockResolvedValue({
           detectionId: '33333333-3333-4333-8333-333333333333',
         }),
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       albumTagSuggestion: {
@@ -245,6 +248,9 @@ describe('AlbumFaceSuggestionsService', () => {
             'faceScan.minMargin': 0.08,
             'faceScan.maxAttempts': 3,
             'faceScan.staleMinutes': 10,
+            'faceScan.retryDelaySeconds': 60,
+            'faceScan.forceRescanLimit': 2,
+            'faceScan.forceRescanCooldownSeconds': 600,
           };
           return values[key] ?? fallback;
         }),
@@ -328,7 +334,168 @@ describe('AlbumFaceSuggestionsService', () => {
       service.requestScan('family-1', 'media-1', member('uploader'), {
         force: true,
       }),
-    ).rejects.toMatchObject({ status: 429 });
+    ).rejects.toMatchObject({
+      status: 429,
+      response: {
+        code: 'FACE_SCAN_FORCE_RESCAN_RATE_LIMITED',
+        errorCode: 'FACE_SCAN_FORCE_RESCAN_RATE_LIMITED',
+        retryAfterSeconds: expect.any(Number),
+        cooldownSeconds: 600,
+        errors: { limit: 2, windowSeconds: 600 },
+      },
+    });
+  });
+
+  it('returns face scan status metadata for FE polling and retry rules', async () => {
+    const startedAt = new Date();
+    prisma.albumMedia.findFirst.mockResolvedValue(media());
+    prisma.faceScanJob.findFirst.mockResolvedValue(
+      scanJob({ status: FaceScanJobStatus.PROCESSING, startedAt }),
+    );
+    prisma.albumFaceDetection.count.mockResolvedValue(1);
+    prisma.albumTagSuggestion.count.mockResolvedValue(1);
+
+    const result = await service.getScanStatus(
+      'family-1',
+      'media-1',
+      member('requester'),
+    );
+
+    expect(result).toMatchObject({
+      scanJobId: '11111111-1111-4111-8111-111111111111',
+      status: FaceScanJobStatus.PROCESSING,
+      statuses: [
+        FaceScanJobStatus.PENDING,
+        FaceScanJobStatus.PROCESSING,
+        FaceScanJobStatus.COMPLETED,
+        FaceScanJobStatus.FAILED,
+      ],
+      detectedFaceCount: 1,
+      suggestionCount: 1,
+      maxProcessingSeconds: 600,
+      retryDelaySeconds: 60,
+      forceRescanLimit: 2,
+      forceRescanCooldownSeconds: 600,
+      retryAllowed: false,
+      retryEndpoint: '/families/family-1/albums/media/media-1/face-scan/retry',
+    });
+    expect(result.staleAt).toEqual(new Date(startedAt.getTime() + 600_000));
+  });
+
+  it('re-enqueues stale active face scan jobs through retry endpoint', async () => {
+    const staleStartedAt = new Date(Date.now() - 11 * 60 * 1000);
+    const staleJob = scanJob({
+      status: FaceScanJobStatus.PROCESSING,
+      startedAt: staleStartedAt,
+    });
+    prisma.albumMedia.findFirst.mockResolvedValue(media());
+    prisma.faceScanJob.findFirst.mockResolvedValue(staleJob);
+    prisma.faceScanJob.update.mockResolvedValue(
+      scanJob({ status: FaceScanJobStatus.PENDING }),
+    );
+
+    const result = await service.retryScan(
+      'family-1',
+      'media-1',
+      member('uploader'),
+    );
+
+    expect(result.status).toBe(FaceScanJobStatus.PENDING);
+    expect(prisma.faceScanJob.update).toHaveBeenCalledWith({
+      where: { scanJobId: staleJob.scanJobId },
+      data: expect.objectContaining({
+        status: FaceScanJobStatus.PENDING,
+        startedAt: null,
+        completedAt: null,
+        lastError: null,
+      }),
+    });
+    expect(queue.pushFaceScanJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: FACE_SCAN_JOB_TYPE,
+        scanJobId: staleJob.scanJobId,
+        mediaId: 'media-1',
+        workspaceId: 'family-1',
+      }),
+    );
+  });
+
+  it('lists detected faces with candidates while keeping flat suggestion items', async () => {
+    const pendingSuggestion = suggestion();
+    prisma.albumMedia.findFirst.mockResolvedValue(media());
+    prisma.albumTagSuggestion.findMany.mockResolvedValue([pendingSuggestion]);
+    prisma.albumFaceDetection.findMany.mockResolvedValue([
+      {
+        detectionId: '33333333-3333-4333-8333-333333333333',
+        workspaceId: 'family-1',
+        scanJobId: '11111111-1111-4111-8111-111111111111',
+        mediaId: 'media-1',
+        faceIndex: 0,
+        boundingBox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+        detectionScore: { toNumber: () => 0.99 },
+        qualityScore: { toNumber: () => 0.95 },
+        modelName: 'mock-face',
+        modelVersion: 'mock-v1',
+        status: AlbumFaceDetectionStatus.MATCHED,
+        createdAt: now,
+        suggestions: [pendingSuggestion],
+      },
+      {
+        detectionId: '44444444-4444-4444-8444-444444444444',
+        workspaceId: 'family-1',
+        scanJobId: '11111111-1111-4111-8111-111111111111',
+        mediaId: 'media-1',
+        faceIndex: 1,
+        boundingBox: { x: 0.55, y: 0.2, width: 0.2, height: 0.3 },
+        detectionScore: { toNumber: () => 0.98 },
+        qualityScore: null,
+        modelName: 'mock-face',
+        modelVersion: 'mock-v1',
+        status: AlbumFaceDetectionStatus.UNMATCHED,
+        createdAt: now,
+        suggestions: [],
+      },
+    ]);
+
+    const result = await service.listSuggestions(
+      'family-1',
+      'media-1',
+      member('requester'),
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        suggestionId: pendingSuggestion.suggestionId,
+        faceId: pendingSuggestion.detectionId,
+        faceIndex: 0,
+        similarityScore: 0.96,
+      }),
+    );
+    expect(result.faces).toHaveLength(2);
+    expect(result.faces[0]).toEqual(
+      expect.objectContaining({
+        faceId: '33333333-3333-4333-8333-333333333333',
+        faceIndex: 0,
+        status: AlbumFaceDetectionStatus.MATCHED,
+        candidates: [
+          expect.objectContaining({
+            suggestionId: pendingSuggestion.suggestionId,
+            memberId: 'target',
+            score: 0.96,
+            status: AlbumTagSuggestionStatus.PENDING,
+          }),
+        ],
+      }),
+    );
+    expect(result.faces[1]).toEqual(
+      expect.objectContaining({
+        faceId: '44444444-4444-4444-8444-444444444444',
+        faceIndex: 1,
+        status: AlbumFaceDetectionStatus.UNMATCHED,
+        candidates: [],
+      }),
+    );
   });
 
   it('processes a queue job, matches only ACTIVE same-workspace profiles, and creates a suggestion', async () => {

@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import type { FamilyMember } from '@prisma/client';
@@ -24,7 +25,11 @@ import { CurrentFamilyMember } from '../family-members/decorators/current-family
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { albumMemberTracker } from './album-throttle';
 import { AlbumFaceSuggestionsService } from './album-face-suggestions.service';
-import { RequestFaceScanDto } from './dto/album-face-suggestions.dto';
+import {
+  FACE_SUGGESTIONS_RESPONSE_EXAMPLE,
+  FaceSuggestionsApiResponseDto,
+  RequestFaceScanDto,
+} from './dto/album-face-suggestions.dto';
 
 @ApiTags('Album Face Suggestions')
 @ApiBearerAuth()
@@ -41,6 +46,11 @@ export class AlbumFaceSuggestionsController {
     default: { limit: 5, ttl: 600_000, getTracker: albumMemberTracker },
   })
   @ApiOperation({ summary: 'Yêu cầu quét khuôn mặt trong ảnh album' })
+  @ApiResponse({
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    description:
+      'Force rescan rate limit. Body includes errorCode/code=FACE_SCAN_FORCE_RESCAN_RATE_LIMITED, retryAfterSeconds, cooldownSeconds; header Retry-After mirrors retryAfterSeconds.',
+  })
   @ResponseMessage('Đã tạo hoặc trả về face scan job hiện có')
   requestScan(
     @Param('familyId') familyId: string,
@@ -49,6 +59,25 @@ export class AlbumFaceSuggestionsController {
     @Body() dto: RequestFaceScanDto = {},
   ) {
     return this.faceSuggestions.requestScan(familyId, mediaId, member, dto);
+  }
+
+  @Post('face-scan/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({
+    default: { limit: 5, ttl: 600_000, getTracker: albumMemberTracker },
+  })
+  @ApiOperation({
+    summary: 'Retry face scan job đã FAILED hoặc bị kẹt quá timeout',
+    description:
+      'Dùng khi GET face-scan trả retryAllowed=true. Job PROCESSING/PENDING chỉ được retry sau maxProcessingSeconds.',
+  })
+  @ResponseMessage('Đã retry face scan job')
+  retryScan(
+    @Param('familyId') familyId: string,
+    @Param('mediaId', ParseUUIDPipe) mediaId: string,
+    @CurrentFamilyMember() member: FamilyMember,
+  ) {
+    return this.faceSuggestions.retryScan(familyId, mediaId, member);
   }
 
   @Get('face-scan')
@@ -64,6 +93,18 @@ export class AlbumFaceSuggestionsController {
 
   @Get('face-suggestions')
   @ApiOperation({ summary: 'Danh sách đề xuất tag từ face scan' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'Envelope chuan. data.faces la contract chinh cho anh nhieu khuon mat: moi face co candidates[] rieng; candidates=[] nghia la detected nhung khong match. BE chi tao suggestion, user confirm moi tao tag chinh thuc. data.items la flat list cu de tuong thich.',
+    type: FaceSuggestionsApiResponseDto,
+    examples: {
+      multiFace: {
+        summary: 'Multi-face suggestion response',
+        value: FACE_SUGGESTIONS_RESPONSE_EXAMPLE,
+      },
+    },
+  })
   @ResponseMessage('Lấy danh sách đề xuất tag thành công')
   listSuggestions(
     @Param('familyId') familyId: string,

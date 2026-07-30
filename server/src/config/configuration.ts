@@ -203,6 +203,18 @@ export default () => ({
     minMargin: parseFloat(process.env.FACE_MATCH_MIN_MARGIN || '0.08'),
     maxAttempts: parseInt(process.env.FACE_SCAN_MAX_ATTEMPTS || '3', 10),
     staleMinutes: parseInt(process.env.FACE_SCAN_STALE_MINUTES || '10', 10),
+    retryDelaySeconds: parseInt(
+      process.env.FACE_SCAN_RETRY_DELAY_SECONDS || '60',
+      10,
+    ),
+    forceRescanLimit: parseInt(
+      process.env.FACE_SCAN_FORCE_RESCAN_LIMIT || '2',
+      10,
+    ),
+    forceRescanCooldownSeconds: parseInt(
+      process.env.FACE_SCAN_FORCE_RESCAN_COOLDOWN_SECONDS || '600',
+      10,
+    ),
     consumerEnabled: process.env.FACE_SCAN_CONSUMER_ENABLED === 'true',
   },
 });

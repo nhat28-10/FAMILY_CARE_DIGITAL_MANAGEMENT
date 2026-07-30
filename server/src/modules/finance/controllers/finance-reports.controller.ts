@@ -25,6 +25,8 @@ import {
   FinanceBadRequestResponseDto,
   FinanceForbiddenResponseDto,
   FinanceSummaryApiResponseDto,
+  JAR_TARGET_ACTUAL_RESPONSE_EXAMPLE,
+  JarTargetActualApiResponseDto,
   MEMBER_CONTRIBUTION_SUMMARY_RESPONSE_EXAMPLE,
   MemberContributionSummaryApiResponseDto,
 } from '../dto/finance-summary-response.dto';
@@ -172,7 +174,17 @@ export class FinanceReportsController {
     description:
       'ID mô hình tài chính cần phân tích; bỏ trống để dùng ACTIVE model.',
   })
-  @ApiResponse({ status: 200, description: 'Báo cáo target-vs-actual theo hũ' })
+  @ApiOkResponse({
+    description:
+      'Envelope chuan. Report chi tinh ledger entries ACTIVE, cash-out types EXPENSE/SUPPORT/ALLOWANCE/REWARD, entryDate >= periodStart va < nextUtcDay(periodEnd). targetAmount = trackedAmount * targetPercentage / 100; actualPercentage = actualAmount / trackedAmount * 100. Giao dich mang jarId cua model cu/khac selected model duoc tinh vao unmapped.legacyJarAmount va khong cong vao jar moi.',
+    type: JarTargetActualApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Jar target vs actual report',
+        value: JAR_TARGET_ACTUAL_RESPONSE_EXAMPLE,
+      },
+    },
+  })
   getJarTargetActualReport(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,

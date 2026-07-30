@@ -513,19 +513,19 @@ describe('FinanceService budget planning', () => {
       {
         jarId: 'spending-jar',
         categoryId: 'food-category',
-        amount: new Prisma.Decimal(90),
+        amount: new Prisma.Decimal(110),
         category: { name: 'Food' },
       },
       {
         jarId: 'savings-jar',
         categoryId: 'saving-category',
-        amount: new Prisma.Decimal(10),
+        amount: new Prisma.Decimal(0),
         category: { name: 'Saving' },
       },
       {
         jarId: null,
         categoryId: null,
-        amount: new Prisma.Decimal(15),
+        amount: new Prisma.Decimal(10),
         category: null,
       },
     ]);
@@ -539,12 +539,41 @@ describe('FinanceService budget planning', () => {
       },
     );
 
-    expect(report.totals.mappedAmount.toString()).toBe('100');
-    expect(report.totals.unmappedAmount.toString()).toBe('15');
-    expect(report.items[0].actualPercentage.toString()).toBe('90');
-    expect(report.items[0].variancePercentage.toString()).toBe('10');
+    expect(report.totals.trackedAmount.toString()).toBe('120');
+    expect(report.totals.mappedAmount.toString()).toBe('110');
+    expect(report.totals.unmappedAmount.toString()).toBe('10');
+    expect(report.items[0].targetAmount.toString()).toBe('96');
+    expect(report.items[0].actualAmount.toString()).toBe('110');
+    expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(91.666, 2);
+    expect(report.items[0].variancePercentage.toNumber()).toBeCloseTo(
+      11.666,
+      2,
+    );
     expect(report.items[0].status).toBe('OVER_TARGET');
     expect(report.items[1].status).toBe('UNDER_TARGET');
+    expect(report.unmapped.percentage.toNumber()).toBeCloseTo(8.333, 2);
+    const jarReportQuery = (
+      prisma.ledgerEntry as {
+        findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
+      }
+    ).findMany.mock.calls[0][0];
+    expect(jarReportQuery.where?.sourceType).toBeUndefined();
+    expect(
+      (prisma.ledgerEntry as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          entryType: {
+            in: [
+              LedgerEntryType.EXPENSE,
+              LedgerEntryType.SUPPORT,
+              LedgerEntryType.ALLOWANCE,
+              LedgerEntryType.REWARD,
+            ],
+          },
+        }),
+      }),
+    );
   });
 
   it('allocates a fund across active jars by model percentages', async () => {
