@@ -14,8 +14,11 @@ export interface ApiErrorResponse {
   message: string;
   statusCode: number;
   code?: string;
+  errorCode?: string;
   feature?: string;
   errors?: unknown;
+  retryAfterSeconds?: number;
+  cooldownSeconds?: number;
 }
 
 /**
@@ -36,8 +39,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Lỗi hệ thống';
     let code: string | undefined;
+    let errorCode: string | undefined;
     let feature: string | undefined;
     let errors: unknown;
+    let retryAfterSeconds: number | undefined;
+    let cooldownSeconds: number | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -57,8 +63,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
 
         if (typeof body.code === 'string') code = body.code;
+        if (typeof body.errorCode === 'string') errorCode = body.errorCode;
         if (typeof body.feature === 'string') feature = body.feature;
         if ('errors' in body) errors = body.errors;
+        if (typeof body.retryAfterSeconds === 'number') {
+          retryAfterSeconds = body.retryAfterSeconds;
+        }
+        if (typeof body.cooldownSeconds === 'number') {
+          cooldownSeconds = body.cooldownSeconds;
+        }
       }
     } else if (exception instanceof Error) {
       // Unexpected error: log the stack but never leak internals to clients.
@@ -69,13 +82,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Bạn thao tác quá nhanh, vui lòng thử lại sau';
     }
 
+    if (exception instanceof ThrottlerException) {
+      code = code ?? 'RATE_LIMITED';
+      errorCode = errorCode ?? code;
+    }
+    if (!code && errorCode) code = errorCode;
+    if (!errorCode && code) errorCode = code;
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(retryAfterSeconds));
+    }
+
     const body: ApiErrorResponse = {
       success: false,
       message,
       statusCode,
       ...(code ? { code } : {}),
+      ...(errorCode ? { errorCode } : {}),
       ...(feature ? { feature } : {}),
       ...(errors !== undefined ? { errors } : {}),
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      ...(cooldownSeconds !== undefined ? { cooldownSeconds } : {}),
     };
     response.status(statusCode).json(body);
   }

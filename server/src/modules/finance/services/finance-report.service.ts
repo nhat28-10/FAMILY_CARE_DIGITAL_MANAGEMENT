@@ -495,7 +495,6 @@ export class FinanceReportService {
         status: LedgerEntryStatus.ACTIVE,
         entryType: { in: this.jarTargetActualTypes() },
         entryDate: { gte: context.start, lt: this.nextUtcDay(context.end) },
-        sourceType: { not: MODEL_FUND_ALLOCATION_SOURCE },
       },
       include: { category: true, jar: true },
     });
@@ -517,6 +516,8 @@ export class FinanceReportService {
     let mappedAmount = zero;
     let unmappedAmount = zero;
     let unmappedEntryCount = 0;
+    let legacyJarAmount = zero;
+    let legacyJarEntryCount = 0;
 
     for (const entry of entries) {
       if (entry.jarId && jarIds.has(entry.jarId)) {
@@ -548,6 +549,10 @@ export class FinanceReportService {
       } else {
         unmappedAmount = unmappedAmount.plus(entry.amount);
         unmappedEntryCount += 1;
+        if (entry.jarId) {
+          legacyJarAmount = legacyJarAmount.plus(entry.amount);
+          legacyJarEntryCount += 1;
+        }
       }
     }
 
@@ -555,10 +560,10 @@ export class FinanceReportService {
     const items = model.jars.map((jar) => {
       const actualAmount = totalsByJar.get(jar.id) ?? zero;
       const targetPercentage = jar.allocationPercentage;
-      const actualPercentage = mappedAmount.equals(0)
+      const actualPercentage = trackedAmount.equals(0)
         ? zero
-        : actualAmount.dividedBy(mappedAmount).times(100);
-      const targetAmount = mappedAmount.times(targetPercentage).dividedBy(100);
+        : actualAmount.dividedBy(trackedAmount).times(100);
+      const targetAmount = trackedAmount.times(targetPercentage).dividedBy(100);
       const varianceAmount = actualAmount.minus(targetAmount);
       const variancePercentage = actualPercentage.minus(targetPercentage);
       const absVariancePercentage = variancePercentage.abs();
@@ -602,7 +607,15 @@ export class FinanceReportService {
       },
       totals: { trackedAmount, mappedAmount, unmappedAmount },
       items,
-      unmapped: { amount: unmappedAmount, entryCount: unmappedEntryCount },
+      unmapped: {
+        amount: unmappedAmount,
+        percentage: trackedAmount.equals(0)
+          ? zero
+          : unmappedAmount.dividedBy(trackedAmount).times(100),
+        entryCount: unmappedEntryCount,
+        legacyJarAmount,
+        legacyJarEntryCount,
+      },
     };
   }
 
@@ -806,7 +819,7 @@ export class FinanceReportService {
   }
 
   private jarTargetActualTypes(): LedgerEntryType[] {
-    return [...this.cashOutTypes(), LedgerEntryType.CONTRIBUTION];
+    return this.cashOutTypes();
   }
 
   private monthKey(date: Date) {

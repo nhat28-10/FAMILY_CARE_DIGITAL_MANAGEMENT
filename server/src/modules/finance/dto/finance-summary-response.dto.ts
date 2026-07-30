@@ -5,6 +5,8 @@ import {
   BudgetPlanStatus,
   EssentialType,
   FinanceLedgerStatus,
+  FinanceModelStatus,
+  FinanceModelType,
 } from '@prisma/client';
 
 class FinanceErrorResponseDto {
@@ -405,6 +407,224 @@ export class CategorySpendingSummaryApiResponseDto {
   data!: CategorySpendingSummaryDataResponseDto;
 }
 
+class JarTargetActualFinanceModelResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ example: '80/20' })
+  name!: string;
+
+  @ApiProperty({
+    enum: FinanceModelType,
+    example: FinanceModelType.EIGHTY_TWENTY,
+  })
+  modelType!: FinanceModelType;
+
+  @ApiProperty({ enum: FinanceModelStatus, example: FinanceModelStatus.ACTIVE })
+  status!: FinanceModelStatus;
+}
+
+class JarTargetActualJarResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  financeModelId!: string;
+
+  @ApiProperty({ example: 'Spending' })
+  name!: string;
+
+  @ApiProperty({ example: 'SPENDING' })
+  jarCode!: string;
+
+  @ApiProperty({
+    example: 80,
+    description: 'Same value as targetPercentage for this jar.',
+  })
+  allocationPercentage!: number;
+
+  @ApiProperty({ example: 'Daily spending jar', nullable: true })
+  description!: string | null;
+}
+
+class JarTargetActualCategoryResponseDto {
+  @ApiProperty({ format: 'uuid', nullable: true })
+  categoryId!: string | null;
+
+  @ApiProperty({
+    example: 'Ăn uống',
+    description: 'Category name, or "Chưa phân loại" when categoryId is null.',
+  })
+  name!: string;
+
+  @ApiProperty({
+    example: 3500000,
+    description: 'VND assigned to this jar/category in the period.',
+  })
+  amount!: number;
+
+  @ApiProperty({ example: 3 })
+  entryCount!: number;
+}
+
+class JarTargetActualItemResponseDto {
+  @ApiProperty({ type: () => JarTargetActualJarResponseDto })
+  jar!: JarTargetActualJarResponseDto;
+
+  @ApiProperty({
+    example: 80,
+    description:
+      'Target percentage configured on the selected finance model jar. Formula source: finance_jars.allocationPercentage.',
+  })
+  targetPercentage!: number;
+
+  @ApiProperty({
+    example: 52.38,
+    description:
+      'Actual share of all tracked cash-out entries in the period. Formula: actualAmount / trackedAmount * 100. Returns 0 when trackedAmount is 0.',
+  })
+  actualPercentage!: number;
+
+  @ApiProperty({
+    example: 8400000,
+    description:
+      'Target VND amount for this jar. Formula: trackedAmount * targetPercentage / 100.',
+  })
+  targetAmount!: number;
+
+  @ApiProperty({
+    example: 5500000,
+    description:
+      'Actual VND amount assigned to this jar. Only ACTIVE ledger entries whose jarId belongs to the selected model are included.',
+  })
+  actualAmount!: number;
+
+  @ApiProperty({
+    example: -2900000,
+    description: 'Formula: actualAmount - targetAmount.',
+  })
+  varianceAmount!: number;
+
+  @ApiProperty({
+    example: -27.62,
+    description: 'Formula: actualPercentage - targetPercentage.',
+  })
+  variancePercentage!: number;
+
+  @ApiProperty({
+    enum: ['ON_TRACK', 'OVER_TARGET', 'UNDER_TARGET'],
+    example: 'UNDER_TARGET',
+    description:
+      'ON_TRACK when |variancePercentage| <= 5; OVER_TARGET when variancePercentage > 5; otherwise UNDER_TARGET.',
+  })
+  status!: 'ON_TRACK' | 'OVER_TARGET' | 'UNDER_TARGET';
+
+  @ApiProperty({
+    type: () => [JarTargetActualCategoryResponseDto],
+    description:
+      'Breakdown of mapped amount inside this jar. Empty array when actualAmount is 0.',
+  })
+  categories!: JarTargetActualCategoryResponseDto[];
+}
+
+class JarTargetActualTotalsResponseDto {
+  @ApiProperty({
+    example: 10500000,
+    description:
+      'VND denominator for target/actual percentage. Formula: mappedAmount + unmappedAmount.',
+  })
+  trackedAmount!: number;
+
+  @ApiProperty({
+    example: 8500000,
+    description:
+      'VND from ACTIVE cash-out ledger entries whose jarId belongs to the selected finance model.',
+  })
+  mappedAmount!: number;
+
+  @ApiProperty({
+    example: 2000000,
+    description:
+      'VND from ACTIVE cash-out ledger entries with no jarId or with jarId from another/old finance model.',
+  })
+  unmappedAmount!: number;
+}
+
+class JarTargetActualUnmappedResponseDto {
+  @ApiProperty({
+    example: 2000000,
+    description:
+      'Same value as totals.unmappedAmount. Includes entries with null jarId and entries carrying jarId from an old/non-selected model.',
+  })
+  amount!: number;
+
+  @ApiProperty({
+    example: 19.05,
+    description:
+      'Formula: amount / trackedAmount * 100. Returns 0 when trackedAmount is 0.',
+  })
+  percentage!: number;
+
+  @ApiProperty({ example: 2 })
+  entryCount!: number;
+
+  @ApiProperty({
+    example: 1500000,
+    description:
+      'Subset of unmapped.amount where ledgerEntry.jarId is not null but the jar does not belong to the selected finance model. This is how old-model transactions are surfaced after active model changes.',
+  })
+  legacyJarAmount!: number;
+
+  @ApiProperty({
+    example: 1,
+    description:
+      'Number of unmapped entries that still carry a jarId from another/old finance model.',
+  })
+  legacyJarEntryCount!: number;
+}
+
+class JarTargetActualDataResponseDto {
+  @ApiProperty({ type: () => FinanceDateRangeResponseDto })
+  period!: FinanceDateRangeResponseDto;
+
+  @ApiProperty({
+    example: 'VND',
+    description: 'Currency for all money fields.',
+  })
+  currency!: string;
+
+  @ApiProperty({
+    type: () => JarTargetActualFinanceModelResponseDto,
+    nullable: true,
+    description:
+      'Selected finance model. Null when financeModelId is omitted and the family has no ACTIVE model.',
+  })
+  financeModel!: JarTargetActualFinanceModelResponseDto | null;
+
+  @ApiProperty({ type: () => JarTargetActualTotalsResponseDto })
+  totals!: JarTargetActualTotalsResponseDto;
+
+  @ApiProperty({
+    type: () => [JarTargetActualItemResponseDto],
+    description: 'One item per active jar in the selected finance model.',
+  })
+  items!: JarTargetActualItemResponseDto[];
+
+  @ApiProperty({ type: () => JarTargetActualUnmappedResponseDto })
+  unmapped!: JarTargetActualUnmappedResponseDto;
+}
+
+export class JarTargetActualApiResponseDto {
+  @ApiProperty({ example: true })
+  success!: boolean;
+
+  @ApiProperty({ example: 'Lấy báo cáo tỷ trọng hũ tài chính thành công' })
+  message!: string;
+
+  @ApiProperty({ type: () => JarTargetActualDataResponseDto })
+  data!: JarTargetActualDataResponseDto;
+}
+
 class FinanceMemberUserResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -623,6 +843,88 @@ export const CATEGORY_SPENDING_SUMMARY_RESPONSE_EXAMPLE = {
         amount: 3200000,
       },
     ],
+  },
+};
+
+export const JAR_TARGET_ACTUAL_RESPONSE_EXAMPLE = {
+  success: true,
+  message: 'Lay bao cao ty trong hu tai chinh thanh cong',
+  data: {
+    period: {
+      periodStart: '2026-07-01T00:00:00.000Z',
+      periodEnd: '2026-07-31T00:00:00.000Z',
+    },
+    currency: 'VND',
+    financeModel: {
+      id: 'model-80-20',
+      name: '80/20',
+      modelType: 'EIGHTY_TWENTY',
+      status: 'ACTIVE',
+    },
+    totals: {
+      trackedAmount: 10550000,
+      mappedAmount: 8500000,
+      unmappedAmount: 2050000,
+    },
+    items: [
+      {
+        jar: {
+          id: 'jar-spending',
+          financeModelId: 'model-80-20',
+          name: 'Spending',
+          jarCode: 'SPENDING',
+          allocationPercentage: 80,
+          description: 'Daily spending jar',
+        },
+        targetPercentage: 80,
+        actualPercentage: 52.13,
+        targetAmount: 8440000,
+        actualAmount: 5500000,
+        varianceAmount: -2940000,
+        variancePercentage: -27.87,
+        status: 'UNDER_TARGET',
+        categories: [
+          {
+            categoryId: 'category-food',
+            name: 'An uong',
+            amount: 3500000,
+            entryCount: 3,
+          },
+        ],
+      },
+      {
+        jar: {
+          id: 'jar-savings',
+          financeModelId: 'model-80-20',
+          name: 'Savings',
+          jarCode: 'SAVINGS',
+          allocationPercentage: 20,
+          description: 'Savings jar',
+        },
+        targetPercentage: 20,
+        actualPercentage: 28.44,
+        targetAmount: 2110000,
+        actualAmount: 3000000,
+        varianceAmount: 890000,
+        variancePercentage: 8.44,
+        status: 'OVER_TARGET',
+        categories: [
+          {
+            categoryId: 'category-saving',
+            name: 'Tiet kiem',
+            amount: 3000000,
+            entryCount: 1,
+          },
+        ],
+      },
+    ],
+    unmapped: {
+      amount: 2050000,
+      percentage: 19.43,
+      entryCount: 2,
+      legacyJarAmount: 1500000,
+      legacyJarEntryCount: 1,
+    },
   },
 };
 

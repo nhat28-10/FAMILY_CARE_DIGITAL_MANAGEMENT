@@ -36,6 +36,12 @@ import { CreateFundAllocationDto } from '../dto/create-fund-allocation.dto';
 import { CreateFinanceJarDto } from '../dto/create-finance-jar.dto';
 import { CreateFinanceModelDto } from '../dto/create-finance-model.dto';
 import {
+  CATEGORY_JAR_MAPPING_DELETE_RESPONSE_EXAMPLE,
+  CATEGORY_JAR_MAPPING_DETAIL_RESPONSE_EXAMPLE,
+  CATEGORY_JAR_MAPPING_LIST_RESPONSE_EXAMPLE,
+  CategoryJarMappingDeleteApiResponseDto,
+  CategoryJarMappingDetailApiResponseDto,
+  CategoryJarMappingListApiResponseDto,
   FinanceCategoryJarMappingQueryDto,
   UpsertFinanceCategoryJarMappingDto,
 } from '../dto/finance-category-jar-mapping.dto';
@@ -310,6 +316,17 @@ export class FinanceModelsController {
     summary:
       'Lấy cấu hình category thuộc hũ nào theo mô hình tài chính active hoặc modelId cụ thể',
   })
+  @ApiOkResponse({
+    description:
+      'Envelope chuan. data.financeModel co the null khi khong truyen financeModelId va family chua co ACTIVE model; data.items la [] khi model chua co mapping.',
+    type: CategoryJarMappingListApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Category to jar mappings',
+        value: CATEGORY_JAR_MAPPING_LIST_RESPONSE_EXAMPLE,
+      },
+    },
+  })
   listCategoryJarMappings(
     @Param('familyId') familyId: string,
     @Query() query: FinanceCategoryJarMappingQueryDto,
@@ -325,6 +342,17 @@ export class FinanceModelsController {
   @ApiOperation({
     summary:
       'Tạo hoặc cập nhật mapping category -> jar cho một mô hình tài chính',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Envelope chuan. Upsert theo unique key (financeModelId, categoryId); categoryId chi tro toi mot jar trong cung financeModelId.',
+    type: CategoryJarMappingDetailApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Upserted category to jar mapping',
+        value: CATEGORY_JAR_MAPPING_DETAIL_RESPONSE_EXAMPLE,
+      },
+    },
   })
   upsertCategoryJarMapping(
     @Param('familyId') familyId: string,
@@ -342,6 +370,17 @@ export class FinanceModelsController {
     name: 'mappingId',
     description: 'ID mapping cần xóa',
     format: 'uuid',
+  })
+  @ApiOkResponse({
+    description:
+      'Envelope chuan. data la mapping vua bi xoa de FE co the cap nhat cache/local state.',
+    type: CategoryJarMappingDeleteApiResponseDto,
+    examples: {
+      sample: {
+        summary: 'Deleted category to jar mapping',
+        value: CATEGORY_JAR_MAPPING_DELETE_RESPONSE_EXAMPLE,
+      },
+    },
   })
   deleteCategoryJarMapping(
     @Param('familyId') familyId: string,

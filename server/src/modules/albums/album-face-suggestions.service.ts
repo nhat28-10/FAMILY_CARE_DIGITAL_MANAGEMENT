@@ -65,8 +65,19 @@ const suggestionInclude = {
   detection: true,
 } satisfies Prisma.AlbumTagSuggestionInclude;
 
+const faceDetectionInclude = {
+  suggestions: {
+    include: { suggestedMember: { select: suggestionMemberSelect } },
+    orderBy: [{ createdAt: 'desc' }, { suggestionId: 'desc' }],
+  },
+} satisfies Prisma.AlbumFaceDetectionInclude;
+
 type SuggestionWithDetection = Prisma.AlbumTagSuggestionGetPayload<{
   include: typeof suggestionInclude;
+}>;
+
+type DetectionWithSuggestions = Prisma.AlbumFaceDetectionGetPayload<{
+  include: typeof faceDetectionInclude;
 }>;
 
 type ScannableMedia = Pick<
@@ -99,6 +110,11 @@ interface FaceMatch {
   margin: number | null;
 }
 
+const FACE_SCAN_FORCE_RESCAN_RATE_LIMITED =
+  'FACE_SCAN_FORCE_RESCAN_RATE_LIMITED';
+const FACE_SCAN_JOB_NOT_RETRYABLE = 'FACE_SCAN_JOB_NOT_RETRYABLE';
+const FACE_SCAN_FEATURE = 'ALBUM_FACE_SCAN';
+
 @Injectable()
 export class AlbumFaceSuggestionsService {
   private readonly logger = new Logger(AlbumFaceSuggestionsService.name);
@@ -107,6 +123,9 @@ export class AlbumFaceSuggestionsService {
   private readonly minMargin: number;
   private readonly maxAttempts: number;
   private readonly staleMinutes: number;
+  private readonly retryDelaySeconds: number;
+  private readonly forceRescanLimit: number;
+  private readonly forceRescanCooldownSeconds: number;
   private readonly forceScanHits = new Map<string, number[]>();
 
   constructor(
@@ -132,6 +151,18 @@ export class AlbumFaceSuggestionsService {
     this.staleMinutes = Math.max(
       1,
       config.get<number>('faceScan.staleMinutes', 10),
+    );
+    this.retryDelaySeconds = Math.max(
+      1,
+      config.get<number>('faceScan.retryDelaySeconds', 60),
+    );
+    this.forceRescanLimit = Math.max(
+      1,
+      config.get<number>('faceScan.forceRescanLimit', 2),
+    );
+    this.forceRescanCooldownSeconds = Math.max(
+      1,
+      config.get<number>('faceScan.forceRescanCooldownSeconds', 600),
     );
   }
 
@@ -206,6 +237,84 @@ export class AlbumFaceSuggestionsService {
     }
   }
 
+  async retryScan(
+    workspaceId: string,
+    mediaId: string,
+    requester: FamilyMember,
+  ) {
+    const media = await this.getVisibleMedia(workspaceId, mediaId, requester);
+    this.assertScannableMedia(media);
+    if (!this.canForceScan(media, requester)) {
+      throw new ForbiddenException('Ban khong co quyen retry face scan nay');
+    }
+
+    const job = await this.prisma.faceScanJob.findFirst({
+      where: { workspaceId, mediaId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!job) {
+      throw new BadRequestException('Media chua co face scan job de retry');
+    }
+
+    const isFailed = job.status === FaceScanJobStatus.FAILED;
+    const isStaleActive =
+      (job.status === FaceScanJobStatus.PENDING ||
+        job.status === FaceScanJobStatus.PROCESSING) &&
+      this.isJobStale(job);
+    if (!isFailed && !isStaleActive) {
+      throw new HttpException(
+        {
+          message: 'Face scan job hien tai chua du dieu kien retry',
+          code: FACE_SCAN_JOB_NOT_RETRYABLE,
+          errorCode: FACE_SCAN_JOB_NOT_RETRYABLE,
+          feature: FACE_SCAN_FEATURE,
+          errors: {
+            status: job.status,
+            maxProcessingSeconds: this.maxProcessingSeconds(),
+            staleAt: this.staleAt(job),
+          },
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const queuedAt = new Date();
+    const queued = await this.prisma.faceScanJob.update({
+      where: { scanJobId: job.scanJobId },
+      data: {
+        status: FaceScanJobStatus.PENDING,
+        startedAt: null,
+        completedAt: null,
+        lastError: null,
+        updatedAt: queuedAt,
+      },
+    });
+    try {
+      await this.queue.pushFaceScanJob({
+        version: FACE_SCAN_JOB_VERSION,
+        type: FACE_SCAN_JOB_TYPE,
+        scanJobId: queued.scanJobId,
+        mediaId,
+        workspaceId,
+        requestedAt: queuedAt.toISOString(),
+      });
+      return this.mapJobSummary(queued);
+    } catch (error) {
+      const message = sanitizeModerationError(error);
+      await this.prisma.faceScanJob.update({
+        where: { scanJobId: queued.scanJobId },
+        data: {
+          status: FaceScanJobStatus.FAILED,
+          lastError: message,
+          completedAt: new Date(),
+        },
+      });
+      throw new ServiceUnavailableException(
+        'Khong the dua face scan retry vao hang doi, vui long thu lai',
+      );
+    }
+  }
+
   async getScanStatus(
     workspaceId: string,
     mediaId: string,
@@ -220,11 +329,19 @@ export class AlbumFaceSuggestionsService {
       return {
         scanJobId: null,
         status: null,
+        statuses: Object.values(FaceScanJobStatus),
         detectedFaceCount: 0,
         suggestionCount: 0,
         startedAt: null,
         completedAt: null,
         error: null,
+        maxProcessingSeconds: this.maxProcessingSeconds(),
+        retryDelaySeconds: this.retryDelaySeconds,
+        forceRescanLimit: this.forceRescanLimit,
+        forceRescanCooldownSeconds: this.forceRescanCooldownSeconds,
+        staleAt: null,
+        retryAllowed: false,
+        retryEndpoint: `/families/${workspaceId}/albums/media/${mediaId}/face-scan/retry`,
       };
     }
     return this.mapJobSummary(job);
@@ -236,12 +353,31 @@ export class AlbumFaceSuggestionsService {
     requester: FamilyMember,
   ) {
     const media = await this.getVisibleMedia(workspaceId, mediaId, requester);
-    const suggestions = await this.prisma.albumTagSuggestion.findMany({
-      where: { workspaceId, mediaId },
-      include: suggestionInclude,
-      orderBy: [{ createdAt: 'desc' }, { suggestionId: 'desc' }],
-    });
+    const [suggestions, detections] = await this.prisma.$transaction([
+      this.prisma.albumTagSuggestion.findMany({
+        where: { workspaceId, mediaId },
+        include: suggestionInclude,
+        orderBy: [{ createdAt: 'desc' }, { suggestionId: 'desc' }],
+      }),
+      this.prisma.albumFaceDetection.findMany({
+        where: {
+          workspaceId,
+          mediaId,
+          status: {
+            in: [
+              AlbumFaceDetectionStatus.MATCHED,
+              AlbumFaceDetectionStatus.UNMATCHED,
+            ],
+          },
+        },
+        include: faceDetectionInclude,
+        orderBy: [{ faceIndex: 'asc' }, { createdAt: 'asc' }],
+      }),
+    ]);
     return {
+      faces: detections.map((detection) =>
+        this.mapDetectedFace(detection, media, requester),
+      ),
       items: suggestions.map((suggestion) =>
         this.mapSuggestion(suggestion, media, requester),
       ),
@@ -463,7 +599,7 @@ export class AlbumFaceSuggestionsService {
             lastError: message,
           },
         });
-        return { action: 'RETRY', retryDelaySeconds: 60 };
+        return { action: 'RETRY', retryDelaySeconds: this.retryDelaySeconds };
       }
       await this.failJob(job, message);
       return { action: 'ACK' };
@@ -731,13 +867,30 @@ export class AlbumFaceSuggestionsService {
 
   private assertForceScanRateLimit(memberId: string) {
     const now = Date.now();
-    const windowMs = 10 * 60 * 1000;
+    const windowMs = this.forceRescanCooldownSeconds * 1000;
     const hits = (this.forceScanHits.get(memberId) ?? []).filter(
       (hit) => now - hit < windowMs,
     );
-    if (hits.length >= 2) {
+    if (hits.length >= this.forceRescanLimit) {
+      const oldestHit = Math.min(...hits);
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((windowMs - (now - oldestHit)) / 1000),
+      );
       throw new HttpException(
-        'Bạn đã yêu cầu quét lại quá nhiều lần, vui lòng thử lại sau',
+        {
+          message:
+            'Ban da yeu cau quet lai qua nhieu lan, vui long thu lai sau',
+          code: FACE_SCAN_FORCE_RESCAN_RATE_LIMITED,
+          errorCode: FACE_SCAN_FORCE_RESCAN_RATE_LIMITED,
+          feature: FACE_SCAN_FEATURE,
+          retryAfterSeconds,
+          cooldownSeconds: this.forceRescanCooldownSeconds,
+          errors: {
+            limit: this.forceRescanLimit,
+            windowSeconds: this.forceRescanCooldownSeconds,
+          },
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -763,12 +916,44 @@ export class AlbumFaceSuggestionsService {
     return {
       scanJobId: job.scanJobId,
       status: job.status,
+      statuses: Object.values(FaceScanJobStatus),
       detectedFaceCount,
       suggestionCount,
       startedAt: job.startedAt,
       completedAt: job.completedAt,
       error: job.lastError,
+      maxProcessingSeconds: this.maxProcessingSeconds(),
+      retryDelaySeconds: this.retryDelaySeconds,
+      forceRescanLimit: this.forceRescanLimit,
+      forceRescanCooldownSeconds: this.forceRescanCooldownSeconds,
+      staleAt: this.staleAt(job),
+      retryAllowed:
+        job.status === FaceScanJobStatus.FAILED ||
+        ((job.status === FaceScanJobStatus.PENDING ||
+          job.status === FaceScanJobStatus.PROCESSING) &&
+          this.isJobStale(job)),
+      retryEndpoint: `/families/${job.workspaceId}/albums/media/${job.mediaId}/face-scan/retry`,
     };
+  }
+
+  private maxProcessingSeconds() {
+    return this.staleMinutes * 60;
+  }
+
+  private staleAt(job: FaceScanJob) {
+    const base = job.startedAt ?? job.createdAt;
+    if (
+      job.status !== FaceScanJobStatus.PENDING &&
+      job.status !== FaceScanJobStatus.PROCESSING
+    ) {
+      return null;
+    }
+    return new Date(base.getTime() + this.maxProcessingSeconds() * 1000);
+  }
+
+  private isJobStale(job: FaceScanJob) {
+    const staleAt = this.staleAt(job);
+    return staleAt !== null && staleAt.getTime() <= Date.now();
   }
 
   private mapSuggestion(
@@ -779,6 +964,8 @@ export class AlbumFaceSuggestionsService {
     return {
       suggestionId: suggestion.suggestionId,
       detectionId: suggestion.detectionId,
+      faceId: suggestion.detectionId,
+      faceIndex: suggestion.detection.faceIndex,
       boundingBox: suggestion.detection.boundingBox,
       similarityScore: this.decimalToNumber(suggestion.similarityScore),
       secondBestScore: this.decimalToNumber(suggestion.secondBestScore),
@@ -799,6 +986,40 @@ export class AlbumFaceSuggestionsService {
           suggestion.status === AlbumTagSuggestionStatus.PENDING &&
           this.policy.canMemberAccessMedia(media, requester),
       },
+    };
+  }
+
+  private mapDetectedFace(
+    detection: DetectionWithSuggestions,
+    media: ScannableMedia,
+    requester: FamilyMember,
+  ) {
+    return {
+      faceId: detection.detectionId,
+      detectionId: detection.detectionId,
+      faceIndex: detection.faceIndex,
+      boundingBox: detection.boundingBox,
+      detectionScore: this.decimalToNumber(detection.detectionScore),
+      qualityScore: this.decimalToNumber(detection.qualityScore),
+      status: detection.status,
+      candidates: detection.suggestions.map((suggestion) => ({
+        suggestionId: suggestion.suggestionId,
+        memberId: suggestion.suggestedMember.id,
+        displayName: this.displayName(suggestion.suggestedMember),
+        avatarUrl: suggestion.suggestedMember.user.avatarUrl,
+        score: this.decimalToNumber(suggestion.similarityScore),
+        secondBestScore: this.decimalToNumber(suggestion.secondBestScore),
+        scoreMargin: this.decimalToNumber(suggestion.scoreMargin),
+        status: suggestion.status,
+        permissions: {
+          canConfirm:
+            suggestion.status === AlbumTagSuggestionStatus.PENDING &&
+            this.policy.canMemberAccessMedia(media, requester),
+          canReject:
+            suggestion.status === AlbumTagSuggestionStatus.PENDING &&
+            this.policy.canMemberAccessMedia(media, requester),
+        },
+      })),
     };
   }
 
