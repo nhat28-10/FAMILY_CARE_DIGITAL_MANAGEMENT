@@ -23,8 +23,8 @@ const defaultSettings = {
   locationRequired: true,
 };
 
-function membership(id: string, familyRole: FamilyRole) {
-  return { id, familyRole } as Parameters<WearablesService['pair']>[1];
+function membership(id: string, familyRole: FamilyRole, userId = `${id}-user`) {
+  return { id, familyRole, userId } as Parameters<WearablesService['pair']>[1];
 }
 
 describe('WearablesService', () => {
@@ -37,6 +37,7 @@ describe('WearablesService', () => {
     id: 'c0ffee00-0000-0000-0000-000000000001',
     workspaceId,
     ownerMemberId: owner.id,
+    ownerUserId: owner.userId,
     deviceType: WearableDeviceType.SMARTWATCH,
     pairingStatus: DevicePairingStatus.PAIRED,
     gpsEnabled: true,
@@ -106,6 +107,7 @@ describe('WearablesService', () => {
           data: expect.objectContaining({
             workspaceId,
             ownerMemberId: owner.id,
+            ownerUserId: owner.userId,
             pairingStatus: DevicePairingStatus.PAIRED,
             gpsEnabled: true,
             sosEnabled: true,
@@ -125,7 +127,10 @@ describe('WearablesService', () => {
     });
 
     it('lets a manager pair for another ACTIVE member', async () => {
-      prisma.familyMember.findFirst.mockResolvedValue({ id: owner.id });
+      prisma.familyMember.findFirst.mockResolvedValue({
+        id: owner.id,
+        userId: owner.userId,
+      });
 
       await service.pair(workspaceId, manager, {
         ...pairDto,
@@ -134,16 +139,35 @@ describe('WearablesService', () => {
 
       const data = prisma.wearableDevice.create.mock.calls[0][0].data as {
         ownerMemberId: string;
+        ownerUserId: string;
       };
       expect(data.ownerMemberId).toBe(owner.id);
+      expect(data.ownerUserId).toBe(owner.userId);
     });
 
-    it('rejects a second active SOS device for the same owner', async () => {
+    it('rejects a second paired wearable for the same user account', async () => {
       prisma.wearableDevice.count.mockResolvedValue(1);
 
       await expect(
         service.pair(workspaceId, owner, pairDto),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('getMine', () => {
+    it('returns the paired wearable for the current user account', async () => {
+      prisma.wearableDevice.findFirst.mockResolvedValue(pairedDevice);
+
+      await service.getMine(owner.userId);
+
+      expect(prisma.wearableDevice.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            ownerUserId: owner.userId,
+            pairingStatus: DevicePairingStatus.PAIRED,
+          },
+        }),
+      );
     });
   });
 

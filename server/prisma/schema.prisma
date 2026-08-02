@@ -318,6 +318,7 @@ model User {
   memberships             FamilyMember[]
   refreshTokens           RefreshToken[]
   deviceTokens            DeviceToken[]
+  ownedWearableDevices    WearableDevice[]           @relation("OwnedUserWearableDevices")
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   joinRequests            JoinRequest[]
@@ -1383,6 +1384,7 @@ model WearableDevice {
   id               String              @id @default(dbgenerated("gen_random_uuid()")) @map("device_id") @db.Uuid
   workspaceId      String              @map("workspace_id")
   ownerMemberId    String              @map("owner_member_id")
+  ownerUserId      String              @map("owner_user_id")
   deviceName       String              @map("device_name")
   deviceType       WearableDeviceType  @map("device_type")
   deviceIdentifier String              @map("device_identifier")
@@ -1394,6 +1396,7 @@ model WearableDevice {
   updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace   Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerUser   User         @relation("OwnedUserWearableDevices", fields: [ownerUserId], references: [id], onDelete: Cascade)
   ownerMember FamilyMember @relation("OwnedWearableDevices", fields: [ownerMemberId], references: [id], onDelete: Cascade)
 
   sosAlerts            SosAlert[]
@@ -1401,12 +1404,12 @@ model WearableDevice {
   sensorEvents         SensorEvent[]
   memberLocationPoints MemberLocationPoint[]
 
-  // Plus a partial unique index (one active SOS device per owner) added via raw
-  // SQL in the migration: UNIQUE(owner_member_id) WHERE pairing_status='PAIRED'
-  // AND sos_enabled=true.
+  // Plus a partial unique index (one paired wearable per user account) added
+  // via raw SQL in the migration: UNIQUE(owner_user_id) WHERE pairing_status='PAIRED'.
   @@unique([workspaceId, deviceIdentifier])
   @@index([workspaceId])
   @@index([ownerMemberId])
+  @@index([ownerUserId])
   @@map("wearable_devices")
 }
 

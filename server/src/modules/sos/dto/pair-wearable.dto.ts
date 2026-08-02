@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 
 export class PairWearableDto {
-  @ApiProperty({ example: 'Đồng hồ của bà' })
+  @ApiProperty({ example: 'Wear OS Simulator' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
@@ -22,8 +22,8 @@ export class PairWearableDto {
   deviceType!: WearableDeviceType;
 
   @ApiProperty({
-    example: 'SN-2026-0001',
-    description: 'Số serial / MAC — duy nhất trong gia đình',
+    example: 'wearos-emulator-001',
+    description: 'Serial number / MAC / emulator id, unique within a family',
   })
   @IsString()
   @IsNotEmpty()
@@ -37,7 +37,7 @@ export class PairWearableDto {
 
   @ApiPropertyOptional({
     default: true,
-    description: 'Mỗi thành viên chỉ có 1 thiết bị SOS đang ghép nối',
+    description: 'One user account can have only one paired wearable',
   })
   @IsOptional()
   @IsBoolean()
@@ -46,7 +46,7 @@ export class PairWearableDto {
   @ApiPropertyOptional({
     format: 'uuid',
     description:
-      'Ghép nối hộ thành viên khác (chỉ FAMILY_MANAGER / DEPUTY_MEMBER)',
+      'Pair a wearable for another family member. FAMILY_MANAGER or DEPUTY_MEMBER only.',
   })
   @IsOptional()
   @IsUUID()
