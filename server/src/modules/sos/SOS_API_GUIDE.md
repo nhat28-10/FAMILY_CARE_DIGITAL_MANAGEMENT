@@ -88,12 +88,19 @@ Nếu cài đặt `notifyAllMembers=false` → chỉ `FAMILY_MANAGER`/`DEPUTY_ME
 - `POST /emergency-contacts` — thêm (MANAGER/DEPUTY): `{ contactName, phoneNumber, relationshipNote?, priorityOrder?, isActive? }`.
 - `PATCH /emergency-contacts/:contactId` / `DELETE /emergency-contacts/:contactId` — sửa/xóa (MANAGER/DEPUTY).
 
-### 2.1c Thiết bị đeo & sự kiện cảm biến (base: `/api/v1/families/:familyId/wearables`)
+### 2.1c Thiết bị đeo & sự kiện cảm biến
+
+Account-level:
+
+- `GET /api/v1/wearables/me` — wearable đang ghép nối của user account hiện tại, hoặc `null` nếu chưa có.
+  Dùng endpoint này ở màn Profile/Settings trước khi hiện nút kết nối.
+
+Family-level base: `/api/v1/families/:familyId/wearables`
 
 - `GET /` — danh sách thiết bị của gia đình (kèm `ownerMember`).
 - `POST /` — ghép nối thiết bị cho chính mình: `{ deviceName, deviceType, deviceIdentifier, gpsEnabled?, sosEnabled? }`.
   Kèm `ownerMemberId` = ghép hộ thành viên khác (chỉ MANAGER/DEPUTY).
-  Ràng buộc: mỗi thành viên chỉ có **1 thiết bị SOS đang ghép nối** (409 nếu trùng);
+  Ràng buộc: mỗi user account chỉ có **1 wearable đang ghép nối** trên toàn hệ thống (409 nếu trùng);
   `deviceIdentifier` duy nhất trong gia đình.
 - `PATCH /:deviceId` — đổi tên/bật tắt GPS-SOS/`pairingStatus` (`UNPAIRED` = gỡ, `LOST` = báo mất) — chủ thiết bị hoặc MANAGER/DEPUTY.
 - `DELETE /:deviceId` — xóa thiết bị (chủ hoặc MANAGER/DEPUTY).

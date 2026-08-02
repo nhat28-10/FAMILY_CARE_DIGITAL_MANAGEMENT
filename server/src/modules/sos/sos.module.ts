@@ -5,6 +5,7 @@ import { FamilyMembersModule } from '../family-members/family-members.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
 import { EmergencyContactsController } from './controllers/emergency-contacts.controller';
+import { MyWearablesController } from './controllers/my-wearables.controller';
 import { SosController } from './controllers/sos.controller';
 import { SosSettingsController } from './controllers/sos-settings.controller';
 import { WearablesController } from './controllers/wearables.controller';
@@ -28,6 +29,7 @@ import { SosGateway } from './sos.gateway';
     SosController,
     SosSettingsController,
     EmergencyContactsController,
+    MyWearablesController,
     WearablesController,
   ],
   providers: [SosService, SosSettingsService, WearablesService, SosGateway],

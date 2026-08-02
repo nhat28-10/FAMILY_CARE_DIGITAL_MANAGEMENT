@@ -24,6 +24,7 @@ Table users {
   memberships family_members [not null]
   refreshTokens refresh_tokens [not null]
   deviceTokens device_tokens [not null]
+  ownedWearableDevices wearable_devices [not null]
   passwordResetTokens password_reset_tokens [not null]
   emailVerificationTokens email_verification_tokens [not null]
   joinRequests join_requests [not null]
@@ -784,6 +785,7 @@ Table wearable_devices {
   id String [pk]
   workspaceId String [not null]
   ownerMemberId String [not null]
+  ownerUserId String [not null]
   deviceName String [not null]
   deviceType WearableDeviceType [not null]
   deviceIdentifier String [not null]
@@ -794,6 +796,7 @@ Table wearable_devices {
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   workspace families [not null]
+  ownerUser users [not null]
   ownerMember family_members [not null]
   sosAlerts sos_alerts [not null]
   sosLocationPoints sos_location_points [not null]
@@ -1975,6 +1978,8 @@ Ref: sos_settings.createdByMemberId > family_members.id [delete: Set Null]
 Ref: emergency_contacts.sosSettingId > sos_settings.id [delete: Cascade]
 
 Ref: wearable_devices.workspaceId > families.id [delete: Cascade]
+
+Ref: wearable_devices.ownerUserId > users.id [delete: Cascade]
 
 Ref: wearable_devices.ownerMemberId > family_members.id [delete: Cascade]
 

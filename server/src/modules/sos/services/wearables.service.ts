@@ -63,6 +63,7 @@ export class WearablesService {
     dto: PairWearableDto,
   ) {
     const ownerMemberId = dto.ownerMemberId ?? currentMember.id;
+    let ownerUserId = currentMember.userId;
     if (ownerMemberId !== currentMember.id) {
       if (!MANAGER_ROLES.includes(currentMember.familyRole)) {
         throw new ForbiddenException(
@@ -75,30 +76,30 @@ export class WearablesService {
           familyId: workspaceId,
           status: MemberStatus.ACTIVE,
         },
+        select: { id: true, userId: true },
       });
       if (!target) {
         throw new NotFoundException(
           'Không tìm thấy thành viên nhận thiết bị trong gia đình',
         );
       }
+      ownerUserId = target.userId;
     }
 
-    const sosEnabled = dto.sosEnabled ?? true;
-    if (sosEnabled) {
-      await this.assertNoActiveSosDevice(ownerMemberId);
-    }
+    await this.assertNoPairedWearable(ownerUserId);
 
     try {
       return await this.prisma.wearableDevice.create({
         data: {
           workspaceId,
           ownerMemberId,
+          ownerUserId,
           deviceName: dto.deviceName,
           deviceType: dto.deviceType,
           deviceIdentifier: dto.deviceIdentifier,
           pairingStatus: DevicePairingStatus.PAIRED,
           gpsEnabled: dto.gpsEnabled ?? true,
-          sosEnabled,
+          sosEnabled: dto.sosEnabled ?? true,
         },
         include: ownerInclude,
       });
@@ -115,6 +116,27 @@ export class WearablesService {
     });
   }
 
+  getMine(ownerUserId: string) {
+    return this.prisma.wearableDevice.findFirst({
+      where: {
+        ownerUserId,
+        pairingStatus: DevicePairingStatus.PAIRED,
+      },
+      include: {
+        ...ownerInclude,
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
   async update(
     workspaceId: string,
     deviceId: string,
@@ -124,16 +146,14 @@ export class WearablesService {
     const device = await this.loadDevice(workspaceId, deviceId);
     this.assertOwnerOrManager(device, currentMember);
 
-    // Re-check the one-active-SOS-device rule when the update turns the
-    // device into (or keeps it) PAIRED + sosEnabled from a different state.
-    const willBeActiveSos =
-      (dto.sosEnabled ?? device.sosEnabled) &&
+    // Re-check the account-level wearable rule when a previously unpaired/lost
+    // device is paired again.
+    const willBePaired =
       (dto.pairingStatus ?? device.pairingStatus) ===
-        DevicePairingStatus.PAIRED;
-    const isActiveSos =
-      device.sosEnabled && device.pairingStatus === DevicePairingStatus.PAIRED;
-    if (willBeActiveSos && !isActiveSos) {
-      await this.assertNoActiveSosDevice(device.ownerMemberId);
+      DevicePairingStatus.PAIRED;
+    const isPaired = device.pairingStatus === DevicePairingStatus.PAIRED;
+    if (willBePaired && !isPaired) {
+      await this.assertNoPairedWearable(device.ownerUserId, device.id);
     }
 
     try {
@@ -285,12 +305,15 @@ export class WearablesService {
     }
   }
 
-  private async assertNoActiveSosDevice(ownerMemberId: string) {
+  private async assertNoPairedWearable(
+    ownerUserId: string,
+    excludeDeviceId?: string,
+  ) {
     const count = await this.prisma.wearableDevice.count({
       where: {
-        ownerMemberId,
+        ownerUserId,
         pairingStatus: DevicePairingStatus.PAIRED,
-        sosEnabled: true,
+        ...(excludeDeviceId ? { id: { not: excludeDeviceId } } : {}),
       },
     });
     if (count > 0) {
@@ -305,6 +328,24 @@ export class WearablesService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
+      const target = error.meta?.target;
+      const fields =
+        typeof target === 'string'
+          ? [target]
+          : Array.isArray(target)
+            ? target
+            : [];
+      if (
+        fields.some((field) =>
+          [
+            'ownerUserId',
+            'owner_user_id',
+            'wearable_devices_owner_user_paired_unique',
+          ].includes(field),
+        )
+      ) {
+        throw new ConflictException('Tai khoan nay da ket noi mot wearable');
+      }
       throw new ConflictException(
         'Mã định danh thiết bị đã được dùng trong gia đình',
       );
