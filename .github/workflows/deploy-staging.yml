@@ -10,6 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate VPS secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+
+          missing=""
+          [ -n "$VPS_HOST" ] || missing="$missing VPS_HOST"
+          [ -n "$VPS_USER" ] || missing="$missing VPS_USER"
+          [ -n "$VPS_SSH_KEY" ] || missing="$missing VPS_SSH_KEY"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required GitHub repository secrets:$missing"
+            exit 1
+          fi
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -19,6 +37,14 @@ jobs:
           script: |
             set -e
 
+            on_error() {
+              echo "Deploy failed. Current Docker status:"
+              docker compose -f docker-compose.prod.yml ps || true
+              echo "Recent API logs:"
+              docker compose -f docker-compose.prod.yml logs --tail=120 api || true
+            }
+            trap on_error ERR
+
             cd /home/FAMILY_CARE_DIGITAL_MANAGEMENT
             git checkout Staging
             git pull origin Staging
@@ -26,7 +52,7 @@ jobs:
             cd server
             docker compose -f docker-compose.prod.yml up -d --build
 
-            docker ps
-            curl -f http://127.0.0.1:3000/api/docs > /dev/null
+            docker compose -f docker-compose.prod.yml ps
+            curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/api/docs > /dev/null
 
             echo "Deploy staging successfully"
