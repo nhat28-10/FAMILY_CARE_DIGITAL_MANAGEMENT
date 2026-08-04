@@ -398,3 +398,52 @@ Watcher vào **giữa chừng**: chỉ cần `sos:join` → nhận `sos:snapshot
   # trigger (tự stream khi nhận sos:track:start)
   $env:TOKEN="<token A>"; $env:WORKSPACE="<familyId>"; $env:ROLE="trigger"; node scripts/sos-ws-test.mjs
   ```
+---
+
+## 6. Wear OS emulator auto-SOS events
+
+Use the existing wearable event endpoint:
+
+`POST /api/v1/families/:familyId/wearables/:deviceId/events`
+
+Supported demo auto-SOS events:
+
+- `FALL_DETECTED`: create SOS only when family setting `autoCreateAlertFromFall=true`.
+- `HEART_RATE_ABNORMAL`: create SOS when family SOS and device SOS are enabled.
+- `SOS_BUTTON_PRESSED`: create SOS immediately from the wearable SOS button.
+
+Example fall event:
+
+```json
+{
+  "eventType": "FALL_DETECTED",
+  "severity": "HIGH",
+  "rawValue": {
+    "gForce": 3.2,
+    "stillSeconds": 8
+  }
+}
+```
+
+Example abnormal heart-rate event:
+
+```json
+{
+  "eventType": "HEART_RATE_ABNORMAL",
+  "rawValue": {
+    "heartRate": 142,
+    "thresholdHigh": 130,
+    "durationSeconds": 30
+  }
+}
+```
+
+Response remains:
+
+```json
+{
+  "event": { "...": "..." },
+  "alertId": "<sosAlertId or null>",
+  "alertCreated": true
+}
+```

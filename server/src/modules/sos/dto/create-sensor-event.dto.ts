@@ -14,7 +14,7 @@ export class CreateSensorEventDto {
 
   @ApiPropertyOptional({
     description: 'Số liệu thô từ cảm biến (JSON tùy thiết bị)',
-    example: { gForce: 3.2, heartRate: 120 },
+    example: { gForce: 3.2, heartRate: 142 },
   })
   @IsOptional()
   @IsObject()
