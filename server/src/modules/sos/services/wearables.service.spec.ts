@@ -7,6 +7,7 @@ import {
   DevicePairingStatus,
   FamilyRole,
   SensorEventType,
+  SosSeverity,
   SosSourceType,
   WearableDeviceType,
 } from '@prisma/client';
@@ -276,6 +277,29 @@ describe('WearablesService', () => {
       );
 
       expect(sosService.trigger).toHaveBeenCalled();
+      expect(result.alertCreated).toBe(true);
+    });
+
+    it('creates a critical alert on HEART_RATE_ABNORMAL with bpm context', async () => {
+      const result = await service.ingestEvent(
+        workspaceId,
+        pairedDevice.id,
+        owner,
+        {
+          eventType: SensorEventType.HEART_RATE_ABNORMAL,
+          rawValue: { heartRate: 142 },
+        },
+      );
+
+      expect(sosService.trigger).toHaveBeenCalledWith(
+        workspaceId,
+        owner.id,
+        expect.objectContaining({
+          severity: SosSeverity.CRITICAL,
+          message: 'Thiet bi phat hien nhip tim bat thuong (142 bpm)',
+        }),
+        pairedDevice.id,
+      );
       expect(result.alertCreated).toBe(true);
     });
 

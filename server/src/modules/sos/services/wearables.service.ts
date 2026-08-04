@@ -235,11 +235,13 @@ export class WearablesService {
           device.deviceType === WearableDeviceType.SIMULATED_DEVICE
             ? SosSourceType.SIMULATED_DEVICE
             : SosSourceType.WEARABLE,
-        severity: dto.severity ?? SosSeverity.HIGH,
+        severity: dto.severity ?? this.defaultSeverityForEvent(dto.eventType),
         message:
-          dto.eventType === SensorEventType.FALL_DETECTED
-            ? 'Thiết bị phát hiện té ngã'
-            : 'Nút SOS trên thiết bị được nhấn',
+          dto.eventType === SensorEventType.HEART_RATE_ABNORMAL
+            ? this.buildAlertMessage(dto)
+            : dto.eventType === SensorEventType.FALL_DETECTED
+              ? 'Thiết bị phát hiện té ngã'
+              : 'Nút SOS trên thiết bị được nhấn',
       },
       device.id,
     );
@@ -281,7 +283,28 @@ export class WearablesService {
     if (eventType === SensorEventType.FALL_DETECTED) {
       return settings.autoCreateAlertFromFall;
     }
+    if (eventType === SensorEventType.HEART_RATE_ABNORMAL) {
+      return true;
+    }
     return false;
+  }
+
+  private defaultSeverityForEvent(eventType: SensorEventType) {
+    return eventType === SensorEventType.HEART_RATE_ABNORMAL
+      ? SosSeverity.CRITICAL
+      : SosSeverity.HIGH;
+  }
+
+  private buildAlertMessage(dto: CreateSensorEventDto) {
+    const heartRate = this.extractHeartRate(dto.rawValue);
+    return heartRate === null
+      ? 'Thiet bi phat hien nhip tim bat thuong'
+      : `Thiet bi phat hien nhip tim bat thuong (${heartRate} bpm)`;
+  }
+
+  private extractHeartRate(rawValue?: Record<string, unknown>) {
+    const value = rawValue?.heartRate;
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
 
   private async loadDevice(workspaceId: string, deviceId: string) {
