@@ -86,9 +86,40 @@ export class WearablesService {
       ownerUserId = target.userId;
     }
 
-    await this.assertNoPairedWearable(ownerUserId);
-
     try {
+      const existingDevice = await this.prisma.wearableDevice.findFirst({
+        where: {
+          workspaceId,
+          deviceIdentifier: dto.deviceIdentifier,
+        },
+      });
+      if (existingDevice) {
+        if (existingDevice.ownerUserId !== ownerUserId) {
+          throw new ConflictException(
+            'Mã định danh thiết bị đã được dùng trong gia đình',
+          );
+        }
+        if (existingDevice.pairingStatus === DevicePairingStatus.PAIRED) {
+          throw new ConflictException('Tai khoan nay da ket noi mot wearable');
+        }
+
+        await this.assertNoPairedWearable(ownerUserId, existingDevice.id);
+        return await this.prisma.wearableDevice.update({
+          where: { id: existingDevice.id },
+          data: {
+            ownerMemberId,
+            ownerUserId,
+            deviceName: dto.deviceName,
+            deviceType: dto.deviceType,
+            pairingStatus: DevicePairingStatus.PAIRED,
+            gpsEnabled: dto.gpsEnabled ?? true,
+            sosEnabled: dto.sosEnabled ?? true,
+          },
+          include: ownerInclude,
+        });
+      }
+
+      await this.assertNoPairedWearable(ownerUserId);
       return await this.prisma.wearableDevice.create({
         data: {
           workspaceId,
@@ -356,7 +387,9 @@ export class WearablesService {
         typeof target === 'string'
           ? [target]
           : Array.isArray(target)
-            ? target
+            ? target.filter(
+                (field): field is string => typeof field === 'string',
+              )
             : [];
       if (
         fields.some((field) =>
