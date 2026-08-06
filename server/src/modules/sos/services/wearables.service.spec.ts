@@ -72,7 +72,16 @@ describe('WearablesService', () => {
     prisma = {
       wearableDevice: {
         create: jest.fn().mockResolvedValue(pairedDevice),
-        findFirst: jest.fn().mockResolvedValue(pairedDevice),
+        findFirst: jest.fn().mockImplementation((args?: { where?: object }) => {
+          if (
+            args?.where &&
+            'deviceIdentifier' in args.where &&
+            'workspaceId' in args.where
+          ) {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve(pairedDevice);
+        }),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue(pairedDevice),
         delete: jest.fn().mockResolvedValue(pairedDevice),
@@ -152,6 +161,51 @@ describe('WearablesService', () => {
       await expect(
         service.pair(workspaceId, owner, pairDto),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('re-pairs an existing unpaired wearable for the same account and identifier', async () => {
+      const unpairedDevice = {
+        ...pairedDevice,
+        pairingStatus: DevicePairingStatus.UNPAIRED,
+      };
+      prisma.wearableDevice.findFirst.mockResolvedValueOnce(unpairedDevice);
+
+      await service.pair(workspaceId, owner, pairDto);
+
+      expect(prisma.wearableDevice.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: unpairedDevice.id },
+          data: expect.objectContaining({
+            ownerMemberId: owner.id,
+            ownerUserId: owner.userId,
+            pairingStatus: DevicePairingStatus.PAIRED,
+          }),
+        }),
+      );
+      expect(
+        prisma.wearableDevice.update.mock.calls[0][0].data,
+      ).not.toHaveProperty('deviceIdentifier');
+      expect(prisma.wearableDevice.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new wearable after the account no longer has a paired device', async () => {
+      prisma.wearableDevice.count.mockResolvedValue(0);
+
+      await service.pair(workspaceId, owner, {
+        ...pairDto,
+        deviceIdentifier: 'SN-NEW',
+      });
+
+      expect(prisma.wearableDevice.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            ownerUserId: owner.userId,
+            deviceIdentifier: 'SN-NEW',
+            pairingStatus: DevicePairingStatus.PAIRED,
+          }),
+        }),
+      );
+      expect(prisma.wearableDevice.update).not.toHaveBeenCalled();
     });
   });
 
