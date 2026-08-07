@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
+import { AuthModule } from '../auth/auth.module';
 import { FamilyMembersModule } from '../family-members/family-members.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
@@ -8,9 +9,11 @@ import { EmergencyContactsController } from './controllers/emergency-contacts.co
 import { MyWearablesController } from './controllers/my-wearables.controller';
 import { SosController } from './controllers/sos.controller';
 import { SosSettingsController } from './controllers/sos-settings.controller';
+import { WearableActivationsController } from './controllers/wearable-activations.controller';
 import { WearablesController } from './controllers/wearables.controller';
 import { SosService } from './services/sos.service';
 import { SosSettingsService } from './services/sos-settings.service';
+import { WearableActivationsService } from './services/wearable-activations.service';
 import { WearablesService } from './services/wearables.service';
 import { SosGateway } from './sos.gateway';
 
@@ -21,6 +24,7 @@ import { SosGateway } from './sos.gateway';
 @Module({
   imports: [
     JwtModule.register({}),
+    AuthModule,
     UsersModule,
     FamilyMembersModule,
     NotificationsModule,
@@ -29,10 +33,17 @@ import { SosGateway } from './sos.gateway';
     SosController,
     SosSettingsController,
     EmergencyContactsController,
+    WearableActivationsController,
     MyWearablesController,
     WearablesController,
   ],
-  providers: [SosService, SosSettingsService, WearablesService, SosGateway],
+  providers: [
+    SosService,
+    SosSettingsService,
+    WearableActivationsService,
+    WearablesService,
+    SosGateway,
+  ],
   exports: [SosGateway, SosService],
 })
 export class SosModule {}

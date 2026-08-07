@@ -14,6 +14,7 @@ import {
   SosAlertStatus,
   SosSeverity,
   SosSourceType,
+  WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
 import type { FamilyMember, WearableDevice } from '@prisma/client';
@@ -114,7 +115,7 @@ export class WearablesService {
         }
 
         await this.assertNoPairedWearable(ownerUserId, existingDevice.id);
-        return await this.prisma.wearableDevice.update({
+        const device = await this.prisma.wearableDevice.update({
           where: { id: existingDevice.id },
           data: {
             ownerMemberId,
@@ -127,10 +128,17 @@ export class WearablesService {
           },
           include: ownerInclude,
         });
+        await this.markActivationPaired(dto.deviceIdentifier, {
+          workspaceId,
+          ownerMemberId,
+          ownerUserId,
+          wearableDeviceId: device.id,
+        });
+        return device;
       }
 
       await this.assertNoPairedWearable(ownerUserId);
-      return await this.prisma.wearableDevice.create({
+      const device = await this.prisma.wearableDevice.create({
         data: {
           workspaceId,
           ownerMemberId,
@@ -144,6 +152,13 @@ export class WearablesService {
         },
         include: ownerInclude,
       });
+      await this.markActivationPaired(dto.deviceIdentifier, {
+        workspaceId,
+        ownerMemberId,
+        ownerUserId,
+        wearableDeviceId: device.id,
+      });
+      return device;
     } catch (error) {
       this.rethrowUniqueViolation(error);
     }
@@ -361,6 +376,31 @@ export class WearablesService {
   ) {
     const value = rawValue?.[key];
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  private async markActivationPaired(
+    code: string,
+    data: {
+      workspaceId: string;
+      ownerMemberId: string;
+      ownerUserId: string;
+      wearableDeviceId: string;
+    },
+  ) {
+    await this.prisma.wearableActivationSession.updateMany({
+      where: {
+        code,
+        status: WearableActivationStatus.PENDING,
+        expiresAt: { gt: new Date() },
+      },
+      data: {
+        status: WearableActivationStatus.PAIRED,
+        workspaceId: data.workspaceId,
+        ownerMemberId: data.ownerMemberId,
+        ownerUserId: data.ownerUserId,
+        wearableDeviceId: data.wearableDeviceId,
+      },
+    });
   }
 
   private async loadDevice(workspaceId: string, deviceId: string) {

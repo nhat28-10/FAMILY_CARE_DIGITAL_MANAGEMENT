@@ -9,6 +9,7 @@ import {
   SensorEventType,
   SosSeverity,
   SosSourceType,
+  WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
 
@@ -60,6 +61,7 @@ describe('WearablesService', () => {
       delete: jest.Mock;
       count: jest.Mock;
     };
+    wearableActivationSession: { updateMany: jest.Mock };
     familyMember: { findFirst: jest.Mock };
     sensorEvent: { create: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     sosAlert: { findFirst: jest.Mock };
@@ -86,6 +88,9 @@ describe('WearablesService', () => {
         update: jest.fn().mockResolvedValue(pairedDevice),
         delete: jest.fn().mockResolvedValue(pairedDevice),
         count: jest.fn().mockResolvedValue(0),
+      },
+      wearableActivationSession: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       familyMember: { findFirst: jest.fn() },
       sensorEvent: {
@@ -206,6 +211,27 @@ describe('WearablesService', () => {
         }),
       );
       expect(prisma.wearableDevice.update).not.toHaveBeenCalled();
+    });
+
+    it('marks a live activation session as paired when pairing by FCW code', async () => {
+      await service.pair(workspaceId, owner, {
+        ...pairDto,
+        deviceIdentifier: 'FCW-8SRERK',
+      });
+
+      expect(prisma.wearableActivationSession.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            code: 'FCW-8SRERK',
+            status: WearableActivationStatus.PENDING,
+          }),
+          data: expect.objectContaining({
+            status: WearableActivationStatus.PAIRED,
+            ownerUserId: owner.userId,
+            wearableDeviceId: pairedDevice.id,
+          }),
+        }),
+      );
     });
   });
 

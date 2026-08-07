@@ -279,7 +279,21 @@ export class AuthService {
     return sanitizeUser(user);
   }
 
-  /** Xác thực email bằng mã OTP; trả về user đã được cập nhật trạng thái. */
+  /** Cấp token nội bộ cho một user đã được backend xác thực qua luồng trusted khác. */
+  async issueTokensForUserId(userId: string): Promise<AuthResult> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Không tìm thấy người dùng');
+    }
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản đã bị khóa');
+    }
+
+    const loggedInUser = await this.usersService.updateLastLogin(user.id);
+    return this.buildAuthResult(loggedInUser);
+  }
+
+  /** Cập nhật hồ sơ cá nhân của user hiện tại. */
   async updateProfile(
     userId: string,
     dto: UpdateMyProfileDto,
