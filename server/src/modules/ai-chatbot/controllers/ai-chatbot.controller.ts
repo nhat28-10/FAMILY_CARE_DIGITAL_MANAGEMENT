@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -26,6 +28,15 @@ import { VerifiedGuard } from '../../auth/guards/verified.guard';
 import { CurrentFamilyMember } from '../../family-members/decorators/current-family-member.decorator';
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { AiMessageQueryDto } from '../dto/ai-message-query.dto';
+import {
+  AiConfirmActionApiResponseDto,
+  AiConversationApiResponseDto,
+  AiConversationListApiResponseDto,
+  AiDeleteConversationApiResponseDto,
+  AiMessageListApiResponseDto,
+  AiRejectActionApiResponseDto,
+  AiSendMessageApiResponseDto,
+} from '../dto/ai-chatbot-response.dto';
 import { CreateAiConversationDto } from '../dto/create-ai-conversation.dto';
 import { SendAiMessageDto } from '../dto/send-ai-message.dto';
 import { AiActionsService } from '../services/ai-actions.service';
@@ -52,6 +63,7 @@ export class AiChatbotController {
   @HttpCode(HttpStatus.CREATED)
   @ResponseMessage('Tạo cuộc trò chuyện với trợ lý AI thành công')
   @ApiOperation({ summary: 'Tạo cuộc trò chuyện mới với trợ lý AI' })
+  @ApiCreatedResponse({ type: AiConversationApiResponseDto })
   createConversation(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -65,6 +77,7 @@ export class AiChatbotController {
   @ApiOperation({
     summary: 'Danh sách cuộc trò chuyện AI của chính thành viên hiện tại',
   })
+  @ApiOkResponse({ type: AiConversationListApiResponseDto })
   listConversations(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -82,6 +95,7 @@ export class AiChatbotController {
   @ResponseMessage('Lấy lịch sử trò chuyện AI thành công')
   @ApiOperation({ summary: 'Lịch sử tin nhắn của một cuộc trò chuyện AI' })
   @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @ApiOkResponse({ type: AiMessageListApiResponseDto })
   listMessages(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -109,6 +123,7 @@ export class AiChatbotController {
   @ApiParam({ name: 'conversationId', format: 'uuid' })
   @ApiResponse({ status: 502, description: 'Trợ lý AI không phản hồi' })
   @ApiResponse({ status: 503, description: 'Trợ lý AI chưa được cấu hình' })
+  @ApiOkResponse({ type: AiSendMessageApiResponseDto })
   sendMessage(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember() member: FamilyMember,
@@ -129,6 +144,7 @@ export class AiChatbotController {
   @ApiParam({ name: 'messageId', format: 'uuid' })
   @ApiResponse({ status: 409, description: 'Đề xuất đã được xử lý' })
   @ApiResponse({ status: 410, description: 'Đề xuất đã hết hạn' })
+  @ApiOkResponse({ type: AiConfirmActionApiResponseDto })
   confirmAction(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember() member: FamilyMember,
@@ -149,6 +165,7 @@ export class AiChatbotController {
   @ApiOperation({ summary: 'Từ chối đề xuất hành động của AI' })
   @ApiParam({ name: 'conversationId', format: 'uuid' })
   @ApiParam({ name: 'messageId', format: 'uuid' })
+  @ApiOkResponse({ type: AiRejectActionApiResponseDto })
   rejectAction(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember() member: FamilyMember,
@@ -169,6 +186,7 @@ export class AiChatbotController {
     summary: 'Xóa một cuộc trò chuyện AI (kèm toàn bộ tin nhắn)',
   })
   @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @ApiOkResponse({ type: AiDeleteConversationApiResponseDto })
   deleteConversation(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,

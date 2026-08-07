@@ -12,7 +12,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -25,6 +28,7 @@ import { CurrentFamilyMember } from '../../family-members/decorators/current-fam
 import { FamilyPermissionGuard } from '../../family-members/guards/family-permission.guard';
 import { CreateSensorEventDto } from '../dto/create-sensor-event.dto';
 import { PairWearableDto } from '../dto/pair-wearable.dto';
+import { WearableEventIngestApiResponseDto } from '../dto/sensor-event-response.dto';
 import { UpdateWearableDto } from '../dto/update-wearable.dto';
 import { WearablesService } from '../services/wearables.service';
 
@@ -89,6 +93,19 @@ export class WearablesController {
   @ApiOperation({
     summary:
       'Nhận sự kiện cảm biến (chỉ chủ thiết bị) — SOS_BUTTON_PRESSED/FALL_DETECTED có thể tự tạo cảnh báo',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Returns saved event plus alertCreated/alertId. Duplicate active SOS returns alertCreated=false and alertId=existing active alert id.',
+    type: WearableEventIngestApiResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'code/errorCode can be WEARABLE_NOT_PAIRED, INVALID_SENSOR_EVENT_TYPE, or INVALID_SENSOR_EVENT_PAYLOAD.',
+  })
+  @ApiConflictResponse({
+    description:
+      'code/errorCode can be WEARABLE_ALREADY_PAIRED or DEVICE_IDENTIFIER_TAKEN.',
   })
   ingestEvent(
     @Param('familyId') familyId: string,

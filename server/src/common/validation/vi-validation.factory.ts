@@ -125,6 +125,12 @@ const DOCKER_LOG_QUERY_FIELDS = new Set([
   'until',
 ]);
 
+function validationErrorCode(property?: string): string | undefined {
+  if (property === 'eventType') return 'INVALID_SENSOR_EVENT_TYPE';
+  if (property === 'rawValue') return 'INVALID_SENSOR_EVENT_PAYLOAD';
+  return undefined;
+}
+
 /** Builds a Vietnamese message for a single failed constraint. */
 function messageFor(property: string, key: string): string {
   const label = FIELD_LABELS[property] ?? property;
@@ -214,5 +220,8 @@ export function viValidationExceptionFactory(
         ? messageFor(first.property, key)
         : 'Dữ liệu không hợp lệ';
 
-  return new BadRequestException(message);
+  const code = validationErrorCode(first?.property);
+  return new BadRequestException(
+    code ? { message, code, errorCode: code } : message,
+  );
 }
