@@ -319,6 +319,7 @@ model User {
   refreshTokens           RefreshToken[]
   deviceTokens            DeviceToken[]
   ownedWearableDevices    WearableDevice[]           @relation("OwnedUserWearableDevices")
+  wearableActivations     WearableActivationSession[] @relation("WearableActivationOwnerUser")
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   joinRequests            JoinRequest[]
@@ -432,6 +433,7 @@ model Family {
   tasks                      Task[]
   sosSetting                 SosSetting?
   wearableDevices            WearableDevice[]
+  wearableActivations        WearableActivationSession[]
   sosAlerts                  SosAlert[]
   memberLocationPoints       MemberLocationPoint[]
   notifications              Notification[]
@@ -495,6 +497,7 @@ model FamilyMember {
   resolvedRewardDisputes           RewardDispute[]            @relation("RewardDisputeResolvedBy")
   createdSosSettings               SosSetting[]               @relation("CreatedSosSettings")
   ownedWearableDevices             WearableDevice[]           @relation("OwnedWearableDevices")
+  wearableActivations              WearableActivationSession[] @relation("WearableActivationOwnerMember")
   triggeredSosAlerts               SosAlert[]                 @relation("TriggeredSosAlerts")
   resolvedSosAlerts                SosAlert[]                 @relation("ResolvedSosAlerts")
   sosResponses                     SosResponse[]              @relation("SosResponses")
@@ -1308,6 +1311,13 @@ enum DevicePairingStatus {
   LOST
 }
 
+enum WearableActivationStatus {
+  PENDING
+  PAIRED
+  CLAIMED
+  EXPIRED
+}
+
 /// Origin of a GPS location point (shared by SOS routes and daily tracking).
 enum GpsSourceType {
   MOBILE_GPS
@@ -1404,6 +1414,7 @@ model WearableDevice {
   sosLocationPoints    SosLocationPoint[]
   sensorEvents         SensorEvent[]
   memberLocationPoints MemberLocationPoint[]
+  activationSessions   WearableActivationSession[]
 
   // Plus a partial unique index (one paired wearable per user account) added
   // via raw SQL in the migration: UNIQUE(owner_user_id) WHERE pairing_status='PAIRED'.
@@ -1412,6 +1423,34 @@ model WearableDevice {
   @@index([ownerMemberId])
   @@index([ownerUserId])
   @@map("wearable_devices")
+}
+
+/// Short-lived activation session used by Wear OS before it has a user token.
+model WearableActivationSession {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @map("activation_session_id") @db.Uuid
+  code             String                   @map("code")
+  status           WearableActivationStatus @default(PENDING) @map("status")
+  deviceName       String?                  @map("device_name")
+  deviceType       WearableDeviceType       @default(SMARTWATCH) @map("device_type")
+  workspaceId      String?                  @map("workspace_id")
+  ownerMemberId    String?                  @map("owner_member_id")
+  ownerUserId      String?                  @map("owner_user_id")
+  wearableDeviceId String?                  @map("wearable_device_id") @db.Uuid
+  expiresAt        DateTime                 @map("expires_at") @db.Timestamptz
+  claimedAt        DateTime?                @map("claimed_at") @db.Timestamptz
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace      Family?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerMember    FamilyMember?   @relation("WearableActivationOwnerMember", fields: [ownerMemberId], references: [id], onDelete: Cascade)
+  ownerUser      User?           @relation("WearableActivationOwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  wearableDevice WearableDevice? @relation(fields: [wearableDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([code, status])
+  @@index([expiresAt])
+  @@index([ownerUserId])
+  @@index([wearableDeviceId])
+  @@map("wearable_activation_sessions")
 }
 
 /// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
