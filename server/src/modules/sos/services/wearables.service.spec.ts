@@ -61,7 +61,8 @@ describe('WearablesService', () => {
       delete: jest.Mock;
       count: jest.Mock;
     };
-    wearableActivationSession: { updateMany: jest.Mock };
+    wearableActivationSession: { findMany: jest.Mock; updateMany: jest.Mock };
+    refreshToken: { updateMany: jest.Mock };
     familyMember: { findFirst: jest.Mock };
     sensorEvent: { create: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     sosAlert: { findFirst: jest.Mock };
@@ -90,8 +91,10 @@ describe('WearablesService', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       wearableActivationSession: {
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       familyMember: { findFirst: jest.fn() },
       sensorEvent: {
         create: jest.fn().mockResolvedValue({ id: 'event-1' }),
@@ -272,6 +275,25 @@ describe('WearablesService', () => {
           data: expect.objectContaining({
             pairingStatus: DevicePairingStatus.UNPAIRED,
           }),
+        }),
+      );
+    });
+
+    it('revokes wearable refresh token sessions when unpairing', async () => {
+      prisma.wearableActivationSession.findMany.mockResolvedValue([
+        { claimedRefreshTokenId: 'refresh-session-1' },
+      ]);
+
+      await service.update(workspaceId, pairedDevice.id, owner, {
+        pairingStatus: DevicePairingStatus.UNPAIRED,
+      });
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: { in: ['refresh-session-1'] },
+            revokedAt: null,
+          },
         }),
       );
     });

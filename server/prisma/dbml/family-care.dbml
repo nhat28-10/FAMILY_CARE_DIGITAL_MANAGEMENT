@@ -83,6 +83,7 @@ Table refresh_tokens {
   revokedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   user users [not null]
+  wearableActivationSessions wearable_activation_sessions [not null]
 
   Note: 'One row per active refresh token (per device/session). The raw token is never stored — only its bcrypt hash. Supports multi-device + per-session revocation and rotation.'
 }
@@ -824,6 +825,7 @@ Table wearable_activation_sessions {
   ownerMemberId String
   ownerUserId String
   wearableDeviceId String
+  claimedRefreshTokenId String
   expiresAt DateTime [not null]
   claimedAt DateTime
   createdAt DateTime [default: `now()`, not null]
@@ -832,6 +834,7 @@ Table wearable_activation_sessions {
   ownerMember family_members
   ownerUser users
   wearableDevice wearable_devices
+  claimedRefreshToken refresh_tokens
 
   Note: 'Short-lived activation session used by Wear OS before it has a user token.'
 }
@@ -2024,6 +2027,8 @@ Ref: wearable_activation_sessions.ownerMemberId > family_members.id [delete: Cas
 Ref: wearable_activation_sessions.ownerUserId > users.id [delete: Cascade]
 
 Ref: wearable_activation_sessions.wearableDeviceId > wearable_devices.id [delete: Set Null]
+
+Ref: wearable_activation_sessions.claimedRefreshTokenId > refresh_tokens.id [delete: Set Null]
 
 Ref: sos_alerts.workspaceId > families.id [delete: Cascade]
 

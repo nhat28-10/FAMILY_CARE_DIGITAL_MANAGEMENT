@@ -318,13 +318,13 @@ model User {
   memberships             FamilyMember[]
   refreshTokens           RefreshToken[]
   deviceTokens            DeviceToken[]
-  ownedWearableDevices    WearableDevice[]           @relation("OwnedUserWearableDevices")
+  ownedWearableDevices    WearableDevice[]            @relation("OwnedUserWearableDevices")
   wearableActivations     WearableActivationSession[] @relation("WearableActivationOwnerUser")
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   joinRequests            JoinRequest[]
-  provisioningLogs        WorkspaceProvisioningLog[] @relation("CreatedProvisioningLogs")
-  purchasedSubscriptions  FamilySubscription[]       @relation("PurchasedSubscriptions")
+  provisioningLogs        WorkspaceProvisioningLog[]  @relation("CreatedProvisioningLogs")
+  purchasedSubscriptions  FamilySubscription[]        @relation("PurchasedSubscriptions")
 
   @@map("users")
 }
@@ -394,7 +394,8 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wearableActivationSessions WearableActivationSession[] @relation("WearableActivationClaimedRefreshToken")
 
   @@index([userId])
   @@map("refresh_tokens")
@@ -475,56 +476,56 @@ model FamilyMember {
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  decidedJoinRequests              JoinRequest[]              @relation("DecidedJoinRequests")
+  decidedJoinRequests              JoinRequest[]               @relation("DecidedJoinRequests")
   monthlyFinances                  MemberMonthlyFinance[]
-  createdLedgerEntries             LedgerEntry[]              @relation("CreatedLedgerEntries")
-  createdBudgetPlans               BudgetPlan[]               @relation("CreatedBudgetPlans")
-  createdFinancialGoals            FinancialGoal[]            @relation("CreatedFinancialGoals")
-  goalAllocations                  GoalAllocation[]           @relation("GoalAllocations")
-  requestedSpendingSupportRequests SpendingSupportRequest[]   @relation("RequestedSpendingSupportRequests")
-  reviewedSpendingSupportRequests  SpendingSupportRequest[]   @relation("ReviewedSpendingSupportRequests")
-  createdTasks                     Task[]                     @relation("CreatedTasks")
-  assignedTasks                    TaskAssignment[]           @relation("TaskAssignedTo")
-  givenTaskAssignments             TaskAssignment[]           @relation("TaskAssignedBy")
-  submittedTaskSubmissions         TaskSubmission[]           @relation("TaskSubmissionSubmittedBy")
-  reviewedTaskSubmissions          TaskSubmission[]           @relation("TaskSubmissionReviewedBy")
-  reportedTaskUnavailabilities     TaskUnavailability[]       @relation("TaskUnavailabilityReportedBy")
-  handledTaskUnavailabilities      TaskUnavailability[]       @relation("TaskUnavailabilityHandledBy")
-  receivedRewardSettlements        RewardSettlement[]         @relation("RewardSettlementReceiver")
-  settledRewardSettlements         RewardSettlement[]         @relation("RewardSettlementSettledBy")
-  rewardAllocations                RewardAllocation[]         @relation("RewardAllocationAllocatedBy")
-  reportedRewardDisputes           RewardDispute[]            @relation("RewardDisputeReportedBy")
-  resolvedRewardDisputes           RewardDispute[]            @relation("RewardDisputeResolvedBy")
-  createdSosSettings               SosSetting[]               @relation("CreatedSosSettings")
-  ownedWearableDevices             WearableDevice[]           @relation("OwnedWearableDevices")
+  createdLedgerEntries             LedgerEntry[]               @relation("CreatedLedgerEntries")
+  createdBudgetPlans               BudgetPlan[]                @relation("CreatedBudgetPlans")
+  createdFinancialGoals            FinancialGoal[]             @relation("CreatedFinancialGoals")
+  goalAllocations                  GoalAllocation[]            @relation("GoalAllocations")
+  requestedSpendingSupportRequests SpendingSupportRequest[]    @relation("RequestedSpendingSupportRequests")
+  reviewedSpendingSupportRequests  SpendingSupportRequest[]    @relation("ReviewedSpendingSupportRequests")
+  createdTasks                     Task[]                      @relation("CreatedTasks")
+  assignedTasks                    TaskAssignment[]            @relation("TaskAssignedTo")
+  givenTaskAssignments             TaskAssignment[]            @relation("TaskAssignedBy")
+  submittedTaskSubmissions         TaskSubmission[]            @relation("TaskSubmissionSubmittedBy")
+  reviewedTaskSubmissions          TaskSubmission[]            @relation("TaskSubmissionReviewedBy")
+  reportedTaskUnavailabilities     TaskUnavailability[]        @relation("TaskUnavailabilityReportedBy")
+  handledTaskUnavailabilities      TaskUnavailability[]        @relation("TaskUnavailabilityHandledBy")
+  receivedRewardSettlements        RewardSettlement[]          @relation("RewardSettlementReceiver")
+  settledRewardSettlements         RewardSettlement[]          @relation("RewardSettlementSettledBy")
+  rewardAllocations                RewardAllocation[]          @relation("RewardAllocationAllocatedBy")
+  reportedRewardDisputes           RewardDispute[]             @relation("RewardDisputeReportedBy")
+  resolvedRewardDisputes           RewardDispute[]             @relation("RewardDisputeResolvedBy")
+  createdSosSettings               SosSetting[]                @relation("CreatedSosSettings")
+  ownedWearableDevices             WearableDevice[]            @relation("OwnedWearableDevices")
   wearableActivations              WearableActivationSession[] @relation("WearableActivationOwnerMember")
-  triggeredSosAlerts               SosAlert[]                 @relation("TriggeredSosAlerts")
-  resolvedSosAlerts                SosAlert[]                 @relation("ResolvedSosAlerts")
-  sosResponses                     SosResponse[]              @relation("SosResponses")
-  memberLocationPoints             MemberLocationPoint[]      @relation("MemberLocationPoints")
-  notifications                    Notification[]             @relation("MemberNotifications")
-  createdConversations             Conversation[]             @relation("CreatedConversations")
-  conversationParticipations       ConversationParticipant[]  @relation("ConversationParticipations")
-  sentMessages                     Message[]                  @relation("SentMessages")
-  pinnedMessages                   Message[]                  @relation("PinnedMessages")
-  messageReactions                 MessageReaction[]          @relation("MessageReactions")
-  createdAnnouncements             FamilyAnnouncement[]       @relation("CreatedAnnouncements")
-  createdCalendarEvents            CalendarEvent[]            @relation("CreatedCalendarEvents")
-  calendarEventParticipations      CalendarEventParticipant[] @relation("CalendarEventParticipations")
-  uploadedAlbumMedia               AlbumMedia[]               @relation("UploadedAlbumMedia")
-  deletedAlbumMedia                AlbumMedia[]               @relation("DeletedAlbumMedia")
-  reviewedModerationChecks         MediaModerationCheck[]     @relation("ReviewedModerationChecks")
-  taggedAlbumMediaTags             AlbumMediaTag[]            @relation("TaggedAlbumMediaTags")
-  createdAlbumMediaTags            AlbumMediaTag[]            @relation("CreatedAlbumMediaTags")
-  faceProfiles                     MemberFaceProfile[]        @relation("MemberFaceProfiles")
-  consentedFaceProfiles            MemberFaceProfile[]        @relation("ConsentedFaceProfiles")
-  requestedFaceScanJobs            FaceScanJob[]              @relation("RequestedFaceScanJobs")
-  suggestedAlbumTagSuggestions     AlbumTagSuggestion[]       @relation("SuggestedAlbumTagSuggestions")
-  confirmedAlbumTagSuggestions     AlbumTagSuggestion[]       @relation("ConfirmedAlbumTagSuggestions")
-  rejectedAlbumTagSuggestions      AlbumTagSuggestion[]       @relation("RejectedAlbumTagSuggestions")
-  aiConversations                  AIConversation[]           @relation("MemberAIConversations")
-  goalContributionPlans            GoalContributionPlan[]     @relation("GoalContributionPlans")
-  reviewedGoalContributionPlans    GoalContributionPlan[]     @relation("ReviewedGoalContributionPlans")
+  triggeredSosAlerts               SosAlert[]                  @relation("TriggeredSosAlerts")
+  resolvedSosAlerts                SosAlert[]                  @relation("ResolvedSosAlerts")
+  sosResponses                     SosResponse[]               @relation("SosResponses")
+  memberLocationPoints             MemberLocationPoint[]       @relation("MemberLocationPoints")
+  notifications                    Notification[]              @relation("MemberNotifications")
+  createdConversations             Conversation[]              @relation("CreatedConversations")
+  conversationParticipations       ConversationParticipant[]   @relation("ConversationParticipations")
+  sentMessages                     Message[]                   @relation("SentMessages")
+  pinnedMessages                   Message[]                   @relation("PinnedMessages")
+  messageReactions                 MessageReaction[]           @relation("MessageReactions")
+  createdAnnouncements             FamilyAnnouncement[]        @relation("CreatedAnnouncements")
+  createdCalendarEvents            CalendarEvent[]             @relation("CreatedCalendarEvents")
+  calendarEventParticipations      CalendarEventParticipant[]  @relation("CalendarEventParticipations")
+  uploadedAlbumMedia               AlbumMedia[]                @relation("UploadedAlbumMedia")
+  deletedAlbumMedia                AlbumMedia[]                @relation("DeletedAlbumMedia")
+  reviewedModerationChecks         MediaModerationCheck[]      @relation("ReviewedModerationChecks")
+  taggedAlbumMediaTags             AlbumMediaTag[]             @relation("TaggedAlbumMediaTags")
+  createdAlbumMediaTags            AlbumMediaTag[]             @relation("CreatedAlbumMediaTags")
+  faceProfiles                     MemberFaceProfile[]         @relation("MemberFaceProfiles")
+  consentedFaceProfiles            MemberFaceProfile[]         @relation("ConsentedFaceProfiles")
+  requestedFaceScanJobs            FaceScanJob[]               @relation("RequestedFaceScanJobs")
+  suggestedAlbumTagSuggestions     AlbumTagSuggestion[]        @relation("SuggestedAlbumTagSuggestions")
+  confirmedAlbumTagSuggestions     AlbumTagSuggestion[]        @relation("ConfirmedAlbumTagSuggestions")
+  rejectedAlbumTagSuggestions      AlbumTagSuggestion[]        @relation("RejectedAlbumTagSuggestions")
+  aiConversations                  AIConversation[]            @relation("MemberAIConversations")
+  goalContributionPlans            GoalContributionPlan[]      @relation("GoalContributionPlans")
+  reviewedGoalContributionPlans    GoalContributionPlan[]      @relation("ReviewedGoalContributionPlans")
 
   @@unique([familyId, userId])
   @@index([userId])
@@ -1427,29 +1428,32 @@ model WearableDevice {
 
 /// Short-lived activation session used by Wear OS before it has a user token.
 model WearableActivationSession {
-  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @map("activation_session_id") @db.Uuid
-  code             String                   @map("code")
-  status           WearableActivationStatus @default(PENDING) @map("status")
-  deviceName       String?                  @map("device_name")
-  deviceType       WearableDeviceType       @default(SMARTWATCH) @map("device_type")
-  workspaceId      String?                  @map("workspace_id")
-  ownerMemberId    String?                  @map("owner_member_id")
-  ownerUserId      String?                  @map("owner_user_id")
-  wearableDeviceId String?                  @map("wearable_device_id") @db.Uuid
-  expiresAt        DateTime                 @map("expires_at") @db.Timestamptz
-  claimedAt        DateTime?                @map("claimed_at") @db.Timestamptz
-  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @map("activation_session_id") @db.Uuid
+  code                  String                   @map("code")
+  status                WearableActivationStatus @default(PENDING) @map("status")
+  deviceName            String?                  @map("device_name")
+  deviceType            WearableDeviceType       @default(SMARTWATCH) @map("device_type")
+  workspaceId           String?                  @map("workspace_id")
+  ownerMemberId         String?                  @map("owner_member_id")
+  ownerUserId           String?                  @map("owner_user_id")
+  wearableDeviceId      String?                  @map("wearable_device_id") @db.Uuid
+  claimedRefreshTokenId String?                  @map("claimed_refresh_token_id")
+  expiresAt             DateTime                 @map("expires_at") @db.Timestamptz
+  claimedAt             DateTime?                @map("claimed_at") @db.Timestamptz
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
 
-  workspace      Family?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ownerMember    FamilyMember?   @relation("WearableActivationOwnerMember", fields: [ownerMemberId], references: [id], onDelete: Cascade)
-  ownerUser      User?           @relation("WearableActivationOwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  wearableDevice WearableDevice? @relation(fields: [wearableDeviceId], references: [id], onDelete: SetNull)
+  workspace           Family?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerMember         FamilyMember?   @relation("WearableActivationOwnerMember", fields: [ownerMemberId], references: [id], onDelete: Cascade)
+  ownerUser           User?           @relation("WearableActivationOwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  wearableDevice      WearableDevice? @relation(fields: [wearableDeviceId], references: [id], onDelete: SetNull)
+  claimedRefreshToken RefreshToken?   @relation("WearableActivationClaimedRefreshToken", fields: [claimedRefreshTokenId], references: [id], onDelete: SetNull)
 
   @@index([code, status])
   @@index([expiresAt])
   @@index([ownerUserId])
   @@index([wearableDeviceId])
+  @@index([claimedRefreshTokenId])
   @@map("wearable_activation_sessions")
 }
 

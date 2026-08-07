@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   GoneException,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ describe('WearableActivationsService', () => {
     ownerMemberId: null,
     ownerUserId: null,
     wearableDeviceId: null,
+    claimedRefreshTokenId: null,
     expiresAt: future,
     claimedAt: null,
   };
@@ -33,7 +35,7 @@ describe('WearableActivationsService', () => {
       updateMany: jest.Mock;
     };
   };
-  let auth: { issueTokensForUserId: jest.Mock };
+  let auth: { issueTokenSessionForUserId: jest.Mock };
   let service: WearableActivationsService;
 
   beforeEach(() => {
@@ -51,10 +53,13 @@ describe('WearableActivationsService', () => {
       },
     };
     auth = {
-      issueTokensForUserId: jest.fn().mockResolvedValue({
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        user: { id: 'user-1' },
+      issueTokenSessionForUserId: jest.fn().mockResolvedValue({
+        auth: {
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          user: { id: 'user-1' },
+        },
+        refreshTokenId: 'refresh-session-1',
       }),
     };
     service = new WearableActivationsService(
@@ -92,10 +97,17 @@ describe('WearableActivationsService', () => {
   });
 
   it('rejects claim before mobile has paired the code', async () => {
-    await expect(service.claim(baseSession.id)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(auth.issueTokensForUserId).not.toHaveBeenCalled();
+    try {
+      await service.claim(baseSession.id);
+      fail('Expected ACTIVATION_NOT_PAIRED');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        code: 'ACTIVATION_NOT_PAIRED',
+        errorCode: 'ACTIVATION_NOT_PAIRED',
+      });
+    }
+    expect(auth.issueTokenSessionForUserId).not.toHaveBeenCalled();
   });
 
   it('claims tokens after the activation session is paired', async () => {
@@ -113,11 +125,34 @@ describe('WearableActivationsService', () => {
         where: { id: baseSession.id },
         data: expect.objectContaining({
           status: WearableActivationStatus.CLAIMED,
+          claimedRefreshTokenId: 'refresh-session-1',
         }),
       }),
     );
-    expect(auth.issueTokensForUserId).toHaveBeenCalledWith('user-1');
+    expect(auth.issueTokenSessionForUserId).toHaveBeenCalledWith('user-1');
     expect(result.accessToken).toBe('access-token');
+  });
+
+  it('rejects claiming an already claimed activation session', async () => {
+    prisma.wearableActivationSession.findUnique.mockResolvedValue({
+      ...baseSession,
+      status: WearableActivationStatus.CLAIMED,
+      ownerUserId: 'user-1',
+      wearableDeviceId: 'c0ffee00-0000-0000-0000-000000000001',
+      claimedRefreshTokenId: 'refresh-session-1',
+    });
+
+    try {
+      await service.claim(baseSession.id);
+      fail('Expected ACTIVATION_ALREADY_CLAIMED');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        code: 'ACTIVATION_ALREADY_CLAIMED',
+        errorCode: 'ACTIVATION_ALREADY_CLAIMED',
+      });
+    }
+    expect(auth.issueTokenSessionForUserId).not.toHaveBeenCalled();
   });
 
   it('marks an expired session and rejects claim', async () => {
@@ -134,9 +169,16 @@ describe('WearableActivationsService', () => {
       expiresAt: new Date(Date.now() - 60_000),
     });
 
-    await expect(service.claim(baseSession.id)).rejects.toBeInstanceOf(
-      GoneException,
-    );
+    try {
+      await service.claim(baseSession.id);
+      fail('Expected ACTIVATION_EXPIRED');
+    } catch (error) {
+      expect(error).toBeInstanceOf(GoneException);
+      expect((error as GoneException).getResponse()).toMatchObject({
+        code: 'ACTIVATION_EXPIRED',
+        errorCode: 'ACTIVATION_EXPIRED',
+      });
+    }
   });
 
   it('throws not found for an unknown session', async () => {
