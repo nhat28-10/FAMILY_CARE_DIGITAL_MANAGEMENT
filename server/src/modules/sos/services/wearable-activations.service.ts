@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 
 import {
   BadRequestException,
+  ConflictException,
   GoneException,
   Injectable,
   NotFoundException,
@@ -18,6 +19,14 @@ import type { CreateWearableActivationDto } from '../dto/create-wearable-activat
 
 const ACTIVATION_TTL_MS = 10 * 60 * 1000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ACTIVATION_ERROR_CODES = {
+  ACTIVATION_NOT_FOUND: 'ACTIVATION_NOT_FOUND',
+  ACTIVATION_NOT_PAIRED: 'ACTIVATION_NOT_PAIRED',
+  ACTIVATION_ALREADY_CLAIMED: 'ACTIVATION_ALREADY_CLAIMED',
+  ACTIVATION_EXPIRED: 'ACTIVATION_EXPIRED',
+  ACTIVATION_INVALID_DEVICE: 'ACTIVATION_INVALID_DEVICE',
+  ACTIVATION_CREATE_FAILED: 'ACTIVATION_CREATE_FAILED',
+} as const;
 
 @Injectable()
 export class WearableActivationsService {
@@ -49,7 +58,10 @@ export class WearableActivationsService {
       }
     }
 
-    throw new BadRequestException('Khong tao duoc ma kich hoat wearable');
+    throw this.badRequest(
+      ACTIVATION_ERROR_CODES.ACTIVATION_CREATE_FAILED,
+      'Không tạo được mã kích hoạt wearable',
+    );
   }
 
   async getStatus(sessionId: string) {
@@ -63,30 +75,40 @@ export class WearableActivationsService {
     const current = await this.refreshExpiredStatus(session);
 
     if (current.status === WearableActivationStatus.EXPIRED) {
-      throw new GoneException('Ma kich hoat wearable da het han');
+      throw this.gone(
+        ACTIVATION_ERROR_CODES.ACTIVATION_EXPIRED,
+        'Mã kích hoạt wearable đã hết hạn',
+      );
     }
-    if (
-      current.status !== WearableActivationStatus.PAIRED &&
-      current.status !== WearableActivationStatus.CLAIMED
-    ) {
-      throw new BadRequestException('Wearable chua duoc ghep noi tren mobile');
+    if (current.status === WearableActivationStatus.CLAIMED) {
+      throw this.conflict(
+        ACTIVATION_ERROR_CODES.ACTIVATION_ALREADY_CLAIMED,
+        'Mã kích hoạt wearable đã được sử dụng',
+      );
+    }
+    if (current.status !== WearableActivationStatus.PAIRED) {
+      throw this.badRequest(
+        ACTIVATION_ERROR_CODES.ACTIVATION_NOT_PAIRED,
+        'Wearable chưa được ghép nối trên mobile',
+      );
     }
     if (!current.ownerUserId || !current.wearableDeviceId) {
-      throw new BadRequestException(
-        'Session kich hoat chua co thiet bi hop le',
+      throw this.badRequest(
+        ACTIVATION_ERROR_CODES.ACTIVATION_INVALID_DEVICE,
+        'Session kích hoạt chưa có thiết bị hợp lệ',
       );
     }
 
+    const { auth, refreshTokenId } =
+      await this.authService.issueTokenSessionForUserId(current.ownerUserId);
     const updated = await this.prisma.wearableActivationSession.update({
       where: { id: current.id },
       data: {
         status: WearableActivationStatus.CLAIMED,
-        claimedAt: current.claimedAt ?? new Date(),
+        claimedAt: new Date(),
+        claimedRefreshTokenId: refreshTokenId,
       },
     });
-    const auth = await this.authService.issueTokensForUserId(
-      current.ownerUserId,
-    );
 
     return {
       activation: this.toResponse(updated),
@@ -99,7 +121,11 @@ export class WearableActivationsService {
       where: { id: sessionId },
     });
     if (!session) {
-      throw new NotFoundException('Khong tim thay session kich hoat wearable');
+      throw new NotFoundException({
+        message: 'Không tìm thấy session kích hoạt wearable',
+        code: ACTIVATION_ERROR_CODES.ACTIVATION_NOT_FOUND,
+        errorCode: ACTIVATION_ERROR_CODES.ACTIVATION_NOT_FOUND,
+      });
     }
     return session;
   }
@@ -167,5 +193,17 @@ export class WearableActivationsService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     );
+  }
+
+  private badRequest(code: string, message: string) {
+    return new BadRequestException({ message, code, errorCode: code });
+  }
+
+  private conflict(code: string, message: string) {
+    return new ConflictException({ message, code, errorCode: code });
+  }
+
+  private gone(code: string, message: string) {
+    return new GoneException({ message, code, errorCode: code });
   }
 }

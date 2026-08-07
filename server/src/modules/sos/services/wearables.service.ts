@@ -213,11 +213,18 @@ export class WearablesService {
     }
 
     try {
-      return await this.prisma.wearableDevice.update({
+      const updated = await this.prisma.wearableDevice.update({
         where: { id: device.id },
         data: { ...dto },
         include: ownerInclude,
       });
+      if (
+        dto.pairingStatus !== undefined &&
+        dto.pairingStatus !== DevicePairingStatus.PAIRED
+      ) {
+        await this.revokeWearableTokenSessions(device.id);
+      }
+      return updated;
     } catch (error) {
       this.rethrowUniqueViolation(error);
     }
@@ -230,7 +237,11 @@ export class WearablesService {
   ) {
     const device = await this.loadDevice(workspaceId, deviceId);
     this.assertOwnerOrManager(device, currentMember);
-    return this.prisma.wearableDevice.delete({ where: { id: device.id } });
+    const deleted = await this.prisma.wearableDevice.delete({
+      where: { id: device.id },
+    });
+    await this.revokeWearableTokenSessions(device.id);
+    return deleted;
   }
 
   // ---------------------------------------------------------------------------
@@ -400,6 +411,27 @@ export class WearablesService {
         ownerUserId: data.ownerUserId,
         wearableDeviceId: data.wearableDeviceId,
       },
+    });
+  }
+
+  private async revokeWearableTokenSessions(deviceId: string) {
+    const sessions = await this.prisma.wearableActivationSession.findMany({
+      where: {
+        wearableDeviceId: deviceId,
+        claimedRefreshTokenId: { not: null },
+      },
+      select: { claimedRefreshTokenId: true },
+    });
+    const refreshTokenIds = sessions
+      .map((session) => session.claimedRefreshTokenId)
+      .filter((id): id is string => typeof id === 'string');
+    if (refreshTokenIds.length === 0) {
+      return;
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: { id: { in: refreshTokenIds }, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
   }
 
