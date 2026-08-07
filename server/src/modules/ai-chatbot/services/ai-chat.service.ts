@@ -117,6 +117,7 @@ export class AiChatService {
     const toolTrace: AiToolTrace[] = [];
     const modulesUsed = new Set<AiRelatedModule>();
     let pendingAction: AiPendingAction | undefined;
+    let deniedWriteAction: AiActionType | undefined;
 
     const maxRounds = this.openAiClient.config.maxToolRounds;
     for (let round = 0; round <= maxRounds; round++) {
@@ -137,6 +138,13 @@ export class AiChatService {
           call.type === 'function',
       );
       if (toolCalls.length === 0) {
+        if (!pendingAction && deniedWriteAction) {
+          return {
+            finalText: this.writePermissionText(deniedWriteAction),
+            toolTrace,
+            modulesUsed,
+          };
+        }
         return {
           finalText: choice.content?.trim() || this.fallbackText(),
           toolTrace,
@@ -155,6 +163,7 @@ export class AiChatService {
           pendingAction,
         );
         pendingAction = result.pendingAction ?? pendingAction;
+        deniedWriteAction = result.deniedActionType ?? deniedWriteAction;
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
@@ -164,7 +173,10 @@ export class AiChatService {
     }
 
     return {
-      finalText: this.fallbackText(),
+      finalText:
+        !pendingAction && deniedWriteAction
+          ? this.writePermissionText(deniedWriteAction)
+          : this.fallbackText(),
       toolTrace,
       pendingAction,
       modulesUsed,
@@ -177,7 +189,11 @@ export class AiChatService {
     toolTrace: AiToolTrace[],
     modulesUsed: Set<AiRelatedModule>,
     existingAction: AiPendingAction | undefined,
-  ): Promise<{ content: string; pendingAction?: AiPendingAction }> {
+  ): Promise<{
+    content: string;
+    pendingAction?: AiPendingAction;
+    deniedActionType?: AiActionType;
+  }> {
     const name = call.function.name;
     const tool = this.toolRegistry.getTool(name);
     const startedAt = Date.now();
@@ -212,6 +228,7 @@ export class AiChatService {
           content: JSON.stringify({
             error: 'Bạn không có quyền thực hiện hành động này',
           }),
+          deniedActionType: tool.actionType as AiActionType,
         };
       }
       try {
@@ -309,6 +326,8 @@ export class AiChatService {
       '- Các trường như danh mục (categoryId), hũ (jarId), người được giao là TÙY CHỌN. Nếu danh sách trả về rỗng, không tìm thấy mục khớp, hoặc người dùng không nêu, cứ tạo đề xuất và BỎ TRỐNG các trường đó — tuyệt đối không từ chối hay đòi hỏi thêm thông tin không bắt buộc.',
       '- Nếu tool trả về lỗi thiếu quyền, giải thích lịch sự rằng tài khoản không có quyền xem/làm việc đó.',
       '- Câu hỏi ngoài phạm vi gia đình (kiến thức chung về tài chính, nuôi dạy con...) có thể trả lời ngắn gọn, thêm lưu ý đây là thông tin tham khảo.',
+      '- Neu tool propose_* tra loi thieu quyen hoac khong tao duoc de xuat, TUYET DOI khong noi nguoi dung bam xac nhan tren ung dung.',
+      '- Voi FAMILY_MEMBER, khi noi ve du lieu tai chinh ca nhan hay dung "ban"; chi dung "gia dinh/nha minh" khi tool tra ve du lieu pham vi gia dinh.',
     ].join('\n');
   }
 
@@ -323,5 +342,17 @@ export class AiChatService {
 
   private fallbackText(): string {
     return 'Xin lỗi, tôi chưa thể trả lời câu hỏi này. Bạn thử diễn đạt lại giúp mình nhé.';
+  }
+  private writePermissionText(actionType: AiActionType): string {
+    switch (actionType) {
+      case AiActionType.CREATE_LEDGER_ENTRY:
+        return 'Ban khong co quyen ghi khoan thu/chi vao so chung. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_TASK:
+        return 'Ban khong co quyen tao cong viec cho gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_CALENDAR_EVENT:
+        return 'Ban khong co quyen tao su kien lich gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      default:
+        return 'Ban khong co quyen thuc hien hanh dong nay. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+    }
   }
 }

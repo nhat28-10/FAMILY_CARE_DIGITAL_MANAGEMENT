@@ -37,8 +37,10 @@ export class ToolRegistryService {
 
   /** Tool member này được dùng — tool ngoài quyền không gửi cho model. */
   getToolsForRole(familyRole: FamilyRole): AiToolDefinition[] {
-    return [...this.tools.values()].filter((tool) =>
-      tool.allowedRoles.includes(familyRole),
+    // Hide unauthorized read tools, but expose write tools so permission
+    // denials are explicit instead of being guessed by the model.
+    return [...this.tools.values()].filter(
+      (tool) => tool.kind === 'write' || tool.allowedRoles.includes(familyRole),
     );
   }
 

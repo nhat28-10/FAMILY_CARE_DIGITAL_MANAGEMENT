@@ -272,9 +272,21 @@ describe('WearablesService', () => {
         pairingStatus: DevicePairingStatus.UNPAIRED,
       });
 
-      await expect(
-        service.ingestEvent(workspaceId, pairedDevice.id, owner, buttonEvent),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      try {
+        await service.ingestEvent(
+          workspaceId,
+          pairedDevice.id,
+          owner,
+          buttonEvent,
+        );
+        fail('Expected WEARABLE_NOT_PAIRED');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).getResponse()).toMatchObject({
+          code: 'WEARABLE_NOT_PAIRED',
+          errorCode: 'WEARABLE_NOT_PAIRED',
+        });
+      }
     });
 
     it('creates an SOS alert on SOS_BUTTON_PRESSED and links the event', async () => {
@@ -355,6 +367,24 @@ describe('WearablesService', () => {
         pairedDevice.id,
       );
       expect(result.alertCreated).toBe(true);
+    });
+
+    it('creates a critical alert on low HEART_RATE_ABNORMAL with thresholdLow context', async () => {
+      await service.ingestEvent(workspaceId, pairedDevice.id, owner, {
+        eventType: SensorEventType.HEART_RATE_ABNORMAL,
+        rawValue: { heartRate: 38, thresholdLow: 50, durationSeconds: 30 },
+      });
+
+      expect(sosService.trigger).toHaveBeenCalledWith(
+        workspaceId,
+        owner.id,
+        expect.objectContaining({
+          severity: SosSeverity.CRITICAL,
+          message:
+            'Thiet bi phat hien nhip tim thap (38 bpm, nguong 50 bpm) trong 30s',
+        }),
+        pairedDevice.id,
+      );
     });
 
     it('does not create a duplicate alert while the owner already has one active', async () => {

@@ -68,7 +68,7 @@ describe('ToolRegistryService', () => {
       const names = registry
         .getToolsForRole(FamilyRole.FAMILY_MEMBER)
         .map((tool) => tool.name);
-      expect(names).toEqual(['read_everyone']);
+      expect(names).toEqual(['propose_something', 'read_everyone']);
     });
 
     it('FAMILY_MANAGER nhận đủ tool, đúng format OpenAI', () => {

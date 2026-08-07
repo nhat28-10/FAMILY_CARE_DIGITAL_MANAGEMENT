@@ -109,8 +109,8 @@ describe('AiChatService', () => {
     );
   });
 
-  const send = () =>
-    service.sendMessage(familyId, member, conversationId, {
+  const send = (currentMember: FamilyMember = member) =>
+    service.sendMessage(familyId, currentMember, conversationId, {
       content: 'câu hỏi',
     });
 
@@ -226,6 +226,43 @@ describe('AiChatService', () => {
     await send();
 
     expect(buildActionPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it('member write tool bi tu choi quyen thi khong tra pendingAction', async () => {
+    const normalMember = {
+      ...member,
+      id: 'member-normal',
+      familyRole: FamilyRole.FAMILY_MEMBER,
+    } as FamilyMember;
+    const buildActionPayload = jest.fn();
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_ledger_entry',
+      kind: 'write',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_ledger_entry', {
+          amount: 200000,
+          description: 'an toi',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion(
+          'Toi da ghi nhan khoan chi 200.000 VND, vui long xac nhan tren ung dung nhe.',
+        ),
+      );
+
+    const result = await send(normalMember);
+
+    expect(result.pendingAction).toBeNull();
+    expect(buildActionPayload).not.toHaveBeenCalled();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toContain('khong co quyen ghi khoan thu/chi');
+    expect(aiRow.permissionContext.pendingAction).toBeUndefined();
   });
 
   it('hết round budget vẫn trả text (gọi cuối tool_choice none)', async () => {
