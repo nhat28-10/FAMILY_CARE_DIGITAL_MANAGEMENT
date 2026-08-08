@@ -1,6 +1,34 @@
 # AI Chatbot contract
 
-Updated: 2026-08-07
+Updated: 2026-08-08
+
+## Rich UI hints
+
+Every message now includes `uiHints` so FE can render the chatbot as a richer
+Family Copilot experience without parsing natural language.
+
+`aiMessage.uiHints`:
+
+- `displayStyle`: `TEXT`, `INSIGHT_CARD`, `ACTION_CARD`, `RESULT_CARD`, or
+  `PERMISSION_NOTICE`.
+- `intent`: `GENERAL`, `INSIGHT`, `ACTION_PROPOSAL`, `ACTION_RESULT`, or
+  `PERMISSION_LIMIT`.
+- `title`: short card title, for example `Đề xuất cần bạn xác nhận`.
+- `icon`: one of `bot`, `wallet`, `check-square`, `calendar`, `shield`,
+  `sparkles`.
+- `confidenceLabel`: `Tham khảo`, `Có dữ liệu`, or `Chờ xác nhận`.
+- `quickActions`: contextual prompt chips the FE can show under the message.
+
+Recommended FE mapping:
+
+- `TEXT`: normal assistant bubble.
+- `INSIGHT_CARD`: compact insight card with title, confidence label, and chips.
+- `ACTION_CARD`: action proposal card; render `pendingAction.uiHints`.
+- `RESULT_CARD`: completed-state card.
+- `PERMISSION_NOTICE`: neutral warning/info card; do not show confirm CTA.
+
+Do not parse `content` to decide CTA state. Use `pendingAction.status` and
+`uiHints.displayStyle`.
 
 ## Pending action
 
@@ -27,6 +55,25 @@ After successful confirm, status stored in the original AI message is
 
 `expiresAt` is ISO UTC from `Date.toISOString()`, for example
 `2026-08-07T12:15:00.000Z`.
+
+`pendingAction.uiHints` provides confirm-card copy:
+
+- `title`
+- `description`
+- `icon`
+- `primaryActionLabel`
+- `secondaryActionLabel`
+- `editActionLabel`
+- `fields`: label/value preview rows derived from the validated payload.
+
+FE should render:
+
+- Primary CTA: call
+  `POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/confirm-action`.
+- Secondary CTA: call
+  `POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/reject-action`.
+- Edit CTA: open a prefilled module form using `pendingAction.preview`; backend
+  does not provide an edit endpoint for pending actions yet.
 
 ## Permission behavior
 
