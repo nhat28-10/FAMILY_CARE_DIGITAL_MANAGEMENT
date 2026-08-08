@@ -222,7 +222,8 @@ export class AiConversationsService {
       case AiActionType.CREATE_LEDGER_ENTRY:
         return {
           title: 'Tạo giao dịch tài chính',
-          description: 'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
+          description:
+            'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
           icon: 'wallet' as const,
           primaryActionLabel: 'Xác nhận ghi sổ',
           secondaryActionLabel: 'Hủy đề xuất',
@@ -232,7 +233,8 @@ export class AiConversationsService {
       case AiActionType.CREATE_TASK:
         return {
           title: 'Tạo công việc gia đình',
-          description: 'AI đã chuẩn bị công việc mới. Bạn có thể xác nhận hoặc chỉnh lại.',
+          description:
+            'AI đã chuẩn bị công việc mới. Bạn có thể xác nhận hoặc chỉnh lại.',
           icon: 'check-square' as const,
           primaryActionLabel: 'Xác nhận tạo việc',
           secondaryActionLabel: 'Hủy đề xuất',
@@ -242,7 +244,8 @@ export class AiConversationsService {
       case AiActionType.CREATE_CALENDAR_EVENT:
         return {
           title: 'Tạo sự kiện lịch',
-          description: 'AI đã chuẩn bị lịch hẹn. Sự kiện chỉ được tạo sau khi bạn xác nhận.',
+          description:
+            'AI đã chuẩn bị lịch hẹn. Sự kiện chỉ được tạo sau khi bạn xác nhận.',
           icon: 'calendar' as const,
           primaryActionLabel: 'Xác nhận tạo lịch',
           secondaryActionLabel: 'Hủy đề xuất',
@@ -293,7 +296,26 @@ export class AiConversationsService {
 
   private field(label: string, value: unknown): AiActionPreviewField | null {
     if (value === null || value === undefined || value === '') return null;
-    return { label, value: String(value) };
+    return { label, value: this.formatPreviewValue(value) };
+  }
+
+  private formatPreviewValue(value: unknown): string {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      typeof value === 'bigint'
+    ) {
+      return value.toString();
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return 'Không hiển thị được';
+    }
   }
 
   private formatMoney(value: unknown): string | null {
@@ -348,7 +370,8 @@ export class AiConversationsService {
         },
         {
           label: 'Đề xuất tiết kiệm',
-          prompt: 'Đề xuất 3 cách tiết kiệm phù hợp với dữ liệu tài chính hiện tại.',
+          prompt:
+            'Đề xuất 3 cách tiết kiệm phù hợp với dữ liệu tài chính hiện tại.',
           relatedModule: AiRelatedModule.FINANCE,
         },
         {

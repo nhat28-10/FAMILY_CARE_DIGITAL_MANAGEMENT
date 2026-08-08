@@ -48,8 +48,7 @@ class AiPendingActionUiHintsResponseDto {
   title!: string;
 
   @ApiProperty({
-    example:
-      'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
+    example: 'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
   })
   description!: string;
 

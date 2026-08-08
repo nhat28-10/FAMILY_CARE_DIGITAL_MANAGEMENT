@@ -5,17 +5,16 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AiActionStatus, AiActionType } from '../types/ai-chatbot.types';
 import { AiConversationsService } from './ai-conversations.service';
 
-const buildAiMessage = (overrides: Partial<AIMessage> = {}): AIMessage =>
-  ({
-    id: 'msg-1',
-    aiConversationId: 'conv-1',
-    senderType: AiSenderType.AI,
-    messageContent: 'Mình đã chuẩn bị một đề xuất, bạn xác nhận nhé.',
-    relatedModule: AiRelatedModule.FINANCE,
-    createdAt: new Date('2026-08-08T00:00:00.000Z'),
-    permissionContext: null,
-    ...overrides,
-  }) as AIMessage;
+const buildAiMessage = (overrides: Partial<AIMessage> = {}): AIMessage => ({
+  id: 'msg-1',
+  aiConversationId: 'conv-1',
+  senderType: AiSenderType.AI,
+  messageContent: 'Mình đã chuẩn bị một đề xuất, bạn xác nhận nhé.',
+  relatedModule: AiRelatedModule.FINANCE,
+  createdAt: new Date('2026-08-08T00:00:00.000Z'),
+  permissionContext: null,
+  ...overrides,
+});
 
 describe('AiConversationsService UI hints', () => {
   let service: AiConversationsService;
@@ -68,8 +67,7 @@ describe('AiConversationsService UI hints', () => {
   it('maps permission text to a permission notice without action CTA', () => {
     const view = service.toMessageView(
       buildAiMessage({
-        messageContent:
-          'Bạn không có quyền ghi khoản thu/chi vào sổ chung.',
+        messageContent: 'Bạn không có quyền ghi khoản thu/chi vào sổ chung.',
         relatedModule: AiRelatedModule.GENERAL,
       }),
     );
