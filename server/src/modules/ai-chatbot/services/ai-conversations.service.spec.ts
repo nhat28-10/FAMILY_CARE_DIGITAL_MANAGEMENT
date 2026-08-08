@@ -79,4 +79,33 @@ describe('AiConversationsService UI hints', () => {
       icon: 'shield',
     });
   });
+
+  it('maps successful daily brief tool trace to an insight card', () => {
+    const view = service.toMessageView(
+      buildAiMessage({
+        messageContent: 'Tổng quan hôm nay của gia đình mình.',
+        relatedModule: AiRelatedModule.GENERAL,
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MEMBER,
+          toolTrace: [
+            {
+              tool: 'get_daily_brief',
+              args: {},
+              ok: true,
+              durationMs: 12,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(view.pendingAction).toBeNull();
+    expect(view.uiHints).toMatchObject({
+      displayStyle: 'INSIGHT_CARD',
+      intent: 'INSIGHT',
+      title: 'Tổng quan hôm nay',
+      icon: 'sparkles',
+      confidenceLabel: 'Có dữ liệu',
+    });
+  });
 });

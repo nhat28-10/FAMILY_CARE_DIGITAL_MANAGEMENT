@@ -10,6 +10,7 @@ import type {
   AiPendingAction,
   AiPermissionContext,
   AiQuickAction,
+  AiToolTrace,
 } from '../types/ai-chatbot.types';
 import { AiActionStatus, AiActionType } from '../types/ai-chatbot.types';
 
@@ -150,6 +151,7 @@ export class AiConversationsService {
         relatedModule,
         message.messageContent,
         pendingAction?.status,
+        context?.toolTrace ?? [],
       ),
     };
   }
@@ -171,7 +173,11 @@ export class AiConversationsService {
     relatedModule: AiRelatedModule,
     content: string,
     pendingStatus?: AiActionStatus,
+    toolTrace: AiToolTrace[] = [],
   ): AiMessageUiHints {
+    const usedDailyBrief = toolTrace.some(
+      (trace) => trace.tool === 'get_daily_brief' && trace.ok,
+    );
     const permissionLimited =
       /kh[oô]ng c[oó] quy[eề]n/i.test(content) ||
       /khong co quyen/i.test(content);
@@ -205,6 +211,16 @@ export class AiConversationsService {
         quickActions: this.quickActionsFor(relatedModule),
       };
     }
+    if (usedDailyBrief) {
+      return {
+        displayStyle: 'INSIGHT_CARD',
+        intent: 'INSIGHT',
+        title: 'Tổng quan hôm nay',
+        icon: 'sparkles',
+        confidenceLabel: 'Có dữ liệu',
+        quickActions: this.quickActionsFor(AiRelatedModule.GENERAL),
+      };
+    }
     const isInsight = relatedModule !== AiRelatedModule.GENERAL;
     return {
       displayStyle: isInsight ? 'INSIGHT_CARD' : 'TEXT',
@@ -228,6 +244,72 @@ export class AiConversationsService {
           primaryActionLabel: 'Xác nhận ghi sổ',
           secondaryActionLabel: 'Hủy đề xuất',
           editActionLabel: 'Chỉnh trước khi ghi',
+          fields,
+        };
+      case AiActionType.CREATE_BUDGET_PLAN:
+        return {
+          title: 'Tạo kế hoạch ngân sách',
+          description:
+            'AI đã chuẩn bị bản nháp ngân sách. Kế hoạch chỉ được tạo sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận tạo ngân sách',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh ngân sách',
+          fields,
+        };
+      case AiActionType.CREATE_BUDGET_LINE:
+        return {
+          title: 'Thêm dòng ngân sách',
+          description:
+            'AI đã chuẩn bị một dòng ngân sách mới. Dòng này chỉ được thêm sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận thêm dòng',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh dòng ngân sách',
+          fields,
+        };
+      case AiActionType.CREATE_FINANCIAL_GOAL:
+        return {
+          title: 'Tạo mục tiêu tài chính',
+          description:
+            'AI đã chuẩn bị mục tiêu tiết kiệm. Mục tiêu chỉ được tạo sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận tạo mục tiêu',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh mục tiêu',
+          fields,
+        };
+      case AiActionType.CREATE_GOAL_ALLOCATION:
+        return {
+          title: 'Phân bổ vào mục tiêu',
+          description:
+            'AI đã chuẩn bị khoản phân bổ cho mục tiêu tài chính. Chỉ thực hiện sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận phân bổ',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh phân bổ',
+          fields,
+        };
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN:
+        return {
+          title: 'Lập kế hoạch đóng góp',
+          description:
+            'AI đã chuẩn bị kế hoạch đóng góp cho mục tiêu. Chỉ tạo sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận lập kế hoạch',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh kế hoạch',
+          fields,
+        };
+      case AiActionType.ALLOCATE_FUND_BY_MODEL:
+        return {
+          title: 'Chia quỹ theo mô hình hũ',
+          description:
+            'AI đã chuẩn bị đề xuất chia quỹ. Các giao dịch phân bổ chỉ được tạo sau khi bạn xác nhận.',
+          icon: 'wallet' as const,
+          primaryActionLabel: 'Xác nhận chia quỹ',
+          secondaryActionLabel: 'Hủy đề xuất',
+          editActionLabel: 'Chỉnh chia quỹ',
           fields,
         };
       case AiActionType.CREATE_TASK:
@@ -284,6 +366,77 @@ export class AiConversationsService {
         this.field('Bắt đầu', payload.startTime),
         this.field('Kết thúc', payload.endTime),
         this.field('Địa điểm', payload.location),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.CREATE_BUDGET_PLAN) {
+      const lines = Array.isArray(payload.lines) ? payload.lines : [];
+      return [
+        this.field('Tên ngân sách', payload.planName),
+        this.field('Loại kỳ', payload.periodType),
+        this.field('Bắt đầu', payload.periodStart),
+        this.field('Kết thúc', payload.periodEnd),
+        this.field(
+          'Thu chung dự kiến',
+          this.formatMoney(payload.expectedSharedIncome),
+        ),
+        this.field(
+          'Chi chung dự kiến',
+          this.formatMoney(payload.expectedSharedExpense),
+        ),
+        this.field('Số dòng ngân sách', lines.length || undefined),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.CREATE_BUDGET_LINE) {
+      const line = this.asRecord(payload.line);
+      return [
+        this.field('Budget plan', payload.budgetPlanId),
+        this.field('Category', line.categoryId),
+        this.field('Hũ', line.jarId),
+        this.field('Số tiền kế hoạch', this.formatMoney(line.plannedAmount)),
+        this.field('Ngưỡng tiền', this.formatMoney(line.thresholdAmount)),
+        this.field('Ngưỡng %', line.thresholdPercent),
+        this.field('Ghi chú', line.note),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.CREATE_FINANCIAL_GOAL) {
+      return [
+        this.field('Tên mục tiêu', payload.goalName),
+        this.field('Số tiền mục tiêu', this.formatMoney(payload.targetAmount)),
+        this.field('Hạn mục tiêu', payload.deadline),
+        this.field(
+          'Đóng góp mỗi tháng',
+          this.formatMoney(payload.monthlyContributionTarget),
+        ),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.CREATE_GOAL_ALLOCATION) {
+      const allocation = this.asRecord(payload.allocation);
+      return [
+        this.field('Mục tiêu', payload.goalId),
+        this.field('Giao dịch nguồn', allocation.ledgerEntryId),
+        this.field('Số tiền phân bổ', this.formatMoney(allocation.amount)),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN) {
+      const contributionPlan = this.asRecord(payload.contributionPlan);
+      const members = Array.isArray(contributionPlan.members)
+        ? contributionPlan.members
+        : [];
+      return [
+        this.field('Mục tiêu', payload.goalId),
+        this.field('Tháng', contributionPlan.periodMonth),
+        this.field('Năm', contributionPlan.periodYear),
+        this.field('Hạn đóng góp', contributionPlan.dueDate),
+        this.field('Số thành viên', members.length),
+      ].filter(Boolean) as AiActionPreviewField[];
+    }
+    if (actionType === AiActionType.ALLOCATE_FUND_BY_MODEL) {
+      return [
+        this.field('Mô hình', payload.modelId),
+        this.field('Tổng tiền chia', this.formatMoney(payload.amount)),
+        this.field('Tháng', payload.periodMonth),
+        this.field('Năm', payload.periodYear),
+        this.field('Ghi chú', payload.note),
       ].filter(Boolean) as AiActionPreviewField[];
     }
     return [

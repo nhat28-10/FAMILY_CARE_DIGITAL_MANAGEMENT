@@ -5,6 +5,7 @@ import { AiActionType } from '../types/ai-chatbot.types';
 import { ToolRegistryService } from './tool-registry.service';
 import type { AiToolDefinition } from './tool.types';
 import type { CalendarAiTools } from './calendar.tools';
+import type { DailyBriefAiTools } from './daily-brief.tools';
 import type { FinanceAiTools } from './finance.tools';
 import type { SafetyAiTools } from './safety.tools';
 import type { TasksAiTools } from './tasks.tools';
@@ -60,6 +61,7 @@ describe('ToolRegistryService', () => {
       provider([openTool]) as unknown as TasksAiTools,
       provider([]) as unknown as CalendarAiTools,
       provider([]) as unknown as SafetyAiTools,
+      provider([]) as unknown as DailyBriefAiTools,
     );
   });
 

@@ -42,6 +42,7 @@ import { SendAiMessageDto } from '../dto/send-ai-message.dto';
 import { AiActionsService } from '../services/ai-actions.service';
 import { AiChatService } from '../services/ai-chat.service';
 import { AiConversationsService } from '../services/ai-conversations.service';
+import { AiDailyBriefService } from '../services/ai-daily-brief.service';
 
 @ApiTags('AI Chatbot - Trợ lý gia đình')
 @ApiBearerAuth()
@@ -57,7 +58,30 @@ export class AiChatbotController {
     private readonly conversationsService: AiConversationsService,
     private readonly chatService: AiChatService,
     private readonly actionsService: AiActionsService,
+    private readonly dailyBriefService: AiDailyBriefService,
   ) {}
+
+  @Get('daily-brief')
+  @ResponseMessage('Lấy tổng quan trợ lý AI thành công')
+  @ApiOperation({
+    summary: 'Tổng quan chủ động hôm nay cho trợ lý AI',
+    description:
+      'Trả về dữ liệu tổng hợp theo quyền người dùng để FE có thể render thẻ Daily Brief hoặc dùng làm dữ liệu mở đầu chatbot.',
+  })
+  @ApiOkResponse({
+    description:
+      'Daily brief gồm task, calendar, finance, insights và suggestedPrompts.',
+  })
+  getDailyBrief(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember() member: FamilyMember,
+  ) {
+    return this.dailyBriefService.getDailyBrief({
+      familyId,
+      memberId: member.id,
+      familyRole: member.familyRole,
+    });
+  }
 
   @Post('conversations')
   @HttpCode(HttpStatus.CREATED)

@@ -10,8 +10,10 @@ import { AiChatbotController } from './controllers/ai-chatbot.controller';
 import { AiActionsService } from './services/ai-actions.service';
 import { AiChatService } from './services/ai-chat.service';
 import { AiConversationsService } from './services/ai-conversations.service';
+import { AiDailyBriefService } from './services/ai-daily-brief.service';
 import { OpenAiClientService } from './services/openai-client.service';
 import { CalendarAiTools } from './tools/calendar.tools';
+import { DailyBriefAiTools } from './tools/daily-brief.tools';
 import { FinanceAiTools } from './tools/finance.tools';
 import { SafetyAiTools } from './tools/safety.tools';
 import { TasksAiTools } from './tools/tasks.tools';
@@ -33,10 +35,12 @@ import { ToolRegistryService } from './tools/tool-registry.service';
   controllers: [AiChatbotController],
   providers: [
     AiConversationsService,
+    AiDailyBriefService,
     AiChatService,
     AiActionsService,
     OpenAiClientService,
     ToolRegistryService,
+    DailyBriefAiTools,
     CalendarAiTools,
     FinanceAiTools,
     TasksAiTools,
