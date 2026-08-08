@@ -22,6 +22,91 @@ class AiActionResultResponseDto {
   id!: string;
 }
 
+class AiQuickActionResponseDto {
+  @ApiProperty({ example: 'Phân tích chi tiêu' })
+  label!: string;
+
+  @ApiProperty({
+    example: 'Phân tích chi tiêu tháng này và chỉ ra khoản bất thường.',
+  })
+  prompt!: string;
+
+  @ApiProperty({ enum: AiRelatedModule, enumName: 'AiRelatedModule' })
+  relatedModule!: AiRelatedModule;
+}
+
+class AiActionPreviewFieldResponseDto {
+  @ApiProperty({ example: 'Số tiền' })
+  label!: string;
+
+  @ApiProperty({ example: '200.000đ' })
+  value!: string;
+}
+
+class AiPendingActionUiHintsResponseDto {
+  @ApiProperty({ example: 'Tạo giao dịch tài chính' })
+  title!: string;
+
+  @ApiProperty({
+    example:
+      'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
+  })
+  description!: string;
+
+  @ApiProperty({ example: 'wallet' })
+  icon!: string;
+
+  @ApiProperty({ example: 'Xác nhận ghi sổ' })
+  primaryActionLabel!: string;
+
+  @ApiProperty({ example: 'Hủy đề xuất' })
+  secondaryActionLabel!: string;
+
+  @ApiProperty({ example: 'Chỉnh trước khi ghi' })
+  editActionLabel!: string;
+
+  @ApiProperty({ type: () => [AiActionPreviewFieldResponseDto] })
+  fields!: AiActionPreviewFieldResponseDto[];
+}
+
+class AiMessageUiHintsResponseDto {
+  @ApiProperty({
+    enum: [
+      'TEXT',
+      'INSIGHT_CARD',
+      'ACTION_CARD',
+      'RESULT_CARD',
+      'PERMISSION_NOTICE',
+    ],
+    example: 'ACTION_CARD',
+  })
+  displayStyle!: string;
+
+  @ApiProperty({
+    enum: [
+      'GENERAL',
+      'INSIGHT',
+      'ACTION_PROPOSAL',
+      'ACTION_RESULT',
+      'PERMISSION_LIMIT',
+    ],
+    example: 'ACTION_PROPOSAL',
+  })
+  intent!: string;
+
+  @ApiProperty({ example: 'Đề xuất cần bạn xác nhận' })
+  title!: string;
+
+  @ApiProperty({ example: 'wallet' })
+  icon!: string;
+
+  @ApiProperty({ example: 'Chờ xác nhận' })
+  confidenceLabel!: string;
+
+  @ApiProperty({ type: () => [AiQuickActionResponseDto] })
+  quickActions!: AiQuickActionResponseDto[];
+}
+
 export class AiPendingActionResponseDto {
   @ApiProperty({ format: 'uuid' })
   messageId!: string;
@@ -55,6 +140,13 @@ export class AiPendingActionResponseDto {
   expiresAt!: string;
 
   @ApiProperty({
+    type: () => AiPendingActionUiHintsResponseDto,
+    description:
+      'UI metadata for rendering a confirm/reject preview card without parsing text.',
+  })
+  uiHints!: AiPendingActionUiHintsResponseDto;
+
+  @ApiProperty({
     type: () => AiActionResultResponseDto,
     required: false,
     description: 'Present after status CONFIRMED.',
@@ -80,6 +172,13 @@ export class AiMessageResponseDto {
 
   @ApiProperty({ type: () => AiPendingActionResponseDto, nullable: true })
   pendingAction!: AiPendingActionResponseDto | null;
+
+  @ApiProperty({
+    type: () => AiMessageUiHintsResponseDto,
+    description:
+      'UI metadata for rich AI cards, contextual quick actions, and state labels.',
+  })
+  uiHints!: AiMessageUiHintsResponseDto;
 }
 
 export class AiConversationResponseDto {

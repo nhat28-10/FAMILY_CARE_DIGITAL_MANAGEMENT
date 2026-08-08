@@ -54,6 +54,53 @@ export interface AiPendingActionPreview {
   actionType: AiActionType;
   preview: Record<string, unknown>;
   expiresAt: string;
+  status: AiActionStatus;
+  uiHints: AiPendingActionUiHints;
+  result?: { id: string };
+}
+
+export type AiMessageDisplayStyle =
+  | 'TEXT'
+  | 'INSIGHT_CARD'
+  | 'ACTION_CARD'
+  | 'RESULT_CARD'
+  | 'PERMISSION_NOTICE';
+
+export type AiUiIntent =
+  | 'GENERAL'
+  | 'INSIGHT'
+  | 'ACTION_PROPOSAL'
+  | 'ACTION_RESULT'
+  | 'PERMISSION_LIMIT';
+
+export interface AiQuickAction {
+  label: string;
+  prompt: string;
+  relatedModule: AiRelatedModule;
+}
+
+export interface AiActionPreviewField {
+  label: string;
+  value: string;
+}
+
+export interface AiPendingActionUiHints {
+  title: string;
+  description: string;
+  icon: 'wallet' | 'check-square' | 'calendar' | 'sparkles';
+  primaryActionLabel: string;
+  secondaryActionLabel: string;
+  editActionLabel: string;
+  fields: AiActionPreviewField[];
+}
+
+export interface AiMessageUiHints {
+  displayStyle: AiMessageDisplayStyle;
+  intent: AiUiIntent;
+  title: string;
+  icon: 'bot' | 'wallet' | 'check-square' | 'calendar' | 'shield' | 'sparkles';
+  confidenceLabel: 'Tham khảo' | 'Có dữ liệu' | 'Chờ xác nhận';
+  quickActions: AiQuickAction[];
 }
 
 export interface AiSendMessageResult {
@@ -68,4 +115,6 @@ export interface AiMessageView {
   content: string;
   relatedModule: AiRelatedModule | null;
   createdAt: Date;
+  pendingAction?: AiPendingActionPreview | null;
+  uiHints?: AiMessageUiHints;
 }
