@@ -74,6 +74,7 @@ class AiMessageUiHintsResponseDto {
       'TEXT',
       'INSIGHT_CARD',
       'ACTION_CARD',
+      'ACTION_PLAN_CARD',
       'RESULT_CARD',
       'PERMISSION_NOTICE',
     ],
@@ -86,6 +87,7 @@ class AiMessageUiHintsResponseDto {
       'GENERAL',
       'INSIGHT',
       'ACTION_PROPOSAL',
+      'ACTION_PLAN',
       'ACTION_RESULT',
       'PERMISSION_LIMIT',
     ],
@@ -109,6 +111,13 @@ class AiMessageUiHintsResponseDto {
 export class AiPendingActionResponseDto {
   @ApiProperty({ format: 'uuid' })
   messageId!: string;
+
+  @ApiProperty({
+    example: 0,
+    description:
+      'Index của action trong pendingActions. Dùng endpoint Sprint 3 để confirm/reject từng bước.',
+  })
+  actionIndex!: number;
 
   @ApiProperty({ enum: AiActionType, enumName: 'AiActionType' })
   actionType!: AiActionType;
@@ -171,6 +180,13 @@ export class AiMessageResponseDto {
 
   @ApiProperty({ type: () => AiPendingActionResponseDto, nullable: true })
   pendingAction!: AiPendingActionResponseDto | null;
+
+  @ApiProperty({
+    type: () => [AiPendingActionResponseDto],
+    description:
+      'Sprint 3: danh sách action trong một action plan. pendingAction là alias của item đầu tiên để tương thích FE cũ.',
+  })
+  pendingActions!: AiPendingActionResponseDto[];
 
   @ApiProperty({
     type: () => AiMessageUiHintsResponseDto,
@@ -250,9 +266,15 @@ class AiSendMessageDataResponseDto {
 
   @ApiProperty({ type: () => AiPendingActionResponseDto, nullable: true })
   pendingAction!: AiPendingActionResponseDto | null;
+
+  @ApiProperty({ type: () => [AiPendingActionResponseDto] })
+  pendingActions!: AiPendingActionResponseDto[];
 }
 
 class AiConfirmActionDataResponseDto {
+  @ApiProperty({ example: 0 })
+  actionIndex!: number;
+
   @ApiProperty({ enum: AiActionType, enumName: 'AiActionType' })
   actionType!: AiActionType;
 
@@ -261,6 +283,9 @@ class AiConfirmActionDataResponseDto {
 }
 
 class AiRejectActionDataResponseDto {
+  @ApiProperty({ example: 0 })
+  actionIndex!: number;
+
   @ApiProperty({ enum: AiActionType, enumName: 'AiActionType' })
   actionType!: AiActionType;
 }

@@ -9,10 +9,10 @@ Family Copilot experience without parsing natural language.
 
 `aiMessage.uiHints`:
 
-- `displayStyle`: `TEXT`, `INSIGHT_CARD`, `ACTION_CARD`, `RESULT_CARD`, or
-  `PERMISSION_NOTICE`.
+- `displayStyle`: `TEXT`, `INSIGHT_CARD`, `ACTION_CARD`,
+  `ACTION_PLAN_CARD`, `RESULT_CARD`, or `PERMISSION_NOTICE`.
 - `intent`: `GENERAL`, `INSIGHT`, `ACTION_PROPOSAL`, `ACTION_RESULT`, or
-  `PERMISSION_LIMIT`.
+  `ACTION_PLAN`, `PERMISSION_LIMIT`.
 - `title`: short card title, for example `Đề xuất cần bạn xác nhận`.
 - `icon`: one of `bot`, `wallet`, `check-square`, `calendar`, `shield`,
   `sparkles`.
@@ -24,16 +24,32 @@ Recommended FE mapping:
 - `TEXT`: normal assistant bubble.
 - `INSIGHT_CARD`: compact insight card with title, confidence label, and chips.
 - `ACTION_CARD`: action proposal card; render `pendingAction.uiHints`.
+- `ACTION_PLAN_CARD`: multi-step action proposal card; render
+  `pendingActions[]`.
 - `RESULT_CARD`: completed-state card.
 - `PERMISSION_NOTICE`: neutral warning/info card; do not show confirm CTA.
 
-Do not parse `content` to decide CTA state. Use `pendingAction.status` and
-`uiHints.displayStyle`.
+Do not parse `content` to decide CTA state. Use `pendingAction.status`,
+`pendingActions[].status`, and `uiHints.displayStyle`.
 
 ## Pending action
 
 AI write actions are proposals only. The app should render a confirm/reject card
 only when the API response contains `pendingAction`.
+
+`pendingAction` is kept as a legacy alias of `pendingActions[0]`. New FE should
+prefer `pendingActions[]`.
+
+Each pending action includes:
+
+- `messageId`
+- `actionIndex`
+- `actionType`
+- `preview`
+- `expiresAt`
+- `status`
+- `uiHints`
+- `result` after confirmation
 
 Supported `actionType` values:
 
@@ -80,6 +96,28 @@ FE should render:
   `POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/reject-action`.
 - Edit CTA: open a prefilled module form using `pendingAction.preview`; backend
   does not provide an edit endpoint for pending actions yet.
+
+## Action plan
+
+Sprint 3 adds multi-step action plans. A single AI message can contain multiple
+pending actions.
+
+When `aiMessage.uiHints.displayStyle === "ACTION_PLAN_CARD"`:
+
+- Render a plan card inside the existing chat box.
+- Render each `aiMessage.pendingActions[]` item as one step.
+- Use `pendingActions[n].actionIndex` when confirming or rejecting a step.
+- Keep step-level states from `pendingActions[n].status`.
+
+Confirm one step:
+
+`POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/actions/:actionIndex/confirm`
+
+Reject one step:
+
+`POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/actions/:actionIndex/reject`
+
+The legacy confirm/reject endpoints still work and target action index `0`.
 
 ## Permission behavior
 

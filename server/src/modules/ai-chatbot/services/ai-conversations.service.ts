@@ -136,9 +136,16 @@ export class AiConversationsService {
    */
   toMessageView(message: AIMessage) {
     const context = message.permissionContext as AiPermissionContext | null;
-    const pendingAction = context?.pendingAction
-      ? this.toPendingActionView(message.id, context.pendingAction)
-      : null;
+    const rawPendingActions =
+      context?.pendingActions && context.pendingActions.length > 0
+        ? context.pendingActions
+        : context?.pendingAction
+          ? [context.pendingAction]
+          : [];
+    const pendingActions = rawPendingActions.map((action, index) =>
+      this.toPendingActionView(message.id, action, index),
+    );
+    const pendingAction = pendingActions[0] ?? null;
     const relatedModule = message.relatedModule ?? AiRelatedModule.GENERAL;
     return {
       id: message.id,
@@ -147,18 +154,24 @@ export class AiConversationsService {
       relatedModule: message.relatedModule,
       createdAt: message.createdAt,
       pendingAction,
+      pendingActions,
       uiHints: this.buildMessageUiHints(
         relatedModule,
         message.messageContent,
-        pendingAction?.status,
+        rawPendingActions,
         context?.toolTrace ?? [],
       ),
     };
   }
 
-  toPendingActionView(messageId: string, action: AiPendingAction) {
+  toPendingActionView(
+    messageId: string,
+    action: AiPendingAction,
+    actionIndex = 0,
+  ) {
     return {
       messageId,
+      actionIndex,
       actionType: action.actionType,
       status: action.status,
       preview: action.payload,
@@ -172,9 +185,15 @@ export class AiConversationsService {
   private buildMessageUiHints(
     relatedModule: AiRelatedModule,
     content: string,
-    pendingStatus?: AiActionStatus,
+    pendingActions: AiPendingAction[] = [],
     toolTrace: AiToolTrace[] = [],
   ): AiMessageUiHints {
+    const pendingCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.PENDING,
+    ).length;
+    const confirmedCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.CONFIRMED,
+    ).length;
     const usedDailyBrief = toolTrace.some(
       (trace) => trace.tool === 'get_daily_brief' && trace.ok,
     );
@@ -191,7 +210,17 @@ export class AiConversationsService {
         quickActions: this.quickActionsFor(AiRelatedModule.GENERAL),
       };
     }
-    if (pendingStatus === AiActionStatus.PENDING) {
+    if (pendingActions.length > 1 && pendingCount > 0) {
+      return {
+        displayStyle: 'ACTION_PLAN_CARD',
+        intent: 'ACTION_PLAN',
+        title: 'Kế hoạch AI đề xuất',
+        icon: 'sparkles',
+        confidenceLabel: 'Chờ xác nhận',
+        quickActions: this.quickActionsFor(relatedModule),
+      };
+    }
+    if (pendingActions[0]?.status === AiActionStatus.PENDING) {
       return {
         displayStyle: 'ACTION_CARD',
         intent: 'ACTION_PROPOSAL',
@@ -201,12 +230,25 @@ export class AiConversationsService {
         quickActions: this.quickActionsFor(relatedModule),
       };
     }
-    if (pendingStatus === AiActionStatus.CONFIRMED) {
+    if (pendingActions.length > 0 && confirmedCount === pendingActions.length) {
       return {
         displayStyle: 'RESULT_CARD',
         intent: 'ACTION_RESULT',
-        title: 'Đã thực hiện đề xuất',
+        title:
+          pendingActions.length > 1
+            ? 'Đã thực hiện kế hoạch'
+            : 'Đã thực hiện đề xuất',
         icon: this.iconForModule(relatedModule),
+        confidenceLabel: 'Có dữ liệu',
+        quickActions: this.quickActionsFor(relatedModule),
+      };
+    }
+    if (pendingActions.length > 1) {
+      return {
+        displayStyle: 'RESULT_CARD',
+        intent: 'ACTION_RESULT',
+        title: 'Kế hoạch đã xử lý',
+        icon: 'sparkles',
         confidenceLabel: 'Có dữ liệu',
         quickActions: this.quickActionsFor(relatedModule),
       };

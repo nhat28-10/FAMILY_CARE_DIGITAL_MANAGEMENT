@@ -223,6 +223,7 @@ describe('AiActionsService', () => {
     });
     expect(prisma.aIMessage.create).toHaveBeenCalled();
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_LEDGER_ENTRY,
       result: { id: 'entry-1' },
     });
@@ -271,6 +272,7 @@ describe('AiActionsService', () => {
       }),
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_BUDGET_PLAN,
       result: { id: 'budget-plan-1' },
     });
@@ -316,6 +318,7 @@ describe('AiActionsService', () => {
       }),
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_FINANCIAL_GOAL,
       result: { id: 'goal-1' },
     });
@@ -354,6 +357,7 @@ describe('AiActionsService', () => {
       budgetLinePayload.line,
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_BUDGET_LINE,
       result: { id: 'budget-line-1' },
     });
@@ -389,6 +393,7 @@ describe('AiActionsService', () => {
       allocationPayload.allocation,
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_GOAL_ALLOCATION,
       result: { id: 'goal-allocation-1' },
     });
@@ -431,6 +436,7 @@ describe('AiActionsService', () => {
       contributionPayload.contributionPlan,
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
       result: { id: 'goal-1' },
     });
@@ -467,6 +473,7 @@ describe('AiActionsService', () => {
       allocationPayload,
     );
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
       result: { id: 'allocation-entry-1' },
     });
@@ -543,6 +550,84 @@ describe('AiActionsService', () => {
       }),
     );
     expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      result: { id: 'event-1' },
+    });
+  });
+
+  it('confirmAtIndex xử lý đúng action thứ hai trong action plan', async () => {
+    const calendarPayload = {
+      title: 'Nhắc đóng góp quỹ',
+      startTime: '2026-08-15T02:00:00.000Z',
+      endTime: '2026-08-15T02:30:00.000Z',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingActions: [
+            {
+              actionType: AiActionType.CREATE_LEDGER_ENTRY,
+              payload: ledgerPayload,
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: member.id,
+              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+            },
+            {
+              actionType: AiActionType.CREATE_CALENDAR_EVENT,
+              payload: calendarPayload,
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: member.id,
+              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+            },
+          ],
+          pendingAction: {
+            actionType: AiActionType.CREATE_LEDGER_ENTRY,
+            payload: ledgerPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await service.confirmAtIndex(
+      familyId,
+      member,
+      conversationId,
+      messageId,
+      1,
+    );
+
+    expect(prisma.aIMessage.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          permissionContext: {
+            path: ['pendingActions', '1', 'status'],
+            equals: AiActionStatus.PENDING,
+          },
+        }),
+      }),
+    );
+    expect(calendarService.createEvent).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      calendarPayload,
+    );
+    const lastUpdate = prisma.aIMessage.update.mock.calls.at(-1)[0];
+    expect(lastUpdate.data.permissionContext.pendingActions[1]).toMatchObject({
+      status: AiActionStatus.CONFIRMED,
+      result: { id: 'event-1' },
+    });
+    expect(lastUpdate.data.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+    });
+    expect(result).toEqual({
+      actionIndex: 1,
       actionType: AiActionType.CREATE_CALENDAR_EVENT,
       result: { id: 'event-1' },
     });
@@ -618,7 +703,10 @@ describe('AiActionsService', () => {
       messageId,
     );
 
-    expect(result).toEqual({ actionType: AiActionType.CREATE_LEDGER_ENTRY });
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+    });
     expect(financeService.createLedgerEntry).not.toHaveBeenCalled();
     const claim = prisma.aIMessage.updateMany.mock.calls[0][0];
     expect(claim.data.permissionContext.pendingAction.status).toBe(
