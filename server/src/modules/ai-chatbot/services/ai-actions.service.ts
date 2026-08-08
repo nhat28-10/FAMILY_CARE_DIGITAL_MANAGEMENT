@@ -12,8 +12,15 @@ import type { AIMessage, FamilyMember } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { CreateCalendarEventDto } from '../../calendar/dto/create-calendar-event.dto';
 import { CalendarService } from '../../calendar/calendar.service';
+import type { ConfirmGoalContributionPlanDto } from '../../finance/dto/confirm-goal-contribution-plan.dto';
+import type { CreateBudgetLineDto } from '../../finance/dto/create-budget-line.dto';
+import type { CreateBudgetPlanDto } from '../../finance/dto/create-budget-plan.dto';
+import type { CreateFinancialGoalDto } from '../../finance/dto/create-financial-goal.dto';
+import type { CreateFundAllocationDto } from '../../finance/dto/create-fund-allocation.dto';
+import type { CreateGoalAllocationDto } from '../../finance/dto/create-goal-allocation.dto';
 import type { CreateLedgerEntryDto } from '../../finance/dto/create-ledger-entry.dto';
 import { FinanceService } from '../../finance/services/finance.service';
+import { FinancialGoalService } from '../../finance/services/financial-goal.service';
 import type { CreateTaskAssignmentDto } from '../../tasks/dto/create-task-assignment.dto';
 import type { CreateTaskDto } from '../../tasks/dto/create-task.dto';
 import { TasksService } from '../../tasks/services/tasks.service';
@@ -35,6 +42,7 @@ export class AiActionsService {
     private readonly conversations: AiConversationsService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly financeService: FinanceService,
+    private readonly financialGoalService: FinancialGoalService,
     private readonly tasksService: TasksService,
     private readonly calendarService: CalendarService,
   ) {}
@@ -227,6 +235,12 @@ export class AiActionsService {
   private findToolByActionType(actionType: AiActionType) {
     return [
       this.toolRegistry.getTool('propose_create_ledger_entry'),
+      this.toolRegistry.getTool('propose_create_budget_plan'),
+      this.toolRegistry.getTool('propose_create_budget_line'),
+      this.toolRegistry.getTool('propose_create_financial_goal'),
+      this.toolRegistry.getTool('propose_create_goal_allocation'),
+      this.toolRegistry.getTool('propose_create_goal_contribution_plan'),
+      this.toolRegistry.getTool('propose_allocate_fund_by_model'),
       this.toolRegistry.getTool('propose_create_task'),
       this.toolRegistry.getTool('propose_create_calendar_event'),
     ].find((tool) => tool?.actionType === actionType);
@@ -254,6 +268,102 @@ export class AiActionsService {
           summary: `Đã tạo giao dịch "${dto.description}" (${Number(
             dto.amount,
           ).toLocaleString('vi-VN')}đ) thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_BUDGET_PLAN: {
+        const dto = action.payload as unknown as CreateBudgetPlanDto;
+        const plan = await this.financeService.createBudgetPlan(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: plan.id },
+          summary: `Đã tạo kế hoạch ngân sách "${dto.planName}" thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_BUDGET_LINE: {
+        const payload = action.payload as unknown as {
+          budgetPlanId: string;
+          line: CreateBudgetLineDto;
+        };
+        const line = await this.financeService.createBudgetLine(
+          familyId,
+          payload.budgetPlanId,
+          payload.line,
+        );
+        return {
+          result: { id: line.id },
+          summary: `Đã thêm dòng ngân sách ${Number(
+            payload.line.plannedAmount,
+          ).toLocaleString('vi-VN')}đ thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_FINANCIAL_GOAL: {
+        const dto = action.payload as unknown as CreateFinancialGoalDto;
+        const created = await this.financialGoalService.createFinancialGoal(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: created.goal.id },
+          summary: `Đã tạo mục tiêu tài chính "${dto.goalName}" thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_GOAL_ALLOCATION: {
+        const payload = action.payload as unknown as {
+          goalId: string;
+          allocation: CreateGoalAllocationDto;
+        };
+        const created = await this.financialGoalService.createGoalAllocation(
+          familyId,
+          memberId,
+          payload.goalId,
+          payload.allocation,
+        );
+        return {
+          result: { id: created.allocation.id },
+          summary: `Đã phân bổ ${Number(
+            payload.allocation.amount,
+          ).toLocaleString('vi-VN')}đ vào mục tiêu tài chính thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN: {
+        const payload = action.payload as unknown as {
+          goalId: string;
+          contributionPlan: ConfirmGoalContributionPlanDto;
+        };
+        const created =
+          await this.financialGoalService.confirmGoalContributionPlans(
+            familyId,
+            memberId,
+            payload.goalId,
+            payload.contributionPlan,
+          );
+        return {
+          result: { id: created.goalId },
+          summary: `Đã lập kế hoạch đóng góp mục tiêu tháng ${payload.contributionPlan.periodMonth}/${payload.contributionPlan.periodYear} thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.ALLOCATE_FUND_BY_MODEL: {
+        const dto = action.payload as unknown as CreateFundAllocationDto;
+        const allocation = await this.financeService.allocateFundByModel(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: allocation.entries[0]?.id ?? allocation.sourceId },
+          summary: `Đã chia quỹ ${Number(dto.amount).toLocaleString(
+            'vi-VN',
+          )}đ theo mô hình hũ thành công.`,
           relatedModule: AiRelatedModule.FINANCE,
         };
       }

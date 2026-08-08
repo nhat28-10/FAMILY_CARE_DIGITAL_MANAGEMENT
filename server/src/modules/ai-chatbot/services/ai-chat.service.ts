@@ -320,11 +320,12 @@ export class AiChatService {
       'Quy tắc:',
       '- Luôn trả lời bằng tiếng Việt, thân thiện và ngắn gọn.',
       '- Khi có dữ liệu từ tool, trả lời theo cấu trúc rõ ràng: "Nhận định", "Đề xuất", "Bước tiếp theo". Không viết một đoạn dài liền mạch.',
+      '- Khi người dùng hỏi "hôm nay có gì", "tổng quan hôm nay", "việc quan trọng", "nhắc tôi", "daily brief" hoặc muốn trợ lý chủ động rà soát ngày hôm nay, hãy dùng get_daily_brief. Sau đó trả lời theo các mục: "Tổng quan hôm nay", "Điểm cần chú ý", "Gợi ý tiếp theo".',
       '- Với đề xuất hành động, hãy nói rõ đây là bản nháp, nêu 2-4 trường quan trọng, rồi hỏi người dùng xác nhận trên ứng dụng. Không nói như thể đã thực hiện xong.',
       '- Nếu chỉ tư vấn chung, đưa tối đa 3 gợi ý có thể làm ngay. Nếu thiếu dữ liệu, nói rõ mức độ chắc chắn thay vì phán đoán.',
       '- Số liệu về gia đình CHỈ được lấy từ kết quả tools — tuyệt đối không bịa.',
       '- Hành động ghi (tạo giao dịch, tạo công việc) chỉ là ĐỀ XUẤT: sau khi gọi tool propose_*, hãy tóm tắt đề xuất và nhắc người dùng bấm xác nhận trên ứng dụng.',
-      '- Khi người dùng yêu cầu tạo lịch/hẹn/sự kiện, dùng propose_create_calendar_event; tạo công việc thì dùng propose_create_task; ghi thu/chi/tài chính thì dùng propose_create_ledger_entry.',
+      '- Khi người dùng yêu cầu tạo lịch/hẹn/sự kiện, dùng propose_create_calendar_event; tạo công việc thì dùng propose_create_task; ghi thu/chi thì dùng propose_create_ledger_entry; lập ngân sách/kế hoạch chi tiêu thì dùng propose_create_budget_plan; thêm dòng ngân sách vào kế hoạch có sẵn thì dùng propose_create_budget_line; tạo mục tiêu tiết kiệm/mục tiêu tài chính thì dùng propose_create_financial_goal; phân bổ tiền vào mục tiêu thì dùng propose_create_goal_allocation; lập kế hoạch đóng góp mục tiêu cho thành viên thì dùng propose_create_goal_contribution_plan; chia quỹ theo mô hình hũ thì dùng propose_allocate_fund_by_model.',
       '- Với lịch sự kiện, hãy quy đổi các cụm như "ngày mai", "tối nay", "thứ 2 tuần sau" sang ISO datetime có timezone theo múi giờ Việt Nam trước khi đề xuất.',
       '- Các trường như danh mục (categoryId), hũ (jarId), người được giao là TÙY CHỌN. Nếu danh sách trả về rỗng, không tìm thấy mục khớp, hoặc người dùng không nêu, cứ tạo đề xuất và BỎ TRỐNG các trường đó — tuyệt đối không từ chối hay đòi hỏi thêm thông tin không bắt buộc.',
       '- Nếu tool trả về lỗi thiếu quyền, giải thích lịch sự rằng tài khoản không có quyền xem/làm việc đó.',
@@ -350,6 +351,16 @@ export class AiChatService {
     switch (actionType) {
       case AiActionType.CREATE_LEDGER_ENTRY:
         return 'Ban khong co quyen ghi khoan thu/chi vao so chung. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_BUDGET_PLAN:
+        return 'Ban khong co quyen tao ke hoach ngan sach gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_BUDGET_LINE:
+        return 'Ban khong co quyen them dong ngan sach gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_FINANCIAL_GOAL:
+        return 'Ban khong co quyen tao muc tieu tai chinh gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN:
+        return 'Ban khong co quyen lap ke hoach dong gop muc tieu cho gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+      case AiActionType.ALLOCATE_FUND_BY_MODEL:
+        return 'Ban khong co quyen chia quy theo mo hinh hu. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
       case AiActionType.CREATE_TASK:
         return 'Ban khong co quyen tao cong viec cho gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
       case AiActionType.CREATE_CALENDAR_EVENT:

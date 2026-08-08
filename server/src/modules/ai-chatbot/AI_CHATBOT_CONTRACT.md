@@ -38,6 +38,12 @@ only when the API response contains `pendingAction`.
 Supported `actionType` values:
 
 - `CREATE_LEDGER_ENTRY`
+- `CREATE_BUDGET_PLAN`
+- `CREATE_BUDGET_LINE`
+- `CREATE_FINANCIAL_GOAL`
+- `CREATE_GOAL_ALLOCATION`
+- `CREATE_GOAL_CONTRIBUTION_PLAN`
+- `ALLOCATE_FUND_BY_MODEL`
 - `CREATE_TASK`
 - `CREATE_CALENDAR_EVENT`
 
@@ -81,10 +87,16 @@ Members who do not have permission to create shared finance/task/calendar data
 must not receive a pendingAction. Backend returns a normal AI answer explaining
 that the member should ask a `FAMILY_MANAGER` or `DEPUTY_MEMBER`.
 
-Finance write actions (`CREATE_LEDGER_ENTRY`) are currently allowed only for:
+Finance manager-only write actions (`CREATE_LEDGER_ENTRY`,
+`CREATE_BUDGET_PLAN`, `CREATE_BUDGET_LINE`, `CREATE_FINANCIAL_GOAL`,
+`CREATE_GOAL_CONTRIBUTION_PLAN`, `ALLOCATE_FUND_BY_MODEL`) are currently
+allowed only for:
 
 - `FAMILY_MANAGER`
 - `DEPUTY_MEMBER`
+
+`CREATE_GOAL_ALLOCATION` is exposed to all roles and the finance goal service
+re-checks whether the member can allocate to the selected goal at confirm time.
 
 ## Feature flags
 
@@ -98,3 +110,26 @@ These keys are official subscription featureAccess keys:
 At the moment, `ai.financeSummary`, `ai.taskSummary`, and
 `ai.savingSuggestions` are feature flags for chatbot/tool behavior, not separate
 REST endpoints.
+
+## Daily Brief
+
+Sprint 2 adds a proactive assistant brief:
+
+`GET /families/:familyId/ai-chatbot/daily-brief`
+
+The response data contains:
+
+- `generatedAt`
+- `family`
+- `scope`: timezone, today, month, year, financeScope
+- `task`: overdueCount, dueTodayCount, nextAssignments
+- `calendar`: upcomingCount, nextEvents
+- `finance`: monthlyCashflow, activeBudgetPlan, budgetAlerts, goals,
+  atRiskGoalCount, missedContributionPlanCount
+- `insights`: prioritized cards with title, message, severity, relatedModule,
+  actionPrompt
+- `suggestedPrompts`: chips FE can send as new chat messages
+
+The existing chat endpoint can also invoke the same data via tool
+`get_daily_brief`. When that happens, `aiMessage.uiHints.displayStyle` is
+`INSIGHT_CARD` and `aiMessage.uiHints.title` is `Tổng quan hôm nay`.
