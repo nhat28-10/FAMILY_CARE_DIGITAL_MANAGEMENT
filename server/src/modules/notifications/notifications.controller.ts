@@ -22,7 +22,6 @@ import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 import {
   NotificationItemApiResponseDto,
   NotificationListApiResponseDto,
-  NotificationNullApiResponseDto,
   NotificationUnreadCountApiResponseDto,
 } from './dto/notification-response.dto';
 import { NotificationsService } from './notifications.service';
@@ -52,7 +51,6 @@ export class NotificationsController {
   @Patch('read-all')
   @ResponseMessage('Đã đánh dấu tất cả thông báo là đã đọc')
   @ApiOperation({ summary: 'Đánh dấu tất cả thông báo của mình là đã đọc' })
-  @ApiOkResponse({ type: NotificationNullApiResponseDto })
   markAllRead(@CurrentFamilyMember('id') memberId: string) {
     return this.notificationsService.markAllRead(memberId);
   }

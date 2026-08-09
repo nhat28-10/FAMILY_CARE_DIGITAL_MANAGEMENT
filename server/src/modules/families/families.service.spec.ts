@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,7 +17,7 @@ import { FamilyMembersService } from '../family-members/family-members.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SosGateway } from '../sos/sos.gateway';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { FamiliesService } from './families.service';
+import { FamiliesService, RELATIONSHIP_ERROR_CODES } from './families.service';
 
 describe('FamiliesService.removeMember (soft delete)', () => {
   const familyId = 'family-id';
@@ -357,7 +358,7 @@ describe('FamiliesService.changeMemberRelationship', () => {
     });
   });
 
-  it('rejects a second active father or mother', async () => {
+  it('rejects a second active father with a stable error code', async () => {
     familyMembers.findByFamilyAndUser.mockResolvedValue({
       id: targetMemberId,
       relationship: Relationship.OTHER,
@@ -365,13 +366,48 @@ describe('FamiliesService.changeMemberRelationship', () => {
     });
     prisma.familyMember.findFirst.mockResolvedValue({ id: 'existing-father' });
 
+    let error: ConflictException | undefined;
+    try {
+      await service.changeMemberRelationship(
+        familyId,
+        targetUserId,
+        Relationship.FATHER,
+      );
+    } catch (err) {
+      error = err as ConflictException;
+    }
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error?.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(error?.getResponse()).toMatchObject({
+      message: 'Gia đình đã có người giữ vai trò Bố',
+      code: RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_FATHER,
+      errorCode: RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_FATHER,
+    });
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a second active mother with a stable error code', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      relationship: Relationship.OTHER,
+      status: MemberStatus.ACTIVE,
+    });
+    prisma.familyMember.findFirst.mockResolvedValue({ id: 'existing-mother' });
+
     await expect(
       service.changeMemberRelationship(
         familyId,
         targetUserId,
-        Relationship.FATHER,
+        Relationship.MOTHER,
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Gia đình đã có người giữ vai trò Mẹ',
+        code: RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_MOTHER,
+        errorCode: RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_MOTHER,
+      },
+    });
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
 
