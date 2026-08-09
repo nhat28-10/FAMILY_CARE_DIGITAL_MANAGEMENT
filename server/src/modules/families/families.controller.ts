@@ -134,7 +134,8 @@ export class FamiliesController {
   @ApiResponse({ status: 404, description: 'Member not found in this family' })
   @ApiResponse({
     status: 409,
-    description: 'Family already has an active FATHER or MOTHER',
+    description:
+      'Family already has an active FATHER or MOTHER. code/errorCode: FAMILY_ALREADY_HAS_FATHER | FAMILY_ALREADY_HAS_MOTHER',
   })
   changeMemberRelationship(
     @Param('familyId') familyId: string,

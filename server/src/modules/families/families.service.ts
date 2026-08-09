@@ -27,6 +27,11 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { generateInviteCode } from './invite-code.util';
 
+export const RELATIONSHIP_ERROR_CODES = {
+  FAMILY_ALREADY_HAS_FATHER: 'FAMILY_ALREADY_HAS_FATHER',
+  FAMILY_ALREADY_HAS_MOTHER: 'FAMILY_ALREADY_HAS_MOTHER',
+} as const;
+
 const memberUserSelect = {
   id: true,
   email: true,
@@ -355,11 +360,18 @@ export class FamiliesService {
         select: { id: true },
       });
       if (existing) {
-        throw new ConflictException(
+        const code =
           relationship === Relationship.FATHER
-            ? 'Gia đình đã có bố'
-            : 'Gia đình đã có mẹ',
-        );
+            ? RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_FATHER
+            : RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_MOTHER;
+        throw new ConflictException({
+          message:
+            relationship === Relationship.FATHER
+              ? 'Gia đình đã có người giữ vai trò Bố'
+              : 'Gia đình đã có người giữ vai trò Mẹ',
+          code,
+          errorCode: code,
+        });
       }
     }
 
