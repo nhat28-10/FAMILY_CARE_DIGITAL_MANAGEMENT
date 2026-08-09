@@ -80,6 +80,48 @@ describe('AiConversationsService UI hints', () => {
     });
   });
 
+  it('maps multiple pending actions to an action plan card', () => {
+    const view = service.toMessageView(
+      buildAiMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingActions: [
+            {
+              actionType: AiActionType.CREATE_FINANCIAL_GOAL,
+              payload: {
+                goalName: 'Quỹ dự phòng',
+                targetAmount: 20000000,
+              },
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: 'member-1',
+              expiresAt: '2026-08-08T00:15:00.000Z',
+            },
+            {
+              actionType: AiActionType.CREATE_TASK,
+              payload: {
+                task: { title: 'Nhắc đóng góp quỹ dự phòng' },
+              },
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: 'member-1',
+              expiresAt: '2026-08-08T00:15:00.000Z',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(view.pendingAction?.actionIndex).toBe(0);
+    expect(view.pendingActions).toHaveLength(2);
+    expect(view.pendingActions?.[1].actionIndex).toBe(1);
+    expect(view.uiHints).toMatchObject({
+      displayStyle: 'ACTION_PLAN_CARD',
+      intent: 'ACTION_PLAN',
+      title: 'Kế hoạch AI đề xuất',
+      confidenceLabel: 'Chờ xác nhận',
+    });
+  });
+
   it('maps successful daily brief tool trace to an insight card', () => {
     const view = service.toMessageView(
       buildAiMessage({

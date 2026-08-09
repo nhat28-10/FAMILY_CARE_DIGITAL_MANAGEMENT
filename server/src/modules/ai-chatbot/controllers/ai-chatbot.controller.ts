@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   UseGuards,
@@ -201,6 +202,65 @@ export class AiChatbotController {
       member,
       conversationId,
       messageId,
+    );
+  }
+
+  @Post(
+    'conversations/:conversationId/messages/:messageId/actions/:actionIndex/confirm',
+  )
+  @UseGuards(VerifiedGuard)
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đã xác nhận và thực hiện một bước trong kế hoạch AI')
+  @ApiOperation({
+    summary: 'Xác nhận một action trong action plan của AI theo actionIndex',
+  })
+  @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @ApiParam({ name: 'messageId', format: 'uuid' })
+  @ApiParam({ name: 'actionIndex', type: Number, example: 0 })
+  @ApiResponse({ status: 409, description: 'Đề xuất đã được xử lý' })
+  @ApiResponse({ status: 410, description: 'Đề xuất đã hết hạn' })
+  @ApiOkResponse({ type: AiConfirmActionApiResponseDto })
+  confirmActionAtIndex(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember() member: FamilyMember,
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
+    @Param('actionIndex', ParseIntPipe) actionIndex: number,
+  ) {
+    return this.actionsService.confirmAtIndex(
+      familyId,
+      member,
+      conversationId,
+      messageId,
+      actionIndex,
+    );
+  }
+
+  @Post(
+    'conversations/:conversationId/messages/:messageId/actions/:actionIndex/reject',
+  )
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đã hủy một bước trong kế hoạch AI')
+  @ApiOperation({
+    summary: 'Từ chối một action trong action plan của AI theo actionIndex',
+  })
+  @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @ApiParam({ name: 'messageId', format: 'uuid' })
+  @ApiParam({ name: 'actionIndex', type: Number, example: 0 })
+  @ApiOkResponse({ type: AiRejectActionApiResponseDto })
+  rejectActionAtIndex(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember() member: FamilyMember,
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
+    @Param('actionIndex', ParseIntPipe) actionIndex: number,
+  ) {
+    return this.actionsService.rejectAtIndex(
+      familyId,
+      member,
+      conversationId,
+      messageId,
+      actionIndex,
     );
   }
 

@@ -51,12 +51,15 @@ export interface AiPendingAction {
 export interface AiPermissionContext {
   familyRole: FamilyRole;
   toolTrace: AiToolTrace[];
+  pendingActions?: AiPendingAction[];
+  /** Legacy mirror của pendingActions[0], giữ cho FE cũ/backward-compatible. */
   pendingAction?: AiPendingAction;
 }
 
 /** Bản tóm tắt đề xuất trả cho client để render nút xác nhận. */
 export interface AiPendingActionPreview {
   messageId: string;
+  actionIndex: number;
   actionType: AiActionType;
   preview: Record<string, unknown>;
   expiresAt: string;
@@ -69,6 +72,7 @@ export type AiMessageDisplayStyle =
   | 'TEXT'
   | 'INSIGHT_CARD'
   | 'ACTION_CARD'
+  | 'ACTION_PLAN_CARD'
   | 'RESULT_CARD'
   | 'PERMISSION_NOTICE';
 
@@ -76,6 +80,7 @@ export type AiUiIntent =
   | 'GENERAL'
   | 'INSIGHT'
   | 'ACTION_PROPOSAL'
+  | 'ACTION_PLAN'
   | 'ACTION_RESULT'
   | 'PERMISSION_LIMIT';
 
@@ -112,7 +117,9 @@ export interface AiMessageUiHints {
 export interface AiSendMessageResult {
   userMessage: AiMessageView;
   aiMessage: AiMessageView;
+  /** Legacy alias của pendingActions[0]. */
   pendingAction: AiPendingActionPreview | null;
+  pendingActions: AiPendingActionPreview[];
 }
 
 export interface AiMessageView {
@@ -122,5 +129,6 @@ export interface AiMessageView {
   relatedModule: AiRelatedModule | null;
   createdAt: Date;
   pendingAction?: AiPendingActionPreview | null;
+  pendingActions?: AiPendingActionPreview[];
   uiHints?: AiMessageUiHints;
 }

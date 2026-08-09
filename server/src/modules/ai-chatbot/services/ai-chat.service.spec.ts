@@ -83,10 +83,13 @@ describe('AiChatService', () => {
         .mockResolvedValue({ id: conversationId, conversationTitle: 'x' }),
       ensureTitle: jest.fn().mockResolvedValue(undefined),
       toMessageView: jest.fn((message: { id: string }) => message),
-      toPendingActionView: jest.fn((messageId: string, action: object) => ({
-        messageId,
-        ...action,
-      })),
+      toPendingActionView: jest.fn(
+        (messageId: string, action: object, actionIndex = 0) => ({
+          messageId,
+          actionIndex,
+          ...action,
+        }),
+      ),
     };
     openAiClient = {
       chat: jest.fn(),
@@ -187,12 +190,14 @@ describe('AiChatService', () => {
     expect(aiRow.permissionContext.pendingAction.proposedByMemberId).toBe(
       member.id,
     );
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(1);
     expect(result.pendingAction).not.toBeNull();
+    expect(result.pendingActions).toHaveLength(1);
     // Round 2 phải bị ép tool_choice 'none' vì đã có đề xuất.
     expect(openAiClient.chat.mock.calls[1][2]).toBe('none');
   });
 
-  it('write tool thứ hai trong cùng lượt bị từ chối', async () => {
+  it('nhiều write tool trong cùng lượt được gom thành pendingActions', async () => {
     const buildActionPayload = jest.fn().mockResolvedValue({ a: 1 });
     toolRegistry.getTool.mockReturnValue({
       name: 'propose_create_ledger_entry',
@@ -221,11 +226,19 @@ describe('AiChatService', () => {
           },
         ],
       })
-      .mockResolvedValueOnce(textCompletion('Đã tạo 1 đề xuất.'));
+      .mockResolvedValueOnce(textCompletion('Đã tạo kế hoạch gồm 2 đề xuất.'));
 
-    await send();
+    const result = await send();
 
-    expect(buildActionPayload).toHaveBeenCalledTimes(1);
+    expect(buildActionPayload).toHaveBeenCalledTimes(2);
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(2);
+    expect(aiRow.permissionContext.pendingAction).toEqual(
+      aiRow.permissionContext.pendingActions[0],
+    );
+    expect(result.pendingAction?.actionIndex).toBe(0);
+    expect(result.pendingActions).toHaveLength(2);
+    expect(result.pendingActions[1].actionIndex).toBe(1);
   });
 
   it('member write tool bi tu choi quyen thi khong tra pendingAction', async () => {

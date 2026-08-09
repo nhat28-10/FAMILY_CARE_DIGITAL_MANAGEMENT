@@ -23,6 +23,7 @@ import { OpenAiClientService } from './openai-client.service';
 
 /** Giới hạn 1 message trong history đưa vào model (ký tự). */
 const HISTORY_MESSAGE_MAX_CHARS = 4000;
+const MAX_PENDING_ACTIONS_PER_MESSAGE = 5;
 
 @Injectable()
 export class AiChatService {
@@ -64,12 +65,14 @@ export class AiChatService {
       familyRole: member.familyRole,
     };
 
-    const { finalText, toolTrace, pendingAction, modulesUsed } =
+    const { finalText, toolTrace, pendingActions, modulesUsed } =
       await this.runAgentLoop(ctx, member, dto.content, history);
+    const pendingAction = pendingActions[0];
 
     const permissionContext: AiPermissionContext = {
       familyRole: member.familyRole,
       toolTrace,
+      ...(pendingActions.length > 0 ? { pendingActions } : {}),
       ...(pendingAction ? { pendingAction } : {}),
     };
 
@@ -90,6 +93,9 @@ export class AiChatService {
       pendingAction: pendingAction
         ? this.conversations.toPendingActionView(aiMessage.id, pendingAction)
         : null,
+      pendingActions: pendingActions.map((action, index) =>
+        this.conversations.toPendingActionView(aiMessage.id, action, index),
+      ),
     };
   }
 
@@ -105,7 +111,7 @@ export class AiChatService {
   ): Promise<{
     finalText: string;
     toolTrace: AiToolTrace[];
-    pendingAction?: AiPendingAction;
+    pendingActions: AiPendingAction[];
     modulesUsed: Set<AiRelatedModule>;
   }> {
     const messages: ChatCompletionMessageParam[] = [
@@ -116,13 +122,13 @@ export class AiChatService {
     const tools = this.toolRegistry.getOpenAiTools(ctx.familyRole);
     const toolTrace: AiToolTrace[] = [];
     const modulesUsed = new Set<AiRelatedModule>();
-    let pendingAction: AiPendingAction | undefined;
+    const pendingActions: AiPendingAction[] = [];
     let deniedWriteAction: AiActionType | undefined;
 
     const maxRounds = this.openAiClient.config.maxToolRounds;
     for (let round = 0; round <= maxRounds; round++) {
       // Hết budget round (hoặc đã có đề xuất) → ép model trả lời bằng text.
-      const forceText = round === maxRounds || pendingAction !== undefined;
+      const forceText = round === maxRounds || pendingActions.length > 0;
       const completion = await this.openAiClient.chat(
         messages,
         tools,
@@ -130,7 +136,12 @@ export class AiChatService {
       );
       const choice = completion.choices[0]?.message;
       if (!choice) {
-        return { finalText: this.fallbackText(), toolTrace, modulesUsed };
+        return {
+          finalText: this.fallbackText(),
+          toolTrace,
+          pendingActions,
+          modulesUsed,
+        };
       }
 
       const toolCalls = (choice.tool_calls ?? []).filter(
@@ -138,17 +149,18 @@ export class AiChatService {
           call.type === 'function',
       );
       if (toolCalls.length === 0) {
-        if (!pendingAction && deniedWriteAction) {
+        if (pendingActions.length === 0 && deniedWriteAction) {
           return {
             finalText: this.writePermissionText(deniedWriteAction),
             toolTrace,
+            pendingActions,
             modulesUsed,
           };
         }
         return {
           finalText: choice.content?.trim() || this.fallbackText(),
           toolTrace,
-          pendingAction,
+          pendingActions,
           modulesUsed,
         };
       }
@@ -160,9 +172,11 @@ export class AiChatService {
           ctx,
           toolTrace,
           modulesUsed,
-          pendingAction,
+          pendingActions,
         );
-        pendingAction = result.pendingAction ?? pendingAction;
+        if (result.pendingAction) {
+          pendingActions.push(result.pendingAction);
+        }
         deniedWriteAction = result.deniedActionType ?? deniedWriteAction;
         messages.push({
           role: 'tool',
@@ -174,11 +188,11 @@ export class AiChatService {
 
     return {
       finalText:
-        !pendingAction && deniedWriteAction
+        pendingActions.length === 0 && deniedWriteAction
           ? this.writePermissionText(deniedWriteAction)
           : this.fallbackText(),
       toolTrace,
-      pendingAction,
+      pendingActions,
       modulesUsed,
     };
   }
@@ -188,7 +202,7 @@ export class AiChatService {
     ctx: AiToolContext,
     toolTrace: AiToolTrace[],
     modulesUsed: Set<AiRelatedModule>,
-    existingAction: AiPendingAction | undefined,
+    existingActions: AiPendingAction[],
   ): Promise<{
     content: string;
     pendingAction?: AiPendingAction;
@@ -214,11 +228,11 @@ export class AiChatService {
 
     if (tool.kind === 'write') {
       // Hành động ghi KHÔNG thực thi — chỉ tạo đề xuất chờ user xác nhận.
-      if (existingAction) {
+      if (existingActions.length >= MAX_PENDING_ACTIONS_PER_MESSAGE) {
         pushTrace(false);
         return {
           content: JSON.stringify({
-            error: 'Chỉ một đề xuất hành động mỗi lượt',
+            error: `Chỉ tối đa ${MAX_PENDING_ACTIONS_PER_MESSAGE} đề xuất hành động mỗi lượt`,
           }),
         };
       }
@@ -325,6 +339,7 @@ export class AiChatService {
       '- Nếu chỉ tư vấn chung, đưa tối đa 3 gợi ý có thể làm ngay. Nếu thiếu dữ liệu, nói rõ mức độ chắc chắn thay vì phán đoán.',
       '- Số liệu về gia đình CHỈ được lấy từ kết quả tools — tuyệt đối không bịa.',
       '- Hành động ghi (tạo giao dịch, tạo công việc) chỉ là ĐỀ XUẤT: sau khi gọi tool propose_*, hãy tóm tắt đề xuất và nhắc người dùng bấm xác nhận trên ứng dụng.',
+      '- Nếu yêu cầu của người dùng cần một kế hoạch nhiều bước, có thể gọi nhiều tool propose_* trong cùng một lượt (tối đa 5). Khi đã có nhiều đề xuất, hãy trình bày như một kế hoạch theo thứ tự bước rõ ràng và nhắc người dùng xác nhận từng bước trên ứng dụng.',
       '- Khi người dùng yêu cầu tạo lịch/hẹn/sự kiện, dùng propose_create_calendar_event; tạo công việc thì dùng propose_create_task; ghi thu/chi thì dùng propose_create_ledger_entry; lập ngân sách/kế hoạch chi tiêu thì dùng propose_create_budget_plan; thêm dòng ngân sách vào kế hoạch có sẵn thì dùng propose_create_budget_line; tạo mục tiêu tiết kiệm/mục tiêu tài chính thì dùng propose_create_financial_goal; phân bổ tiền vào mục tiêu thì dùng propose_create_goal_allocation; lập kế hoạch đóng góp mục tiêu cho thành viên thì dùng propose_create_goal_contribution_plan; chia quỹ theo mô hình hũ thì dùng propose_allocate_fund_by_model.',
       '- Với lịch sự kiện, hãy quy đổi các cụm như "ngày mai", "tối nay", "thứ 2 tuần sau" sang ISO datetime có timezone theo múi giờ Việt Nam trước khi đề xuất.',
       '- Các trường như danh mục (categoryId), hũ (jarId), người được giao là TÙY CHỌN. Nếu danh sách trả về rỗng, không tìm thấy mục khớp, hoặc người dùng không nêu, cứ tạo đề xuất và BỎ TRỐNG các trường đó — tuyệt đối không từ chối hay đòi hỏi thêm thông tin không bắt buộc.',

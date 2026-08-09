@@ -53,16 +53,36 @@ export class AiActionsService {
     conversationId: string,
     messageId: string,
   ) {
+    return this.confirmAtIndex(familyId, member, conversationId, messageId, 0);
+  }
+
+  async confirmAtIndex(
+    familyId: string,
+    member: FamilyMember,
+    conversationId: string,
+    messageId: string,
+    actionIndex: number,
+  ) {
     const { message, context, action } = await this.getPendingActionOrThrow(
       familyId,
       member.id,
       conversationId,
       messageId,
+      actionIndex,
     );
+
+    if (action.status !== AiActionStatus.PENDING) {
+      throw new ConflictException('Đề xuất này đã được xử lý');
+    }
 
     // Hết hạn → đánh dấu EXPIRED rồi báo client.
     if (new Date(action.expiresAt).getTime() < Date.now()) {
-      await this.updateActionStatus(message, context, AiActionStatus.EXPIRED);
+      await this.updateActionStatus(
+        message,
+        context,
+        actionIndex,
+        AiActionStatus.EXPIRED,
+      );
       throw new GoneException('Đề xuất đã hết hạn, hãy yêu cầu trợ lý tạo lại');
     }
 
@@ -78,6 +98,7 @@ export class AiActionsService {
     const claimed = await this.claimPending(
       message,
       context,
+      actionIndex,
       AiActionStatus.CONFIRMED,
     );
     if (!claimed) {
@@ -94,13 +115,19 @@ export class AiActionsService {
       relatedModule = executed.relatedModule;
     } catch (error) {
       // Thực thi lỗi → nhả claim về PENDING để user sửa/bấm lại được.
-      await this.updateActionStatus(message, context, AiActionStatus.PENDING);
+      await this.updateActionStatus(
+        message,
+        context,
+        actionIndex,
+        AiActionStatus.PENDING,
+      );
       throw error;
     }
 
     await this.updateActionStatus(
       message,
       context,
+      actionIndex,
       AiActionStatus.CONFIRMED,
       result,
     );
@@ -114,7 +141,7 @@ export class AiActionsService {
       },
     });
 
-    return { actionType: action.actionType, result };
+    return { actionIndex, actionType: action.actionType, result };
   }
 
   async reject(
@@ -123,21 +150,36 @@ export class AiActionsService {
     conversationId: string,
     messageId: string,
   ) {
+    return this.rejectAtIndex(familyId, member, conversationId, messageId, 0);
+  }
+
+  async rejectAtIndex(
+    familyId: string,
+    member: FamilyMember,
+    conversationId: string,
+    messageId: string,
+    actionIndex: number,
+  ) {
     const { message, context, action } = await this.getPendingActionOrThrow(
       familyId,
       member.id,
       conversationId,
       messageId,
+      actionIndex,
     );
+    if (action.status !== AiActionStatus.PENDING) {
+      throw new ConflictException('Đề xuất này đã được xử lý');
+    }
     const claimed = await this.claimPending(
       message,
       context,
+      actionIndex,
       AiActionStatus.REJECTED,
     );
     if (!claimed) {
       throw new ConflictException('Đề xuất này đã được xử lý');
     }
-    return { actionType: action.actionType };
+    return { actionIndex, actionType: action.actionType };
   }
 
   // ---------------------------------------------------------------------------
@@ -147,6 +189,7 @@ export class AiActionsService {
     memberId: string,
     conversationId: string,
     messageId: string,
+    actionIndex = 0,
   ): Promise<{
     message: AIMessage;
     context: AiPermissionContext;
@@ -166,10 +209,17 @@ export class AiActionsService {
       },
     });
     const context = message?.permissionContext as AiPermissionContext | null;
-    if (!message || !context?.pendingAction) {
+    const actions =
+      context?.pendingActions && context.pendingActions.length > 0
+        ? context.pendingActions
+        : context?.pendingAction
+          ? [context.pendingAction]
+          : [];
+    const action = actions[actionIndex];
+    if (!message || !context || !action) {
       throw new NotFoundException('Không tìm thấy đề xuất hành động');
     }
-    return { message, context, action: context.pendingAction };
+    return { message, context, action };
   }
 
   /**
@@ -179,19 +229,25 @@ export class AiActionsService {
   private async claimPending(
     message: AIMessage,
     context: AiPermissionContext,
+    actionIndex: number,
     target: AiActionStatus,
   ): Promise<boolean> {
+    const statusPath =
+      context.pendingActions && context.pendingActions.length > 0
+        ? ['pendingActions', String(actionIndex), 'status']
+        : ['pendingAction', 'status'];
     const updated = await this.prisma.aIMessage.updateMany({
       where: {
         id: message.id,
         permissionContext: {
-          path: ['pendingAction', 'status'],
+          path: statusPath,
           equals: AiActionStatus.PENDING,
         },
       },
       data: {
         permissionContext: this.buildContext(
           context,
+          actionIndex,
           target,
         ) as unknown as Prisma.InputJsonValue,
       },
@@ -202,6 +258,7 @@ export class AiActionsService {
   private async updateActionStatus(
     message: AIMessage,
     context: AiPermissionContext,
+    actionIndex: number,
     status: AiActionStatus,
     result?: { id: string },
   ): Promise<void> {
@@ -210,6 +267,7 @@ export class AiActionsService {
       data: {
         permissionContext: this.buildContext(
           context,
+          actionIndex,
           status,
           result,
         ) as unknown as Prisma.InputJsonValue,
@@ -219,16 +277,34 @@ export class AiActionsService {
 
   private buildContext(
     context: AiPermissionContext,
+    actionIndex: number,
     status: AiActionStatus,
     result?: { id: string },
   ): AiPermissionContext {
+    const pendingActions =
+      context.pendingActions && context.pendingActions.length > 0
+        ? context.pendingActions.map((action, index) =>
+            index === actionIndex
+              ? {
+                  ...action,
+                  status,
+                  ...(result ? { result } : {}),
+                }
+              : action,
+          )
+        : context.pendingAction
+          ? [
+              {
+                ...context.pendingAction,
+                status,
+                ...(result ? { result } : {}),
+              },
+            ]
+          : [];
     return {
       ...context,
-      pendingAction: {
-        ...context.pendingAction!,
-        status,
-        ...(result ? { result } : {}),
-      },
+      ...(pendingActions.length > 0 ? { pendingActions } : {}),
+      pendingAction: pendingActions[0],
     };
   }
 
