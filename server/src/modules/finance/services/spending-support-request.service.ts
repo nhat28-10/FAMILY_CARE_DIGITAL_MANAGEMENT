@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -12,6 +13,8 @@ import {
   LedgerEntryStatus,
   LedgerEntryType,
   MemberStatus,
+  NotificationPriority,
+  NotificationType,
   Prisma,
   SpendingSupportRequestStatus,
 } from '@prisma/client';
@@ -27,10 +30,29 @@ import {
   SpendingSupportDecision,
 } from '../dto/review-spending-support-request.dto';
 import { SpendingSupportRequestQueryDto } from '../dto/spending-support-request-query.dto';
+import { NotificationsService } from '../../notifications/notifications.service';
+
+const SUPPORT_REQUEST_REFERENCE_TYPE = 'SUPPORT_REQUEST';
+
+type SupportRequestNotificationView = {
+  id: string;
+  requesterMemberId: string;
+  amount: Prisma.Decimal;
+  purpose: string;
+  requesterMember: {
+    displayName: string | null;
+    user: { fullName: string | null };
+  };
+};
 
 @Injectable()
 export class SpendingSupportRequestService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SpendingSupportRequestService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async listSpendingSupportRequests(
     familyId: string,
@@ -95,12 +117,12 @@ export class SpendingSupportRequestService {
     return { ...request, ledgerEntry };
   }
 
-  createSpendingSupportRequest(
+  async createSpendingSupportRequest(
     familyId: string,
     memberId: string,
     dto: CreateSpendingSupportRequestDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const request = await this.prisma.$transaction(async (tx) => {
       await this.getMemberInFamilyOrThrow(familyId, memberId, tx);
       const purpose = dto.purpose.trim();
       if (!purpose) {
@@ -126,15 +148,18 @@ export class SpendingSupportRequestService {
         include: this.spendingSupportRequestInclude(),
       });
     });
+
+    await this.notifySupportRequestCreated(familyId, memberId, request);
+    return request;
   }
 
-  reviewSpendingSupportRequest(
+  async reviewSpendingSupportRequest(
     familyId: string,
     memberId: string,
     requestId: string,
     dto: ReviewSpendingSupportRequestDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const reviewer = await this.getMemberInFamilyOrThrow(
         familyId,
         memberId,
@@ -209,6 +234,9 @@ export class SpendingSupportRequestService {
       );
       return { ...reviewedRequest, ledgerEntry };
     });
+
+    await this.notifySupportRequestReviewed(familyId, result, dto.decision);
+    return result;
   }
 
   cancelSpendingSupportRequest(
@@ -292,6 +320,76 @@ export class SpendingSupportRequestService {
       },
       category: true,
     } satisfies Prisma.SpendingSupportRequestInclude;
+  }
+
+  private async notifySupportRequestCreated(
+    familyId: string,
+    requesterMemberId: string,
+    request: SupportRequestNotificationView,
+  ) {
+    try {
+      const approvers = await this.prisma.familyMember.findMany({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          id: { not: requesterMemberId },
+          familyRole: {
+            in: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          },
+        },
+        select: { id: true },
+      });
+      const requesterName =
+        request.requesterMember.displayName ??
+        request.requesterMember.user.fullName ??
+        'Một thành viên';
+      await this.notificationsService.notify(
+        familyId,
+        approvers.map((m) => m.id),
+        {
+          type: NotificationType.FINANCE,
+          priority: NotificationPriority.HIGH,
+          title: 'Yêu cầu hỗ trợ chi tiêu mới',
+          body: `${requesterName} vừa gửi yêu cầu hỗ trợ ${Number(request.amount).toLocaleString('vi-VN')}đ.`,
+          referenceType: SUPPORT_REQUEST_REFERENCE_TYPE,
+          referenceId: request.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo tạo yêu cầu hỗ trợ chi tiêu (request ${request.id}): ${(err as Error).message}`,
+      );
+    }
+  }
+
+  private async notifySupportRequestReviewed(
+    familyId: string,
+    request: SupportRequestNotificationView,
+    decision: SpendingSupportDecision,
+  ) {
+    try {
+      const approved = decision === SpendingSupportDecision.APPROVE;
+      await this.notificationsService.notify(
+        familyId,
+        [request.requesterMemberId],
+        {
+          type: NotificationType.FINANCE,
+          priority: NotificationPriority.NORMAL,
+          title: approved
+            ? 'Yêu cầu hỗ trợ đã được duyệt'
+            : 'Yêu cầu hỗ trợ bị từ chối',
+          body: approved
+            ? `Yêu cầu hỗ trợ "${request.purpose}" đã được duyệt.`
+            : `Yêu cầu hỗ trợ "${request.purpose}" đã bị từ chối.`,
+          referenceType: SUPPORT_REQUEST_REFERENCE_TYPE,
+          referenceId: request.id,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo duyệt yêu cầu hỗ trợ chi tiêu (request ${request.id}): ${(err as Error).message}`,
+      );
+    }
   }
 
   private async requireSpendingSupportRequest(

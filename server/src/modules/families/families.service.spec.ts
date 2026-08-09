@@ -1,6 +1,15 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FamilyRole, MemberStatus, NotificationType } from '@prisma/client';
+import {
+  FamilyRole,
+  MemberStatus,
+  NotificationType,
+  Relationship,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FamilyMembersService } from '../family-members/family-members.service';
@@ -205,7 +214,11 @@ describe('FamiliesService.changeMemberRole', () => {
     prisma.familyMember.count.mockResolvedValue(2);
 
     await expect(
-      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+      service.changeMemberRole(
+        familyId,
+        targetUserId,
+        FamilyRole.DEPUTY_MEMBER,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
@@ -218,7 +231,11 @@ describe('FamiliesService.changeMemberRole', () => {
     });
 
     await expect(
-      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+      service.changeMemberRole(
+        familyId,
+        targetUserId,
+        FamilyRole.DEPUTY_MEMBER,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
@@ -227,7 +244,11 @@ describe('FamiliesService.changeMemberRole', () => {
     familyMembers.findByFamilyAndUser.mockResolvedValue(null);
 
     await expect(
-      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+      service.changeMemberRole(
+        familyId,
+        targetUserId,
+        FamilyRole.DEPUTY_MEMBER,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
@@ -240,7 +261,11 @@ describe('FamiliesService.changeMemberRole', () => {
     });
 
     await expect(
-      service.changeMemberRole(familyId, targetUserId, FamilyRole.DEPUTY_MEMBER),
+      service.changeMemberRole(
+        familyId,
+        targetUserId,
+        FamilyRole.DEPUTY_MEMBER,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.familyMember.update).not.toHaveBeenCalled();
   });
@@ -270,6 +295,108 @@ describe('FamiliesService.changeMemberRole', () => {
   });
 });
 
+describe('FamiliesService.changeMemberRelationship', () => {
+  const familyId = 'family-id';
+  const targetUserId = 'target-user-id';
+  const targetMemberId = 'target-member-id';
+  const memberUserSelect = {
+    id: true,
+    email: true,
+    fullName: true,
+    avatarUrl: true,
+    userType: true,
+  } as const;
+  let prisma: { familyMember: Record<string, jest.Mock> };
+  let familyMembers: { findByFamilyAndUser: jest.Mock };
+  let service: FamiliesService;
+
+  beforeEach(() => {
+    prisma = {
+      familyMember: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({
+          id: targetMemberId,
+          relationship: Relationship.FATHER,
+          user: { id: targetUserId },
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: targetMemberId,
+          relationship: Relationship.FATHER,
+          user: { id: targetUserId },
+        }),
+      },
+    };
+    familyMembers = { findByFamilyAndUser: jest.fn() };
+    service = new FamiliesService(
+      prisma as unknown as PrismaService,
+      familyMembers as unknown as FamilyMembersService,
+      {} as unknown as SosGateway,
+      {} as unknown as SubscriptionsService,
+      { notify: jest.fn() } as unknown as NotificationsService,
+      { get: jest.fn() } as unknown as ConfigService,
+    );
+  });
+
+  it('updates relationship for an active member', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      relationship: Relationship.OTHER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await service.changeMemberRelationship(
+      familyId,
+      targetUserId,
+      Relationship.FATHER,
+    );
+
+    expect(prisma.familyMember.update).toHaveBeenCalledWith({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      data: { relationship: Relationship.FATHER },
+      include: { user: { select: memberUserSelect } },
+    });
+  });
+
+  it('rejects a second active father or mother', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      relationship: Relationship.OTHER,
+      status: MemberStatus.ACTIVE,
+    });
+    prisma.familyMember.findFirst.mockResolvedValue({ id: 'existing-father' });
+
+    await expect(
+      service.changeMemberRelationship(
+        familyId,
+        targetUserId,
+        Relationship.FATHER,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.familyMember.update).not.toHaveBeenCalled();
+  });
+
+  it('allows multiple grandparents', async () => {
+    familyMembers.findByFamilyAndUser.mockResolvedValue({
+      id: targetMemberId,
+      relationship: Relationship.OTHER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await service.changeMemberRelationship(
+      familyId,
+      targetUserId,
+      Relationship.GRANDPARENT,
+    );
+
+    expect(prisma.familyMember.findFirst).not.toHaveBeenCalled();
+    expect(prisma.familyMember.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { relationship: Relationship.GRANDPARENT },
+      }),
+    );
+  });
+});
+
 describe('FamiliesService.transferOwnership', () => {
   const familyId = 'family-id';
   const managerUserId = 'manager-user-id';
@@ -289,9 +416,7 @@ describe('FamiliesService.transferOwnership', () => {
     prisma = {
       familyMember: { update: jest.fn() },
       family: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: familyId, members: [] }),
+        findUnique: jest.fn().mockResolvedValue({ id: familyId, members: [] }),
       },
       $transaction: jest
         .fn()

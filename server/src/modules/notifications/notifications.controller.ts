@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -18,6 +19,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentFamilyMember } from '../family-members/decorators/current-family-member.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import {
+  NotificationItemApiResponseDto,
+  NotificationListApiResponseDto,
+  NotificationNullApiResponseDto,
+  NotificationUnreadCountApiResponseDto,
+} from './dto/notification-response.dto';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('Notifications')
@@ -31,6 +38,7 @@ export class NotificationsController {
   @Get()
   @ResponseMessage('Lấy danh sách thông báo thành công')
   @ApiOperation({ summary: 'Danh sách thông báo của thành viên hiện tại' })
+  @ApiOkResponse({ type: NotificationListApiResponseDto })
   list(
     @CurrentFamilyMember('id') memberId: string,
     @Query() query: ListNotificationsQueryDto,
@@ -44,6 +52,7 @@ export class NotificationsController {
   @Patch('read-all')
   @ResponseMessage('Đã đánh dấu tất cả thông báo là đã đọc')
   @ApiOperation({ summary: 'Đánh dấu tất cả thông báo của mình là đã đọc' })
+  @ApiOkResponse({ type: NotificationNullApiResponseDto })
   markAllRead(@CurrentFamilyMember('id') memberId: string) {
     return this.notificationsService.markAllRead(memberId);
   }
@@ -51,6 +60,7 @@ export class NotificationsController {
   @Get('unread-count')
   @ResponseMessage('Lấy số thông báo chưa đọc thành công')
   @ApiOperation({ summary: 'Số thông báo chưa đọc của thành viên hiện tại' })
+  @ApiOkResponse({ type: NotificationUnreadCountApiResponseDto })
   unreadCount(@CurrentFamilyMember('id') memberId: string) {
     return this.notificationsService.unreadCount(memberId);
   }
@@ -58,6 +68,7 @@ export class NotificationsController {
   @Patch(':notificationId/read')
   @ResponseMessage('Đã đánh dấu thông báo là đã đọc')
   @ApiOperation({ summary: 'Đánh dấu một thông báo là đã đọc' })
+  @ApiOkResponse({ type: NotificationItemApiResponseDto })
   markRead(
     @CurrentFamilyMember('id') memberId: string,
     @Param('notificationId') notificationId: string,

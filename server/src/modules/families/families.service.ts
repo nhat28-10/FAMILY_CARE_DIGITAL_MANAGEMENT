@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -317,6 +318,56 @@ export class FamiliesService {
     }
 
     return updated;
+  }
+
+  async changeMemberRelationship(
+    familyId: string,
+    targetUserId: string,
+    relationship: Relationship,
+  ): Promise<MemberWithUser> {
+    const target = await this.familyMembersService.findByFamilyAndUser(
+      familyId,
+      targetUserId,
+    );
+    if (!target || target.status !== MemberStatus.ACTIVE) {
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
+    }
+    if (target.relationship === relationship) {
+      return this.prisma.familyMember.findUniqueOrThrow({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        include: { user: { select: memberUserSelect } },
+      });
+    }
+
+    if (
+      relationship === Relationship.FATHER ||
+      relationship === Relationship.MOTHER
+    ) {
+      const existing = await this.prisma.familyMember.findFirst({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          relationship,
+          id: { not: target.id },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new ConflictException(
+          relationship === Relationship.FATHER
+            ? 'Gia đình đã có bố'
+            : 'Gia đình đã có mẹ',
+        );
+      }
+    }
+
+    return this.prisma.familyMember.update({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      data: { relationship },
+      include: { user: { select: memberUserSelect } },
+    });
   }
 
   /**

@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { SpendingSupportDecision } from '../dto/review-spending-support-request.dto';
 import { FinanceService } from './finance.service';
 import { SpendingSupportRequestService } from './spending-support-request.service';
@@ -24,6 +25,7 @@ describe('SpendingSupportRequestService spending support requests', () => {
   const requestId = 'request-id';
   let tx: Record<string, Record<string, jest.Mock>>;
   let prisma: Record<string, unknown>;
+  let notifications: { notify: jest.Mock };
   let service: SpendingSupportRequestService;
 
   const activeMember = {
@@ -46,11 +48,15 @@ describe('SpendingSupportRequestService spending support requests', () => {
     amount: new Prisma.Decimal(250000),
     purpose: 'Mua sách giáo khoa',
     status: SpendingSupportRequestStatus.PENDING,
+    requesterMember: {
+      displayName: 'Con',
+      user: { fullName: 'Nguyen Van A' },
+    },
   };
 
   beforeEach(() => {
     tx = {
-      familyMember: { findFirst: jest.fn() },
+      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
       financeCategory: { findFirst: jest.fn() },
       spendingSupportRequest: {
         findFirst: jest.fn(),
@@ -66,7 +72,7 @@ describe('SpendingSupportRequestService spending support requests', () => {
           ? Promise.all(input)
           : (input as (client: typeof tx) => unknown)(tx),
       ),
-      familyMember: { findFirst: jest.fn() },
+      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
       spendingSupportRequest: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -76,8 +82,13 @@ describe('SpendingSupportRequestService spending support requests', () => {
       financeLedger: { findUnique: jest.fn() },
       memberMonthlyFinance: { findUnique: jest.fn() },
     };
+    (prisma.familyMember as { findMany: jest.Mock }).findMany.mockResolvedValue(
+      [],
+    );
+    notifications = { notify: jest.fn().mockResolvedValue({ ids: [] }) };
     service = new SpendingSupportRequestService(
       prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
     );
   });
 
@@ -102,6 +113,29 @@ describe('SpendingSupportRequestService spending support requests', () => {
       }),
     );
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('notifies managers and deputies when a support request is created', async () => {
+    tx.familyMember.findFirst.mockResolvedValue(activeMember);
+    tx.spendingSupportRequest.create.mockResolvedValue(pendingRequest);
+    (prisma.familyMember as { findMany: jest.Mock }).findMany.mockResolvedValue(
+      [{ id: 'manager-member-id' }],
+    );
+
+    await service.createSpendingSupportRequest(familyId, memberId, {
+      amount: 250000,
+      purpose: 'Mua sách giáo khoa',
+    });
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      ['manager-member-id'],
+      expect.objectContaining({
+        type: 'FINANCE',
+        referenceType: 'SUPPORT_REQUEST',
+        referenceId: requestId,
+      }),
+    );
   });
 
   it('rejects create for an inactive or missing member', async () => {
@@ -195,6 +229,15 @@ describe('SpendingSupportRequestService spending support requests', () => {
           sourceType: 'SUPPORT_REQUEST',
           sourceId: requestId,
         }),
+      }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      familyId,
+      [memberId],
+      expect.objectContaining({
+        type: 'FINANCE',
+        referenceType: 'SUPPORT_REQUEST',
+        referenceId: requestId,
       }),
     );
   });
