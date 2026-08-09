@@ -84,4 +84,31 @@ describe('FinanceAiTools write proposals', () => {
       jest.useRealTimers();
     }
   });
+
+  it('keeps current Vietnam time when user asks for ngay bay gio and model sends date-only', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-08-09T03:04:05.000Z'));
+
+    try {
+      const payload = await ledgerTool().buildActionPayload!(
+        {
+          entryType: LedgerEntryType.EXPENSE,
+          amount: 20000,
+          description: 'Tien nuoc',
+          entryDate: '2026-08-09',
+        },
+        {
+          familyId: 'family-1',
+          memberId: 'member-1',
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          userContent: 'Ghi khoan chi 20.000d tien nuoc ngay bay gio',
+          now: new Date(),
+        },
+      );
+
+      expect(payload.entryDate).toBe('2026-08-09T10:04:05+07:00');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

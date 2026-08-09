@@ -150,7 +150,13 @@ describe('AiChatService', () => {
     expect(toolRegistry.executeReadTool).toHaveBeenCalledWith(
       'get_finance_overview',
       '{}',
-      { familyId, memberId: member.id, familyRole: member.familyRole },
+      expect.objectContaining({
+        familyId,
+        memberId: member.id,
+        familyRole: member.familyRole,
+        userContent: 'câu hỏi',
+        now: expect.any(Date),
+      }),
     );
     const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
     expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);

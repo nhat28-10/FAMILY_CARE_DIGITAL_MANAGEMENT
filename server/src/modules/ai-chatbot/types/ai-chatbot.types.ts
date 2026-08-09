@@ -25,6 +25,8 @@ export interface AiToolContext {
   familyId: string;
   memberId: string;
   familyRole: FamilyRole;
+  userContent?: string;
+  now?: Date;
 }
 
 /** Vết gọi tool lưu vào permissionContext để audit/debug (không lưu full result). */

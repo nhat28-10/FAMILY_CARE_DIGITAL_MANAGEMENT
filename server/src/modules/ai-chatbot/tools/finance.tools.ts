@@ -23,6 +23,7 @@ import { FinancialGoalService } from '../../finance/services/financial-goal.serv
 import { AiActionType } from '../types/ai-chatbot.types';
 import type { AiToolDefinition, AiToolProvider } from './tool.types';
 import { validateActionArgs } from './validate-action-args';
+import { normalizeVietnamDateTimeForText } from './vietnam-date-time.util';
 
 const ALL_ROLES = [
   FamilyRole.FAMILY_MANAGER,
@@ -57,78 +58,18 @@ function intOrUndefined(value: unknown): number | undefined {
   return typeof value === 'number' ? Math.floor(value) : undefined;
 }
 
-function vietnamDateTimeWithTimezone(date = new Date()): string {
-  const parts = vietnamDateTimeParts(date);
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+07:00`;
-}
-
-function vietnamDateTimeParts(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value;
-  return {
-    year: get('year'),
-    month: get('month'),
-    day: get('day'),
-    hour: get('hour'),
-    minute: get('minute'),
-    second: get('second'),
-  };
-}
-
-function normalizeLedgerEntryDate(value: unknown): string {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString();
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})$/);
-    if (dateOnly) {
-      return `${dateOnly[1]}T00:00:00+07:00`;
-    }
-
-    const datetimeWithTimezone = trimmed.match(
-      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/,
-    );
-    if (datetimeWithTimezone) {
-      const [, dateAndMinute, second = '00', fraction = '', timezone] =
-        datetimeWithTimezone;
-      return `${dateAndMinute}:${second}${fraction}${timezone}`;
-    }
-
-    const datetimeWithoutTimezone = trimmed.match(
-      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(\.\d{1,3})?)?$/,
-    );
-    if (datetimeWithoutTimezone) {
-      const [, dateAndMinute, second = '00', fraction = ''] =
-        datetimeWithoutTimezone;
-      return `${dateAndMinute}:${second}${fraction}+07:00`;
-    }
-
-    const parsed = new Date(trimmed);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString();
-    }
-  }
-
-  return vietnamDateTimeWithTimezone();
-}
-
 function normalizeLedgerEntryArgs(
   args: Record<string, unknown>,
+  userContent?: string,
+  now = new Date(),
 ): Record<string, unknown> {
   return {
     ...args,
-    entryDate: normalizeLedgerEntryDate(args.entryDate),
+    entryDate: normalizeVietnamDateTimeForText(
+      args.entryDate,
+      userContent,
+      now,
+    ),
   };
 }
 
@@ -396,10 +337,10 @@ export class FinanceAiTools implements AiToolProvider {
         kind: 'write',
         allowedRoles: [...FINANCE_MANAGER_ROLES],
         actionType: AiActionType.CREATE_LEDGER_ENTRY,
-        buildActionPayload: (args) => {
+        buildActionPayload: (args, ctx) => {
           const dto = validateActionArgs(
             CreateLedgerEntryDto,
-            normalizeLedgerEntryArgs(args),
+            normalizeLedgerEntryArgs(args, ctx.userContent, ctx.now),
           );
           return Promise.resolve({ ...dto });
         },
