@@ -52,8 +52,8 @@ describe('AiConversationsService UI hints', () => {
       confidenceLabel: 'Chờ xác nhận',
     });
     expect(view.pendingAction?.uiHints).toMatchObject({
-      title: 'Tạo giao dịch tài chính',
-      primaryActionLabel: 'Xác nhận ghi sổ',
+      title: 'Tạo khoản chi',
+      primaryActionLabel: 'Xác nhận ghi chi',
       secondaryActionLabel: 'Hủy đề xuất',
     });
     expect(view.pendingAction?.uiHints.fields).toEqual(
@@ -62,6 +62,35 @@ describe('AiConversationsService UI hints', () => {
         { label: 'Nội dung', value: 'tiền chợ' },
       ]),
     );
+  });
+
+  it('uses income-specific copy for ledger income actions', () => {
+    const message = buildAiMessage({
+      permissionContext: {
+        familyRole: FamilyRole.FAMILY_MANAGER,
+        toolTrace: [],
+        pendingAction: {
+          actionType: AiActionType.CREATE_LEDGER_ENTRY,
+          payload: {
+            entryType: 'INCOME',
+            amount: 5000000,
+            description: 'lương',
+            entryDate: '2026-08-08T00:00:00.000Z',
+          },
+          status: AiActionStatus.PENDING,
+          proposedByMemberId: 'member-1',
+          expiresAt: '2026-08-08T00:15:00.000Z',
+        },
+      },
+    });
+
+    const view = service.toMessageView(message);
+
+    expect(view.pendingAction?.uiHints).toMatchObject({
+      title: 'Tạo khoản thu',
+      primaryActionLabel: 'Xác nhận ghi thu',
+      editActionLabel: 'Chỉnh khoản thu',
+    });
   });
 
   it('maps permission text to a permission notice without action CTA', () => {

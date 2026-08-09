@@ -1159,7 +1159,7 @@ export class FinanceService {
             },
           },
         },
-        orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ createdAt: 'desc' }, { entryDate: 'desc' }],
         skip: skipFor(query.page, query.limit),
         take: query.limit,
       }),
