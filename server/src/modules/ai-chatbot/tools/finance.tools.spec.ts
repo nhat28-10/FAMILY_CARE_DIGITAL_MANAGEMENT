@@ -60,9 +60,9 @@ describe('FinanceAiTools write proposals', () => {
     expect(payload.entryDate).toBe('2026-08-09T08:30:00+07:00');
   });
 
-  it('falls back to current Vietnam date when model sends natural language', async () => {
+  it('falls back to current Vietnam datetime when model sends natural language', async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-08-09T03:00:00.000Z'));
+    jest.setSystemTime(new Date('2026-08-09T03:04:05.000Z'));
 
     try {
       const payload = await ledgerTool().buildActionPayload!(
@@ -70,7 +70,7 @@ describe('FinanceAiTools write proposals', () => {
           entryType: LedgerEntryType.EXPENSE,
           amount: 250000,
           description: 'Sửa xe',
-          entryDate: 'hôm nay',
+          entryDate: 'ngay bây giờ',
         },
         {
           familyId: 'family-1',
@@ -79,7 +79,7 @@ describe('FinanceAiTools write proposals', () => {
         },
       );
 
-      expect(payload.entryDate).toBe('2026-08-09T00:00:00+07:00');
+      expect(payload.entryDate).toBe('2026-08-09T10:04:05+07:00');
     } finally {
       jest.useRealTimers();
     }

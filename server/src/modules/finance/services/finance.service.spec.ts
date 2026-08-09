@@ -325,6 +325,7 @@ describe('FinanceService budget planning', () => {
       (prisma.ledgerEntry as { findMany: jest.Mock }).findMany,
     ).toHaveBeenCalledWith(
       expect.objectContaining({
+        orderBy: [{ createdAt: 'desc' }, { entryDate: 'desc' }],
         skip: 0,
         take: 20,
       }),

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AiRelatedModule } from '@prisma/client';
+import { AiRelatedModule, LedgerEntryType } from '@prisma/client';
 import type { AIConversation, AIMessage } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -355,17 +355,18 @@ export class AiConversationsService {
   private buildPendingActionUiHints(action: AiPendingAction) {
     const fields = this.previewFieldsFor(action.actionType, action.payload);
     switch (action.actionType) {
-      case AiActionType.CREATE_LEDGER_ENTRY:
+      case AiActionType.CREATE_LEDGER_ENTRY: {
+        const copy = this.ledgerEntryUiCopy(action.payload);
         return {
-          title: 'Tạo giao dịch tài chính',
-          description:
-            'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
+          title: copy.title,
+          description: copy.description,
           icon: 'wallet' as const,
-          primaryActionLabel: 'Xác nhận ghi sổ',
+          primaryActionLabel: copy.primaryActionLabel,
           secondaryActionLabel: 'Hủy đề xuất',
-          editActionLabel: 'Chỉnh trước khi ghi',
+          editActionLabel: copy.editActionLabel,
           fields,
         };
+      }
       case AiActionType.CREATE_BUDGET_PLAN:
         return {
           title: 'Tạo kế hoạch ngân sách',
@@ -564,7 +565,37 @@ export class AiConversationsService {
       this.field('Số tiền', this.formatMoney(payload.amount)),
       this.field('Nội dung', payload.description),
       this.field('Ngày', payload.entryDate),
+      this.field('Danh mục', payload.categoryId),
+      this.field('Hũ', payload.jarId),
     ].filter(Boolean) as AiActionPreviewField[];
+  }
+
+  private ledgerEntryUiCopy(payload: Record<string, unknown>) {
+    if (payload.entryType === LedgerEntryType.EXPENSE) {
+      return {
+        title: 'Tạo khoản chi',
+        description:
+          'AI đã chuẩn bị bản nháp khoản chi. Chỉ ghi sổ khi bạn xác nhận.',
+        primaryActionLabel: 'Xác nhận ghi chi',
+        editActionLabel: 'Chỉnh khoản chi',
+      };
+    }
+    if (payload.entryType === LedgerEntryType.INCOME) {
+      return {
+        title: 'Tạo khoản thu',
+        description:
+          'AI đã chuẩn bị bản nháp khoản thu. Chỉ ghi sổ khi bạn xác nhận.',
+        primaryActionLabel: 'Xác nhận ghi thu',
+        editActionLabel: 'Chỉnh khoản thu',
+      };
+    }
+    return {
+      title: 'Tạo giao dịch tài chính',
+      description:
+        'AI đã chuẩn bị bản nháp giao dịch. Chỉ ghi sổ khi bạn xác nhận.',
+      primaryActionLabel: 'Xác nhận ghi sổ',
+      editActionLabel: 'Chỉnh trước khi ghi',
+    };
   }
 
   private field(label: string, value: unknown): AiActionPreviewField | null {
