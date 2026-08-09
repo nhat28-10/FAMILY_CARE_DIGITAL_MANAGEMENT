@@ -345,8 +345,8 @@ export class AiChatService {
       '- Các trường như danh mục (categoryId), hũ (jarId), người được giao là TÙY CHỌN. Nếu danh sách trả về rỗng, không tìm thấy mục khớp, hoặc người dùng không nêu, cứ tạo đề xuất và BỎ TRỐNG các trường đó — tuyệt đối không từ chối hay đòi hỏi thêm thông tin không bắt buộc.',
       '- Nếu tool trả về lỗi thiếu quyền, giải thích lịch sự rằng tài khoản không có quyền xem/làm việc đó.',
       '- Câu hỏi ngoài phạm vi gia đình (kiến thức chung về tài chính, nuôi dạy con...) có thể trả lời ngắn gọn, thêm lưu ý đây là thông tin tham khảo.',
-      '- Neu tool propose_* tra loi thieu quyen hoac khong tao duoc de xuat, TUYET DOI khong noi nguoi dung bam xac nhan tren ung dung.',
-      '- Voi FAMILY_MEMBER, khi noi ve du lieu tai chinh ca nhan hay dung "ban"; chi dung "gia dinh/nha minh" khi tool tra ve du lieu pham vi gia dinh.',
+      '- Nếu tool propose_* trả lời thiếu quyền hoặc không tạo được đề xuất, TUYỆT ĐỐI không nói người dùng bấm xác nhận trên ứng dụng.',
+      '- Với FAMILY_MEMBER, khi nói về dữ liệu tài chính cá nhân hãy dùng "bạn"; chỉ dùng "gia đình/nhà mình" khi tool trả về dữ liệu phạm vi gia đình.',
     ].join('\n');
   }
 
@@ -365,23 +365,23 @@ export class AiChatService {
   private writePermissionText(actionType: AiActionType): string {
     switch (actionType) {
       case AiActionType.CREATE_LEDGER_ENTRY:
-        return 'Ban khong co quyen ghi khoan thu/chi vao so chung. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền ghi khoản thu/chi vào sổ chung. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_BUDGET_PLAN:
-        return 'Ban khong co quyen tao ke hoach ngan sach gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền tạo kế hoạch ngân sách gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_BUDGET_LINE:
-        return 'Ban khong co quyen them dong ngan sach gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền thêm dòng ngân sách gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_FINANCIAL_GOAL:
-        return 'Ban khong co quyen tao muc tieu tai chinh gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền tạo mục tiêu tài chính gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN:
-        return 'Ban khong co quyen lap ke hoach dong gop muc tieu cho gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền lập kế hoạch đóng góp mục tiêu cho gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.ALLOCATE_FUND_BY_MODEL:
-        return 'Ban khong co quyen chia quy theo mo hinh hu. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền chia quỹ theo mô hình hũ. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_TASK:
-        return 'Ban khong co quyen tao cong viec cho gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền tạo công việc cho gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       case AiActionType.CREATE_CALENDAR_EVENT:
-        return 'Ban khong co quyen tao su kien lich gia dinh. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền tạo sự kiện lịch gia đình. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
       default:
-        return 'Ban khong co quyen thuc hien hanh dong nay. Hay nho Truong nhom hoac Pho nhom thuc hien giup ban.';
+        return 'Bạn không có quyền thực hiện hành động này. Hãy nhờ Trưởng nhóm hoặc Phó nhóm thực hiện giúp bạn.';
     }
   }
 }

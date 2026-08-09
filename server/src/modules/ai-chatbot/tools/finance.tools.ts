@@ -57,6 +57,65 @@ function intOrUndefined(value: unknown): number | undefined {
   return typeof value === 'number' ? Math.floor(value) : undefined;
 }
 
+function vietnamDateKey(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function normalizeLedgerEntryDate(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (dateOnly) {
+      return `${dateOnly[1]}T00:00:00+07:00`;
+    }
+
+    const datetimeWithTimezone = trimmed.match(
+      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/,
+    );
+    if (datetimeWithTimezone) {
+      const [, dateAndMinute, second = '00', fraction = '', timezone] =
+        datetimeWithTimezone;
+      return `${dateAndMinute}:${second}${fraction}${timezone}`;
+    }
+
+    const datetimeWithoutTimezone = trimmed.match(
+      /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(\.\d{1,3})?)?$/,
+    );
+    if (datetimeWithoutTimezone) {
+      const [, dateAndMinute, second = '00', fraction = ''] =
+        datetimeWithoutTimezone;
+      return `${dateAndMinute}:${second}${fraction}+07:00`;
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+
+  return `${vietnamDateKey()}T00:00:00+07:00`;
+}
+
+function normalizeLedgerEntryArgs(
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...args,
+    entryDate: normalizeLedgerEntryDate(args.entryDate),
+  };
+}
+
 class ProposeCreateBudgetLineDto {
   @IsUUID()
   budgetPlanId!: string;
@@ -306,7 +365,7 @@ export class FinanceAiTools implements AiToolProvider {
             entryDate: {
               type: 'string',
               description:
-                'Ngày giao dịch dạng ISO 8601 (mặc định hôm nay nếu người dùng không nói)',
+                'Ngày giao dịch dạng ISO 8601 có timezone, ví dụ 2026-06-10T15:30:00+07:00. Nếu người dùng nói hôm nay/tuần này, quy đổi theo múi giờ Việt Nam.',
             },
             categoryId: {
               type: 'string',
@@ -322,7 +381,10 @@ export class FinanceAiTools implements AiToolProvider {
         allowedRoles: [...FINANCE_MANAGER_ROLES],
         actionType: AiActionType.CREATE_LEDGER_ENTRY,
         buildActionPayload: (args) => {
-          const dto = validateActionArgs(CreateLedgerEntryDto, args);
+          const dto = validateActionArgs(
+            CreateLedgerEntryDto,
+            normalizeLedgerEntryArgs(args),
+          );
           return Promise.resolve({ ...dto });
         },
       },

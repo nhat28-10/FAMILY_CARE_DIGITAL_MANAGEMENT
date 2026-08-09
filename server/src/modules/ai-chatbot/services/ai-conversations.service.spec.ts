@@ -80,6 +80,38 @@ describe('AiConversationsService UI hints', () => {
     });
   });
 
+  it('maps rejected action to a result card and resolved content', () => {
+    const view = service.toMessageView(
+      buildAiMessage({
+        messageContent:
+          'Mình đã chuẩn bị một đề xuất, bạn xác nhận trên ứng dụng nhé.',
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_LEDGER_ENTRY,
+            payload: {
+              entryType: 'EXPENSE',
+              amount: 200000,
+              description: 'tiền chợ',
+              entryDate: '2026-08-08T00:00:00.000Z',
+            },
+            status: AiActionStatus.REJECTED,
+            proposedByMemberId: 'member-1',
+            expiresAt: '2026-08-08T00:15:00.000Z',
+          },
+        },
+      }),
+    );
+
+    expect(view.content).toBe('Bạn đã hủy đề xuất AI này.');
+    expect(view.uiHints).toMatchObject({
+      displayStyle: 'RESULT_CARD',
+      intent: 'ACTION_RESULT',
+      title: 'Đề xuất đã hủy',
+    });
+  });
+
   it('maps multiple pending actions to an action plan card', () => {
     const view = service.toMessageView(
       buildAiMessage({
