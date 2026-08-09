@@ -94,14 +94,3 @@ export class NotificationUnreadCountApiResponseDto {
   @ApiProperty({ type: () => NotificationUnreadCountResponseDto })
   data!: NotificationUnreadCountResponseDto;
 }
-
-export class NotificationNullApiResponseDto {
-  @ApiProperty({ example: true })
-  success!: true;
-
-  @ApiProperty({ example: 'Đã đánh dấu tất cả thông báo là đã đọc' })
-  message!: string;
-
-  @ApiProperty({ nullable: true, example: null })
-  data!: null;
-}
