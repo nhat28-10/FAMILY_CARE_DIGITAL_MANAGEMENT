@@ -11,6 +11,7 @@ import { CreateCalendarEventDto } from '../../calendar/dto/create-calendar-event
 import { AiActionType } from '../types/ai-chatbot.types';
 import type { AiToolDefinition, AiToolProvider } from './tool.types';
 import { validateActionArgs } from './validate-action-args';
+import { normalizeVietnamCalendarDateTime } from './vietnam-date-time.util';
 
 const ALL_ROLES = [
   FamilyRole.FAMILY_MANAGER,
@@ -115,8 +116,25 @@ export class CalendarAiTools implements AiToolProvider {
         kind: 'write',
         allowedRoles: CALENDAR_MANAGER_ROLES,
         actionType: AiActionType.CREATE_CALENDAR_EVENT,
-        buildActionPayload: (args) => {
-          const dto = validateActionArgs(CreateCalendarEventDto, args);
+        buildActionPayload: (args, ctx) => {
+          const normalizedArgs = {
+            ...args,
+            startTime: normalizeVietnamCalendarDateTime(
+              args.startTime,
+              ctx.userContent,
+              ctx.now,
+            ),
+            ...(args.endTime !== undefined
+              ? {
+                  endTime: normalizeVietnamCalendarDateTime(
+                    args.endTime,
+                    ctx.userContent,
+                    ctx.now,
+                  ),
+                }
+              : {}),
+          };
+          const dto = validateActionArgs(CreateCalendarEventDto, normalizedArgs);
           return Promise.resolve({ ...dto });
         },
       },

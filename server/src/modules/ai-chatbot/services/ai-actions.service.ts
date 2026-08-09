@@ -114,6 +114,10 @@ export class AiActionsService {
       summary = executed.summary;
       relatedModule = executed.relatedModule;
     } catch (error) {
+      this.logger.error(
+        `AI action confirm failed actionType=${action.actionType} familyId=${familyId} memberId=${member.id} conversationId=${conversationId} messageId=${messageId} actionIndex=${actionIndex} payload=${this.safeJson(action.payload)} error=${this.errorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       // Thực thi lỗi → nhả claim về PENDING để user sửa/bấm lại được.
       await this.updateActionStatus(
         message,
@@ -499,5 +503,18 @@ export class AiActionsService {
         );
         throw new NotFoundException('Loại hành động không được hỗ trợ');
     }
+  }
+
+  private safeJson(value: unknown): string {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
   }
 }

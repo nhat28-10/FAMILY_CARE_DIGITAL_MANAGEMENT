@@ -9,6 +9,7 @@ import type {
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { SendAiMessageDto } from '../dto/send-ai-message.dto';
 import { ToolRegistryService } from '../tools/tool-registry.service';
+import { vietnamDateTimeWithTimezone } from '../tools/vietnam-date-time.util';
 import {
   AiActionStatus,
   AiActionType,
@@ -63,6 +64,8 @@ export class AiChatService {
       familyId,
       memberId: member.id,
       familyRole: member.familyRole,
+      userContent: dto.content,
+      now: new Date(),
     };
 
     const { finalText, toolTrace, pendingActions, modulesUsed } =
@@ -320,7 +323,8 @@ export class AiChatService {
       where: { id: ctx.familyId },
       select: { name: true },
     });
-    const today = new Date().toLocaleDateString('vi-VN', {
+    const now = ctx.now ?? new Date();
+    const today = now.toLocaleDateString('vi-VN', {
       weekday: 'long',
       day: 'numeric',
       month: 'numeric',
@@ -331,6 +335,7 @@ export class AiChatService {
       'Bạn là trợ lý AI của ứng dụng Family Care — nền tảng quản lý tài chính và chăm sóc gia đình.',
       `Gia đình hiện tại: "${family?.name ?? 'Gia đình'}". Người đang trò chuyện: ${member.displayName ?? 'thành viên'} (vai trò ${member.familyRole}).`,
       `Hôm nay là ${today} (múi giờ Việt Nam). Đơn vị tiền tệ mặc định là VND.`,
+      `Bây giờ là ${vietnamDateTimeWithTimezone(now)} (múi giờ Việt Nam).`,
       'Quy tắc:',
       '- Luôn trả lời bằng tiếng Việt, thân thiện và ngắn gọn.',
       '- Khi có dữ liệu từ tool, trả lời theo cấu trúc rõ ràng: "Nhận định", "Đề xuất", "Bước tiếp theo". Không viết một đoạn dài liền mạch.',

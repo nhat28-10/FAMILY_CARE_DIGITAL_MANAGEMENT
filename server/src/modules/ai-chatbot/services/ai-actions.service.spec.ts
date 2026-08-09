@@ -192,6 +192,11 @@ describe('AiActionsService', () => {
       tasksService as unknown as TasksService,
       calendarService as unknown as CalendarService,
     );
+    (
+      service as unknown as {
+        logger: { error: (...args: unknown[]) => void };
+      }
+    ).logger = { error: jest.fn() };
   });
 
   const confirm = () =>
@@ -477,6 +482,50 @@ describe('AiActionsService', () => {
       actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
       result: { id: 'allocation-entry-1' },
     });
+  });
+
+  it('confirm ALLOCATE_FUND_BY_MODEL loi thi tra action ve PENDING va ghi log chan doan', async () => {
+    const allocationPayload = {
+      amount: 100000,
+      periodMonth: 8,
+      periodYear: 2026,
+      note: 'Chia quy thang 8',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+            payload: allocationPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+    financeService.allocateFundByModel.mockRejectedValue(
+      new Error('database proxy timeout'),
+    );
+    const logger = { error: jest.fn() };
+    (
+      service as unknown as {
+        logger: { error: (...args: unknown[]) => void };
+      }
+    ).logger = logger;
+
+    await expect(confirm()).rejects.toThrow('database proxy timeout');
+
+    const lastUpdate = prisma.aIMessage.update.mock.calls.at(-1)[0];
+    expect(lastUpdate.data.permissionContext.pendingAction.status).toBe(
+      AiActionStatus.PENDING,
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('ALLOCATE_FUND_BY_MODEL'),
+      expect.any(String),
+    );
   });
 
   it('confirm CREATE_TASK kèm assignment gọi đủ 2 service', async () => {
