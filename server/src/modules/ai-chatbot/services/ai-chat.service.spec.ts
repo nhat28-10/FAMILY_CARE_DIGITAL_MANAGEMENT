@@ -241,7 +241,7 @@ describe('AiChatService', () => {
     expect(result.pendingActions[1].actionIndex).toBe(1);
   });
 
-  it('member write tool bi tu choi quyen thi khong tra pendingAction', async () => {
+  it('member write tool bị từ chối quyền thì không trả pendingAction', async () => {
     const normalMember = {
       ...member,
       id: 'member-normal',
@@ -274,7 +274,7 @@ describe('AiChatService', () => {
     expect(result.pendingAction).toBeNull();
     expect(buildActionPayload).not.toHaveBeenCalled();
     const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
-    expect(aiRow.messageContent).toContain('khong co quyen ghi khoan thu/chi');
+    expect(aiRow.messageContent).toContain('không có quyền ghi khoản thu/chi');
     expect(aiRow.permissionContext.pendingAction).toBeUndefined();
   });
 

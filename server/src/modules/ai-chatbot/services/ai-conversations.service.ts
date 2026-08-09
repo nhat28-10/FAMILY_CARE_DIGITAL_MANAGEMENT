@@ -147,17 +147,21 @@ export class AiConversationsService {
     );
     const pendingAction = pendingActions[0] ?? null;
     const relatedModule = message.relatedModule ?? AiRelatedModule.GENERAL;
+    const content = this.displayContentForActionState(
+      message.messageContent,
+      rawPendingActions,
+    );
     return {
       id: message.id,
       senderType: message.senderType,
-      content: message.messageContent,
+      content,
       relatedModule: message.relatedModule,
       createdAt: message.createdAt,
       pendingAction,
       pendingActions,
       uiHints: this.buildMessageUiHints(
         relatedModule,
-        message.messageContent,
+        content,
         rawPendingActions,
         context?.toolTrace ?? [],
       ),
@@ -193,6 +197,12 @@ export class AiConversationsService {
     ).length;
     const confirmedCount = pendingActions.filter(
       (action) => action.status === AiActionStatus.CONFIRMED,
+    ).length;
+    const rejectedCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.REJECTED,
+    ).length;
+    const expiredCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.EXPIRED,
     ).length;
     const usedDailyBrief = toolTrace.some(
       (trace) => trace.tool === 'get_daily_brief' && trace.ok,
@@ -243,6 +253,35 @@ export class AiConversationsService {
         quickActions: this.quickActionsFor(relatedModule),
       };
     }
+    if (pendingActions.length > 0 && rejectedCount === pendingActions.length) {
+      return {
+        displayStyle: 'RESULT_CARD',
+        intent: 'ACTION_RESULT',
+        title: pendingActions.length > 1 ? 'Kế hoạch đã hủy' : 'Đề xuất đã hủy',
+        icon:
+          pendingActions.length > 1
+            ? 'sparkles'
+            : this.iconForModule(relatedModule),
+        confidenceLabel: 'Có dữ liệu',
+        quickActions: this.quickActionsFor(relatedModule),
+      };
+    }
+    if (pendingActions.length > 0 && expiredCount === pendingActions.length) {
+      return {
+        displayStyle: 'RESULT_CARD',
+        intent: 'ACTION_RESULT',
+        title:
+          pendingActions.length > 1
+            ? 'Kế hoạch đã hết hạn'
+            : 'Đề xuất đã hết hạn',
+        icon:
+          pendingActions.length > 1
+            ? 'sparkles'
+            : this.iconForModule(relatedModule),
+        confidenceLabel: 'Tham khảo',
+        quickActions: this.quickActionsFor(relatedModule),
+      };
+    }
     if (pendingActions.length > 1) {
       return {
         displayStyle: 'RESULT_CARD',
@@ -272,6 +311,45 @@ export class AiConversationsService {
       confidenceLabel: isInsight ? 'Có dữ liệu' : 'Tham khảo',
       quickActions: this.quickActionsFor(relatedModule),
     };
+  }
+
+  private displayContentForActionState(
+    originalContent: string,
+    pendingActions: AiPendingAction[] = [],
+  ): string {
+    if (pendingActions.length === 0) return originalContent;
+
+    const pendingCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.PENDING,
+    ).length;
+    if (pendingCount > 0) return originalContent;
+
+    const confirmedCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.CONFIRMED,
+    ).length;
+    const rejectedCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.REJECTED,
+    ).length;
+    const expiredCount = pendingActions.filter(
+      (action) => action.status === AiActionStatus.EXPIRED,
+    ).length;
+
+    if (confirmedCount === pendingActions.length) {
+      return pendingActions.length > 1
+        ? 'Kế hoạch AI đề xuất đã được xác nhận và thực hiện.'
+        : 'Đề xuất AI đã được xác nhận và thực hiện.';
+    }
+    if (rejectedCount === pendingActions.length) {
+      return pendingActions.length > 1
+        ? 'Bạn đã hủy kế hoạch AI đề xuất.'
+        : 'Bạn đã hủy đề xuất AI này.';
+    }
+    if (expiredCount === pendingActions.length) {
+      return pendingActions.length > 1
+        ? 'Kế hoạch AI đề xuất đã hết hạn. Hãy yêu cầu trợ lý tạo lại nếu vẫn cần.'
+        : 'Đề xuất AI đã hết hạn. Hãy yêu cầu trợ lý tạo lại nếu vẫn cần.';
+    }
+    return 'Kế hoạch AI đề xuất đã được xử lý một phần. Bạn có thể xem trạng thái của từng bước bên dưới.';
   }
 
   private buildPendingActionUiHints(action: AiPendingAction) {

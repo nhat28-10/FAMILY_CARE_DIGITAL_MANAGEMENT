@@ -63,6 +63,17 @@ Supported `actionType` values:
 - `CREATE_TASK`
 - `CREATE_CALENDAR_EVENT`
 
+Recommended FE refresh after a confirmed action:
+
+- `CREATE_LEDGER_ENTRY`, `ALLOCATE_FUND_BY_MODEL`, `CREATE_GOAL_ALLOCATION`:
+  refresh wallet/ledger, finance overview, goals if currently visible.
+- `CREATE_BUDGET_PLAN`, `CREATE_BUDGET_LINE`: refresh wallet budget screens,
+  budget plan list/detail, and finance overview if currently visible.
+- `CREATE_FINANCIAL_GOAL`, `CREATE_GOAL_CONTRIBUTION_PLAN`: refresh wallet goal
+  screens and goal contribution plan detail/list if currently visible.
+- `CREATE_TASK`: refresh task list/detail and assignment views.
+- `CREATE_CALENDAR_EVENT`: refresh calendar event list/detail.
+
 Supported `status` values:
 
 - `PENDING`: waiting for user confirmation.
@@ -95,7 +106,9 @@ FE should render:
 - Secondary CTA: call
   `POST /families/:familyId/ai-chatbot/conversations/:conversationId/messages/:messageId/reject-action`.
 - Edit CTA: open a prefilled module form using `pendingAction.preview`; backend
-  does not provide an edit endpoint for pending actions yet.
+  does not provide an edit endpoint for pending actions yet. If FE does not
+  have a suitable prefilled form, the intended fallback is to reject the current
+  proposal and let the user send a corrected request.
 
 ## Action plan
 
