@@ -1,5 +1,11 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { AiRelatedModule, AiSenderType, FamilyRole, Prisma } from '@prisma/client';
+import {
+  AiRelatedModule,
+  AiSenderType,
+  FamilyRole,
+  LedgerEntryType,
+  Prisma,
+} from '@prisma/client';
 import type { FamilyMember } from '@prisma/client';
 import type {
   ChatCompletionMessageParam,
@@ -141,7 +147,10 @@ export class AiChatService {
       const choice = completion.choices[0]?.message;
       if (!choice) {
         return {
-          finalText: this.fallbackText(),
+          finalText:
+            pendingActions.length > 0
+              ? this.pendingProposalText(pendingActions)
+              : this.fallbackText(),
           toolTrace,
           pendingActions,
           modulesUsed,
@@ -153,16 +162,15 @@ export class AiChatService {
           call.type === 'function',
       );
       if (toolCalls.length === 0) {
-        const recoveredFundAllocation =
+        const recoveredAction =
           pendingActions.length === 0
-            ? await this.recoverFundAllocationProposal(ctx)
+            ? await this.recoverWriteProposal(ctx)
             : null;
-        if (recoveredFundAllocation) {
-          pendingActions.push(recoveredFundAllocation);
+        if (recoveredAction) {
+          pendingActions.push(recoveredAction);
           modulesUsed.add(AiRelatedModule.FINANCE);
           return {
-            finalText:
-              'Mình đã tạo đề xuất chia quỹ theo mô hình tài chính. Bạn xác nhận trên ứng dụng để thực hiện nhé.',
+            finalText: this.recoveredProposalText(recoveredAction.actionType),
             toolTrace,
             pendingActions,
             modulesUsed,
@@ -177,7 +185,10 @@ export class AiChatService {
           };
         }
         return {
-          finalText: choice.content?.trim() || this.fallbackText(),
+          finalText:
+            pendingActions.length > 0
+              ? this.pendingProposalText(pendingActions)
+              : this.safeFinalTextWithoutAction(choice.content?.trim()),
           toolTrace,
           pendingActions,
           modulesUsed,
@@ -207,9 +218,11 @@ export class AiChatService {
 
     return {
       finalText:
-        pendingActions.length === 0 && deniedWriteAction
-          ? this.writePermissionText(deniedWriteAction)
-          : this.fallbackText(),
+        pendingActions.length > 0
+          ? this.pendingProposalText(pendingActions)
+          : deniedWriteAction
+            ? this.writePermissionText(deniedWriteAction)
+            : this.fallbackText(),
       toolTrace,
       pendingActions,
       modulesUsed,
@@ -380,6 +393,7 @@ export class AiChatService {
       '- Khi người dùng yêu cầu tạo lịch/hẹn/sự kiện, dùng propose_create_calendar_event; tạo công việc thì dùng propose_create_task; ghi thu/chi thì dùng propose_create_ledger_entry; lập ngân sách/kế hoạch chi tiêu thì dùng propose_create_budget_plan; thêm dòng ngân sách vào kế hoạch có sẵn thì dùng propose_create_budget_line; tạo mục tiêu tiết kiệm/mục tiêu tài chính thì dùng propose_create_financial_goal; phân bổ tiền vào mục tiêu thì dùng propose_create_goal_allocation; lập kế hoạch đóng góp mục tiêu cho thành viên thì dùng propose_create_goal_contribution_plan; chia quỹ theo mô hình hũ thì dùng propose_allocate_fund_by_model.',
       '- Với lịch sự kiện, hãy quy đổi các cụm như "ngày mai", "tối nay", "thứ 2 tuần sau" sang ISO datetime có timezone theo múi giờ Việt Nam trước khi đề xuất.',
       '- Với ghi thu/chi, nếu có danh mục tài chính phù hợp rõ ràng với nội dung giao dịch, hãy dùng list_finance_categories để lấy categoryId trước khi gọi propose_create_ledger_entry. Nếu không có danh mục khớp rõ thì vẫn tạo đề xuất và bỏ trống categoryId.',
+      '- Với ghi thu/chi, chỉ nói người dùng xác nhận trên ứng dụng sau khi tool propose_create_ledger_entry đã trả status PROPOSED. Nếu không tạo được đề xuất thì nói rõ lý do, không nói như thể đã có thẻ xác nhận.',
       '- Các trường như danh mục (categoryId), hũ (jarId), người được giao là TÙY CHỌN. Nếu danh sách trả về rỗng, không tìm thấy mục khớp, hoặc người dùng không nêu, cứ tạo đề xuất và BỎ TRỐNG các trường đó — tuyệt đối không từ chối hay đòi hỏi thêm thông tin không bắt buộc.',
       '- Nếu tool trả về lỗi thiếu quyền, giải thích lịch sự rằng tài khoản không có quyền xem/làm việc đó.',
       '- Câu hỏi ngoài phạm vi gia đình (kiến thức chung về tài chính, nuôi dạy con...) có thể trả lời ngắn gọn, thêm lưu ý đây là thông tin tham khảo.',
@@ -400,6 +414,80 @@ export class AiChatService {
 
   private fallbackText(): string {
     return 'Xin lỗi, tôi chưa thể trả lời câu hỏi này. Bạn thử diễn đạt lại giúp mình nhé.';
+  }
+
+  private safeFinalTextWithoutAction(content?: string | null): string {
+    const text = content || this.fallbackText();
+    const normalized = this.normalizeVietnamese(text);
+    if (
+      /\bxac nhan\b/.test(normalized) &&
+      /\b(ung dung|app|the xac nhan)\b/.test(normalized)
+    ) {
+      return 'Mình chưa tạo được thẻ xác nhận cho yêu cầu này. Bạn vui lòng nói rõ loại giao dịch, số tiền và ngày ghi nhận để mình tạo đề xuất nhé.';
+    }
+    return text;
+  }
+
+  private async recoverWriteProposal(
+    ctx: AiToolContext,
+  ): Promise<AiPendingAction | null> {
+    return (
+      (await this.recoverLedgerEntryProposal(ctx)) ??
+      (await this.recoverFundAllocationProposal(ctx))
+    );
+  }
+
+  private async recoverLedgerEntryProposal(
+    ctx: AiToolContext,
+  ): Promise<AiPendingAction | null> {
+    if (
+      ctx.familyRole !== FamilyRole.FAMILY_MANAGER &&
+      ctx.familyRole !== FamilyRole.DEPUTY_MEMBER
+    ) {
+      return null;
+    }
+
+    const userContent = ctx.userContent ?? '';
+    const normalized = this.normalizeVietnamese(userContent);
+    if (!/\b(ghi|ghi nhan|them|tao)\b/.test(normalized)) return null;
+
+    const entryType = this.extractLedgerEntryType(normalized);
+    const amount = this.extractMoneyAmount(normalized);
+    if (!entryType || amount === null) return null;
+
+    const tool = this.toolRegistry.getTool('propose_create_ledger_entry');
+    if (
+      !tool?.buildActionPayload ||
+      !tool.allowedRoles.includes(ctx.familyRole)
+    ) {
+      return null;
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = await tool.buildActionPayload(
+        {
+          entryType,
+          amount,
+          description: this.extractLedgerDescription(
+            userContent,
+            normalized,
+            entryType,
+            amount,
+          ),
+          entryDate: ctx.now ?? new Date(),
+        },
+        ctx,
+      );
+    } catch {
+      return null;
+    }
+
+    return this.buildPendingAction(
+      AiActionType.CREATE_LEDGER_ENTRY,
+      payload,
+      ctx,
+    );
   }
 
   private async recoverFundAllocationProposal(
@@ -442,11 +530,23 @@ export class AiChatService {
     } catch {
       return null;
     }
+    return this.buildPendingAction(
+      AiActionType.ALLOCATE_FUND_BY_MODEL,
+      payload,
+      ctx,
+    );
+  }
+
+  private buildPendingAction(
+    actionType: AiActionType,
+    payload: Record<string, unknown>,
+    ctx: AiToolContext,
+  ): AiPendingAction {
     const expiresAt = new Date(
       Date.now() + this.openAiClient.config.actionExpiresMinutes * 60_000,
     ).toISOString();
     return {
-      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      actionType,
       payload,
       status: AiActionStatus.PENDING,
       proposedByMemberId: ctx.memberId,
@@ -454,12 +554,93 @@ export class AiChatService {
     };
   }
 
+  private recoveredProposalText(actionType: AiActionType): string {
+    return this.proposalTextForActionType(actionType);
+  }
+
+  private pendingProposalText(pendingActions: AiPendingAction[]): string {
+    const pending = pendingActions.filter(
+      (action) => action.status === AiActionStatus.PENDING,
+    );
+    if (pending.length > 1) {
+      return 'Mình đã tạo các đề xuất cần xác nhận. Vui lòng kiểm tra từng thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+    }
+    return this.proposalTextForActionType(
+      (pending[0] ?? pendingActions[0]).actionType,
+    );
+  }
+
+  private proposalTextForActionType(actionType: AiActionType): string {
+    switch (actionType) {
+      case AiActionType.CREATE_LEDGER_ENTRY:
+        return 'Mình đã tạo đề xuất ghi khoản thu/chi. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để ghi sổ nhé.';
+      case AiActionType.CREATE_BUDGET_PLAN:
+        return 'Mình đã tạo đề xuất kế hoạch ngân sách. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_BUDGET_LINE:
+        return 'Mình đã tạo đề xuất dòng ngân sách. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_FINANCIAL_GOAL:
+        return 'Mình đã tạo đề xuất mục tiêu tài chính. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_GOAL_ALLOCATION:
+        return 'Mình đã tạo đề xuất phân bổ vào mục tiêu. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN:
+        return 'Mình đã tạo đề xuất kế hoạch đóng góp mục tiêu. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.ALLOCATE_FUND_BY_MODEL:
+        return 'Mình đã tạo đề xuất chia quỹ theo mô hình tài chính. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_TASK:
+        return 'Mình đã tạo đề xuất công việc. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_CALENDAR_EVENT:
+        return 'Mình đã tạo đề xuất lịch. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      default:
+        return 'Mình đã tạo đề xuất hành động. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+    }
+  }
+
   private extractMoneyAmount(text: string): number | null {
     const matches = [...text.matchAll(/(\d[\d.,]*)\s*(?:d|vnd|dong)\b/g)];
-    const raw = matches.at(-1)?.[1];
+    const raw =
+      matches.at(-1)?.[1] ??
+      [...text.matchAll(/\b(\d[\d.,]*)\b/g)]
+        .map((match) => match[1])
+        .filter((value) => {
+          const amount = Number(value.replace(/[.,]/g, ''));
+          return amount >= 1000 && (amount < 1900 || amount > 2100);
+        })
+        .at(-1);
     if (!raw) return null;
     const amount = Number(raw.replace(/[.,]/g, ''));
     return Number.isFinite(amount) && amount > 0 ? amount : null;
+  }
+
+  private extractLedgerEntryType(text: string): LedgerEntryType | null {
+    if (/\b(khoan\s*chi|chi|mua|tra tien|thanh toan)\b/.test(text)) {
+      return LedgerEntryType.EXPENSE;
+    }
+    if (/\b(khoan\s*thu|thu|nhan|luong|thu nhap)\b/.test(text)) {
+      return LedgerEntryType.INCOME;
+    }
+    return null;
+  }
+
+  private extractLedgerDescription(
+    userContent: string,
+    normalized: string,
+    entryType: LedgerEntryType,
+    amount: number,
+  ): string {
+    const marker =
+      entryType === LedgerEntryType.EXPENSE ? 'khoan chi' : 'khoan thu';
+    const markerIndex = normalized.indexOf(marker);
+    const amountText = amount.toLocaleString('vi-VN');
+    if (markerIndex >= 0) {
+      const afterMarker = userContent.slice(markerIndex + marker.length).trim();
+      const withoutAmount = afterMarker
+        .replace(/^\d[\d.,]*\s*(?:đ|d|vnd|đồng|dong)?/i, '')
+        .trim();
+      if (withoutAmount) return withoutAmount.slice(0, 500);
+    }
+    return entryType === LedgerEntryType.EXPENSE
+      ? `Khoản chi ${amountText}đ`
+      : `Khoản thu ${amountText}đ`;
   }
 
   private extractPeriodMonth(text: string): number | null {
