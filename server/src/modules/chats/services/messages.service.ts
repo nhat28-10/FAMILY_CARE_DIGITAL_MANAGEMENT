@@ -358,6 +358,11 @@ export class MessagesService {
         'Không thể thả cảm xúc cho tin nhắn đã thu hồi',
       );
     }
+    if (message.messageType === MessageType.CALL) {
+      throw new BadRequestException(
+        'Không thể thả cảm xúc cho tin nhắn hệ thống',
+      );
+    }
 
     await this.prisma.messageReaction.upsert({
       where: {
@@ -402,6 +407,9 @@ export class MessagesService {
     );
     if (message.deletedAt) {
       throw new BadRequestException('Không thể ghim tin nhắn đã thu hồi');
+    }
+    if (message.messageType === MessageType.CALL) {
+      throw new BadRequestException('Không thể ghim tin nhắn hệ thống');
     }
     const updated = await this.prisma.message.update({
       where: { id: messageId },

@@ -334,6 +334,30 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.toConversation(conversationId, 'chat:conversation:updated', payload);
   }
 
+  // ---------------------------------------------------------------------------
+  // Emit API — video call (module `calls`, gọi qua room `conversation:<id>` có sẵn).
+  // ---------------------------------------------------------------------------
+
+  emitCallIncoming(conversationId: string, payload: unknown): void {
+    this.toConversation(conversationId, 'call:incoming', payload);
+  }
+
+  emitCallAccepted(conversationId: string, payload: unknown): void {
+    this.toConversation(conversationId, 'call:accepted', payload);
+  }
+
+  emitCallDeclined(conversationId: string, payload: unknown): void {
+    this.toConversation(conversationId, 'call:declined', payload);
+  }
+
+  emitCallParticipantUpdate(conversationId: string, payload: unknown): void {
+    this.toConversation(conversationId, 'call:participant-update', payload);
+  }
+
+  emitCallEnded(conversationId: string, payload: unknown): void {
+    this.toConversation(conversationId, 'call:ended', payload);
+  }
+
   /** Join socket online của các user vào room hội thoại (hội thoại mới/thêm member). */
   joinUsersToConversation(userIds: string[], conversationId: string): void {
     const room = this.conversationRoom(conversationId);

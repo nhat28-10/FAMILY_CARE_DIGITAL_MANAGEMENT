@@ -181,6 +181,8 @@ Table family_members {
   sentMessages messages [not null]
   pinnedMessages messages [not null]
   messageReactions message_reactions [not null]
+  initiatedCalls calls [not null]
+  callParticipations call_participants [not null]
   createdAnnouncements family_announcements [not null]
   createdCalendarEvents calendar_events [not null]
   calendarEventParticipations calendar_event_participants [not null]
@@ -992,6 +994,7 @@ Table conversations {
   createdByMember family_members [not null]
   participants conversation_participants [not null]
   messages messages [not null]
+  calls calls [not null]
 
   Note: 'Hội thoại nhóm/riêng trong một family workspace (chat).'
 }
@@ -1023,6 +1026,7 @@ Table messages {
   replyToMessageId String [note: 'Reply/quote: tin nhắn được trả lời (cùng hội thoại).']
   pinnedAt DateTime [note: 'Ghim tin nhắn trong hội thoại.']
   pinnedByMemberId String
+  relatedCallId String [note: 'Cuộc gọi liên quan (chỉ set khi messageType = CALL) — tin nhắn hệ thống ghi log cuộc gọi.']
   sentAt DateTime [default: `now()`, not null]
   editedAt DateTime
   deletedAt DateTime
@@ -1031,10 +1035,47 @@ Table messages {
   replyTo messages
   replies messages [not null]
   pinnedByMember family_members
+  relatedCall calls
   attachments message_attachments [not null]
   reactions message_reactions [not null]
 
   Note: 'Tin nhắn trong một hội thoại.'
+}
+
+Table calls {
+  id String [pk]
+  conversationId String [not null]
+  initiatedByMemberId String [not null]
+  roomName String [unique, not null, note: 'Tên phòng LiveKit, dạng `call-<uuid>`.']
+  status CallStatus [not null, default: 'RINGING']
+  startedAt DateTime [default: `now()`, not null]
+  connectedAt DateTime [note: 'Thời điểm người đầu tiên join phòng (khác startedAt = lúc bắt đầu đổ chuông).']
+  endedAt DateTime
+  endedReason String [note: '\'hangup\' | \'timeout\' | \'all_left\'.']
+  conversation conversations [not null]
+  initiatedByMember family_members [not null]
+  participants call_participants [not null]
+  relatedMessages messages [not null]
+
+  Note: 'Cuộc gọi video/audio trong một hội thoại (LiveKit room 1-1 hoặc nhóm).'
+}
+
+Table call_participants {
+  id String [pk]
+  callId String [not null]
+  memberId String [not null]
+  status CallParticipantStatus [not null, default: 'INVITED']
+  invitedAt DateTime [default: `now()`, not null]
+  joinedAt DateTime
+  leftAt DateTime
+  call calls [not null]
+  member family_members [not null]
+
+  indexes {
+    (callId, memberId) [unique]
+  }
+
+  Note: 'Thành viên tham gia (được mời/đã join/đã rời) một cuộc gọi.'
 }
 
 Table message_reactions {
@@ -1699,6 +1740,7 @@ Enum NotificationType {
   CALENDAR
   FINANCE
   CHAT
+  CALL
 }
 
 Enum NotificationPriority {
@@ -1748,6 +1790,24 @@ Enum MessageType {
   FILE
   LOCATION
   SOS_QUICK_MESSAGE
+  CALL
+}
+
+Enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  CANCELED
+}
+
+Enum CallParticipantStatus {
+  INVITED
+  JOINED
+  DECLINED
+  LEFT
+  NO_ANSWER
 }
 
 Enum AnnouncementStatus {
@@ -2081,6 +2141,16 @@ Ref: messages.senderMemberId > family_members.id [delete: Cascade]
 Ref: messages.replyToMessageId - messages.id [delete: Set Null]
 
 Ref: messages.pinnedByMemberId > family_members.id [delete: Cascade]
+
+Ref: messages.relatedCallId > calls.id [delete: Set Null]
+
+Ref: calls.conversationId > conversations.id [delete: Cascade]
+
+Ref: calls.initiatedByMemberId > family_members.id [delete: Restrict]
+
+Ref: call_participants.callId > calls.id [delete: Cascade]
+
+Ref: call_participants.memberId > family_members.id [delete: Cascade]
 
 Ref: message_reactions.messageId > messages.id [delete: Cascade]
 

@@ -509,6 +509,8 @@ model FamilyMember {
   sentMessages                     Message[]                   @relation("SentMessages")
   pinnedMessages                   Message[]                   @relation("PinnedMessages")
   messageReactions                 MessageReaction[]           @relation("MessageReactions")
+  initiatedCalls                   Call[]                      @relation("InitiatedCalls")
+  callParticipations               CallParticipant[]           @relation("CallParticipations")
   createdAnnouncements             FamilyAnnouncement[]        @relation("CreatedAnnouncements")
   createdCalendarEvents            CalendarEvent[]             @relation("CreatedCalendarEvents")
   calendarEventParticipations      CalendarEventParticipant[]  @relation("CalendarEventParticipations")
@@ -1344,6 +1346,7 @@ enum NotificationType {
   CALENDAR
   FINANCE
   CHAT
+  CALL
 }
 
 enum NotificationPriority {
@@ -1661,6 +1664,24 @@ enum MessageType {
   FILE
   LOCATION
   SOS_QUICK_MESSAGE
+  CALL
+}
+
+enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  CANCELED
+}
+
+enum CallParticipantStatus {
+  INVITED
+  JOINED
+  DECLINED
+  LEFT
+  NO_ANSWER
 }
 
 enum AnnouncementStatus {
@@ -1805,6 +1826,7 @@ model Conversation {
 
   participants ConversationParticipant[]
   messages     Message[]
+  calls        Call[]
 
   @@index([workspaceId])
   @@index([createdByMemberId])
@@ -1843,6 +1865,8 @@ model Message {
   /// Ghim tin nhắn trong hội thoại.
   pinnedAt         DateTime?   @map("pinned_at") @db.Timestamptz
   pinnedByMemberId String?     @map("pinned_by_member_id")
+  /// Cuộc gọi liên quan (chỉ set khi messageType = CALL) — tin nhắn hệ thống ghi log cuộc gọi.
+  relatedCallId    String?     @map("related_call_id") @db.Uuid
   sentAt           DateTime    @default(now()) @map("sent_at") @db.Timestamptz
   editedAt         DateTime?   @map("edited_at") @db.Timestamptz
   deletedAt        DateTime?   @map("deleted_at") @db.Timestamptz
@@ -1852,6 +1876,7 @@ model Message {
   replyTo        Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
   replies        Message[]     @relation("MessageReplies")
   pinnedByMember FamilyMember? @relation("PinnedMessages", fields: [pinnedByMemberId], references: [id], onDelete: SetNull)
+  relatedCall    Call?         @relation(fields: [relatedCallId], references: [id], onDelete: SetNull)
 
   attachments MessageAttachment[]
   reactions   MessageReaction[]
@@ -1860,6 +1885,49 @@ model Message {
   @@index([senderMemberId])
   @@index([conversationId, pinnedAt])
   @@map("messages")
+}
+
+/// Cuộc gọi video/audio trong một hội thoại (LiveKit room 1-1 hoặc nhóm).
+model Call {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @map("call_id") @db.Uuid
+  conversationId      String     @map("conversation_id") @db.Uuid
+  initiatedByMemberId String     @map("initiated_by_member_id")
+  /// Tên phòng LiveKit, dạng `call-<uuid>`.
+  roomName            String     @unique @map("room_name")
+  status              CallStatus @default(RINGING) @map("status")
+  startedAt           DateTime   @default(now()) @map("started_at") @db.Timestamptz
+  /// Thời điểm người đầu tiên join phòng (khác startedAt = lúc bắt đầu đổ chuông).
+  connectedAt         DateTime?  @map("connected_at") @db.Timestamptz
+  endedAt             DateTime?  @map("ended_at") @db.Timestamptz
+  /// 'hangup' | 'timeout' | 'all_left'.
+  endedReason         String?    @map("ended_reason")
+
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiatedByMember  FamilyMember @relation("InitiatedCalls", fields: [initiatedByMemberId], references: [id], onDelete: Restrict)
+  participants       CallParticipant[]
+  relatedMessages    Message[]
+
+  @@index([conversationId, startedAt])
+  @@map("calls")
+}
+
+/// Thành viên tham gia (được mời/đã join/đã rời) một cuộc gọi.
+model CallParticipant {
+  id        String                @id @default(dbgenerated("gen_random_uuid()")) @map("call_participant_id") @db.Uuid
+  callId    String                @map("call_id") @db.Uuid
+  memberId  String                @map("member_id")
+  status    CallParticipantStatus @default(INVITED) @map("status")
+  invitedAt DateTime              @default(now()) @map("invited_at") @db.Timestamptz
+  joinedAt  DateTime?             @map("joined_at") @db.Timestamptz
+  leftAt    DateTime?             @map("left_at") @db.Timestamptz
+
+  call   Call         @relation(fields: [callId], references: [id], onDelete: Cascade)
+  member FamilyMember @relation("CallParticipations", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([callId, memberId])
+  @@index([callId])
+  @@index([memberId])
+  @@map("call_participants")
 }
 
 /// Reaction (thả cảm xúc) trên một tin nhắn.

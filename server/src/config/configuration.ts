@@ -97,6 +97,12 @@ export default () => ({
     // Base64 của file service-account JSON. Rỗng = tắt kênh FCM (dev không cần Firebase).
     serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || '',
   },
+  livekit: {
+    // Managed WebRTC SFU (LiveKit Cloud) cho video call. Rỗng = tắt tính năng call.
+    apiKey: process.env.LIVEKIT_API_KEY || '',
+    apiSecret: process.env.LIVEKIT_API_SECRET || '',
+    url: process.env.LIVEKIT_URL || '', // wss://<project>.livekit.cloud
+  },
   storage: {
     // Cloudflare R2 (S3-compatible) — lưu ảnh/file chat + album. DB chỉ lưu URL.
     r2Endpoint: process.env.R2_ENDPOINT || '',
