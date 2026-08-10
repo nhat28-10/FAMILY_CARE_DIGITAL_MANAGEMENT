@@ -258,6 +258,77 @@ describe('AiChatService', () => {
     );
   });
 
+  it('recovers CREATE_LEDGER_ENTRY expense when model asks to confirm without tool call', async () => {
+    const buildActionPayload = jest.fn().mockImplementation((args) =>
+      Promise.resolve({
+        ...args,
+        entryDate: '2026-08-10T10:00:00+07:00',
+      }),
+    );
+    toolRegistry.getTool.mockImplementation((name: string) => {
+      if (name === 'propose_create_ledger_entry') {
+        return {
+          name,
+          kind: 'write',
+          module: AiRelatedModule.FINANCE,
+          allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          actionType: AiActionType.CREATE_LEDGER_ENTRY,
+          buildActionPayload,
+        };
+      }
+      return undefined;
+    });
+    openAiClient.chat.mockResolvedValue(
+      textCompletion(
+        'Mình đã chuẩn bị đề xuất ghi khoản chi 50.000đ, bạn xác nhận trên ứng dụng nhé.',
+      ),
+    );
+
+    const result = await send(member, 'ghi nhận khoản chi 50000');
+
+    expect(buildActionPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entryType: 'EXPENSE',
+        amount: 50000,
+        description: 'Khoản chi 50.000đ',
+        entryDate: expect.any(Date),
+      }),
+      expect.objectContaining({
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+      payload: {
+        entryType: 'EXPENSE',
+        amount: 50000,
+      },
+    });
+    expect(result.pendingAction).toMatchObject({
+      messageId: 'msg-2',
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+    });
+    expect(result.pendingActions).toHaveLength(1);
+  });
+
+  it('does not ask app confirmation when no pending action can be created', async () => {
+    toolRegistry.getTool.mockReturnValue(undefined);
+    openAiClient.chat.mockResolvedValue(
+      textCompletion('Bạn hãy xác nhận trên ứng dụng để mình ghi sổ nhé.'),
+    );
+
+    const result = await send(member, 'ghi nhận khoản chi');
+
+    expect(result.pendingAction).toBeNull();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toContain('chưa tạo được thẻ xác nhận');
+    expect(aiRow.messageContent).not.toContain('xác nhận trên ứng dụng');
+  });
+
   it('nhiều write tool trong cùng lượt được gom thành pendingActions', async () => {
     const buildActionPayload = jest.fn().mockResolvedValue({ a: 1 });
     toolRegistry.getTool.mockReturnValue({
