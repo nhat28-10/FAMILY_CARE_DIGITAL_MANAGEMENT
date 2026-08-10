@@ -489,6 +489,18 @@ export class FinanceReportService {
     }
 
     const jarIds = new Set(model.jars.map((jar) => jar.id));
+    const categoryMappings =
+      await this.prisma.financeCategoryJarMapping.findMany({
+        where: {
+          familyId,
+          financeModelId: model.id,
+          jarId: { in: [...jarIds] },
+        },
+        select: { categoryId: true, jarId: true },
+      });
+    const jarIdByCategoryId = new Map(
+      categoryMappings.map((mapping) => [mapping.categoryId, mapping.jarId]),
+    );
     const entries = await this.prisma.ledgerEntry.findMany({
       where: {
         ledger: { familyId },
@@ -520,15 +532,21 @@ export class FinanceReportService {
     let legacyJarEntryCount = 0;
 
     for (const entry of entries) {
-      if (entry.jarId && jarIds.has(entry.jarId)) {
+      const resolvedJarId =
+        entry.jarId && jarIds.has(entry.jarId)
+          ? entry.jarId
+          : !entry.jarId && entry.categoryId
+            ? jarIdByCategoryId.get(entry.categoryId)
+            : undefined;
+      if (resolvedJarId) {
         mappedAmount = mappedAmount.plus(entry.amount);
         totalsByJar.set(
-          entry.jarId,
-          (totalsByJar.get(entry.jarId) ?? zero).plus(entry.amount),
+          resolvedJarId,
+          (totalsByJar.get(resolvedJarId) ?? zero).plus(entry.amount),
         );
         const categoryKey = entry.categoryId ?? 'UNCATEGORIZED';
         const categoryMap =
-          categoryTotalsByJar.get(entry.jarId) ??
+          categoryTotalsByJar.get(resolvedJarId) ??
           new Map<
             string,
             {
@@ -545,7 +563,7 @@ export class FinanceReportService {
           amount: (current?.amount ?? zero).plus(entry.amount),
           entryCount: (current?.entryCount ?? 0) + 1,
         });
-        categoryTotalsByJar.set(entry.jarId, categoryMap);
+        categoryTotalsByJar.set(resolvedJarId, categoryMap);
       } else {
         unmappedAmount = unmappedAmount.plus(entry.amount);
         unmappedEntryCount += 1;

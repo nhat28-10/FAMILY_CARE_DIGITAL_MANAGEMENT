@@ -72,7 +72,7 @@ describe('FinanceService budget planning', () => {
       familyMember: { findFirst: jest.fn() },
       budgetPlan: { findFirst: jest.fn() },
       financeModel: { findFirst: jest.fn() },
-      financeCategoryJarMapping: { findMany: jest.fn() },
+      financeCategoryJarMapping: { findMany: jest.fn().mockResolvedValue([]) },
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn(), count: jest.fn() },
     };
@@ -510,6 +510,11 @@ describe('FinanceService budget planning', () => {
         },
       ],
     });
+    (
+      prisma.financeCategoryJarMapping as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([
+      { categoryId: 'food-category', jarId: 'spending-jar' },
+    ]);
     (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
       {
         jarId: 'spending-jar',
@@ -522,6 +527,12 @@ describe('FinanceService budget planning', () => {
         categoryId: 'saving-category',
         amount: new Prisma.Decimal(0),
         category: { name: 'Saving' },
+      },
+      {
+        jarId: null,
+        categoryId: 'food-category',
+        amount: new Prisma.Decimal(100),
+        category: { name: 'Food' },
       },
       {
         jarId: null,
@@ -540,19 +551,35 @@ describe('FinanceService budget planning', () => {
       },
     );
 
-    expect(report.totals.trackedAmount.toString()).toBe('120');
-    expect(report.totals.mappedAmount.toString()).toBe('110');
+    expect(report.totals.trackedAmount.toString()).toBe('220');
+    expect(report.totals.mappedAmount.toString()).toBe('210');
     expect(report.totals.unmappedAmount.toString()).toBe('10');
-    expect(report.items[0].targetAmount.toString()).toBe('96');
-    expect(report.items[0].actualAmount.toString()).toBe('110');
-    expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(91.666, 2);
+    expect(report.items[0].targetAmount.toString()).toBe('176');
+    expect(report.items[0].actualAmount.toString()).toBe('210');
+    expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(95.454, 2);
     expect(report.items[0].variancePercentage.toNumber()).toBeCloseTo(
-      11.666,
+      15.454,
       2,
     );
+    expect(report.items[0].categories[0]).toMatchObject({
+      categoryId: 'food-category',
+      name: 'Food',
+      entryCount: 2,
+    });
+    expect(report.items[0].categories[0].amount.toString()).toBe('210');
     expect(report.items[0].status).toBe('OVER_TARGET');
     expect(report.items[1].status).toBe('UNDER_TARGET');
-    expect(report.unmapped.percentage.toNumber()).toBeCloseTo(8.333, 2);
+    expect(report.unmapped.percentage.toNumber()).toBeCloseTo(4.545, 2);
+    expect(
+      (prisma.financeCategoryJarMapping as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        familyId,
+        financeModelId: 'model-id',
+        jarId: { in: ['spending-jar', 'savings-jar'] },
+      },
+      select: { categoryId: true, jarId: true },
+    });
     const jarReportQuery = (
       prisma.ledgerEntry as {
         findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
