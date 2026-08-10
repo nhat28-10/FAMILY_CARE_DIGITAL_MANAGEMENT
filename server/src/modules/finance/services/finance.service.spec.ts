@@ -72,7 +72,7 @@ describe('FinanceService budget planning', () => {
       familyMember: { findFirst: jest.fn() },
       budgetPlan: { findFirst: jest.fn() },
       financeModel: { findFirst: jest.fn() },
-      financeCategoryJarMapping: { findMany: jest.fn() },
+      financeCategoryJarMapping: { findMany: jest.fn().mockResolvedValue([]) },
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn(), count: jest.fn() },
     };
@@ -325,6 +325,7 @@ describe('FinanceService budget planning', () => {
       (prisma.ledgerEntry as { findMany: jest.Mock }).findMany,
     ).toHaveBeenCalledWith(
       expect.objectContaining({
+        orderBy: [{ createdAt: 'desc' }, { entryDate: 'desc' }],
         skip: 0,
         take: 20,
       }),
@@ -509,26 +510,60 @@ describe('FinanceService budget planning', () => {
         },
       ],
     });
-    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
-      {
-        jarId: 'spending-jar',
-        categoryId: 'food-category',
-        amount: new Prisma.Decimal(110),
-        category: { name: 'Food' },
-      },
-      {
-        jarId: 'savings-jar',
-        categoryId: 'saving-category',
-        amount: new Prisma.Decimal(0),
-        category: { name: 'Saving' },
-      },
-      {
-        jarId: null,
-        categoryId: null,
-        amount: new Prisma.Decimal(10),
-        category: null,
-      },
+    (
+      prisma.financeCategoryJarMapping as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([
+      { categoryId: 'food-category', jarId: 'spending-jar' },
     ]);
+    (prisma.ledgerEntry as { findMany: jest.Mock })
+      .findMany.mockResolvedValueOnce([
+        {
+          jarId: 'spending-jar',
+          amount: new Prisma.Decimal(2400000),
+          metadata: {
+            fundAllocationSnapshot: {
+              jar: { id: 'spending-jar' },
+              amount: 2400000,
+            },
+          },
+        },
+        {
+          jarId: 'savings-jar',
+          amount: new Prisma.Decimal(600000),
+          metadata: {
+            fundAllocationSnapshot: {
+              jar: { id: 'savings-jar' },
+              amount: 600000,
+            },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          jarId: 'spending-jar',
+          categoryId: 'food-category',
+          amount: new Prisma.Decimal(110),
+          category: { name: 'Food' },
+        },
+        {
+          jarId: 'savings-jar',
+          categoryId: 'saving-category',
+          amount: new Prisma.Decimal(0),
+          category: { name: 'Saving' },
+        },
+        {
+          jarId: null,
+          categoryId: 'food-category',
+          amount: new Prisma.Decimal(100),
+          category: { name: 'Food' },
+        },
+        {
+          jarId: null,
+          categoryId: null,
+          amount: new Prisma.Decimal(10),
+          category: null,
+        },
+      ]);
 
     const report = await reportService.getJarTargetActualReport(
       familyId,
@@ -539,24 +574,50 @@ describe('FinanceService budget planning', () => {
       },
     );
 
-    expect(report.totals.trackedAmount.toString()).toBe('120');
-    expect(report.totals.mappedAmount.toString()).toBe('110');
+    expect(report.totals.trackedAmount.toString()).toBe('220');
+    expect(report.totals.mappedAmount.toString()).toBe('210');
     expect(report.totals.unmappedAmount.toString()).toBe('10');
-    expect(report.items[0].targetAmount.toString()).toBe('96');
-    expect(report.items[0].actualAmount.toString()).toBe('110');
-    expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(91.666, 2);
+    expect(report.items[0].targetAmount.toString()).toBe('2400000');
+    expect(report.items[0].actualAmount.toString()).toBe('210');
+    expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(95.454, 2);
     expect(report.items[0].variancePercentage.toNumber()).toBeCloseTo(
-      11.666,
+      15.454,
       2,
     );
+    expect(report.items[0].categories[0]).toMatchObject({
+      categoryId: 'food-category',
+      name: 'Food',
+      entryCount: 2,
+    });
+    expect(report.items[0].categories[0].amount.toString()).toBe('210');
     expect(report.items[0].status).toBe('OVER_TARGET');
+    expect(report.items[1].targetAmount.toString()).toBe('600000');
     expect(report.items[1].status).toBe('UNDER_TARGET');
-    expect(report.unmapped.percentage.toNumber()).toBeCloseTo(8.333, 2);
-    const jarReportQuery = (
+    expect(report.unmapped.percentage.toNumber()).toBeCloseTo(4.545, 2);
+    expect(
+      (prisma.financeCategoryJarMapping as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        familyId,
+        financeModelId: 'model-id',
+        jarId: { in: ['spending-jar', 'savings-jar'] },
+      },
+      select: { categoryId: true, jarId: true },
+    });
+    const allocationTargetQuery = (
       prisma.ledgerEntry as {
         findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
       }
     ).findMany.mock.calls[0][0];
+    expect(allocationTargetQuery.where).toMatchObject({
+      sourceType: 'MODEL_FUND_ALLOCATION',
+      sourceId: { in: ['model-id:2026-06'] },
+    });
+    const jarReportQuery = (
+      prisma.ledgerEntry as {
+        findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
+      }
+    ).findMany.mock.calls[1][0];
     expect(jarReportQuery.where?.sourceType).toBeUndefined();
     expect(
       (prisma.ledgerEntry as { findMany: jest.Mock }).findMany,
@@ -725,6 +786,7 @@ describe('FinanceService budget planning', () => {
       }),
     ).rejects.toMatchObject({
       response: expect.objectContaining({
+        message: 'Kỳ này đã có lần chia quỹ',
         code: 'FUND_ALLOCATION_ALREADY_EXISTS',
       }),
     });
@@ -811,6 +873,10 @@ describe('FinanceService budget planning', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({
         code: 'INSUFFICIENT_AVAILABLE_FUND',
+        requestedAmount: 10000000,
+        availableAmount: 1000000,
+        periodMonth: 7,
+        periodYear: 2026,
       }),
     });
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();

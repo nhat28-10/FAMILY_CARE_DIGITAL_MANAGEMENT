@@ -9,8 +9,6 @@ import {
 
 import { CreateTaskAssignmentDto } from '../../tasks/dto/create-task-assignment.dto';
 import { CreateTaskDto } from '../../tasks/dto/create-task.dto';
-import type { MyTaskAssignmentQueryDto } from '../../tasks/dto/my-task-assignment-query.dto';
-import type { TaskQueryDto } from '../../tasks/dto/task-query.dto';
 import { TasksService } from '../../tasks/services/tasks.service';
 import { FamilyMembersService } from '../../family-members/family-members.service';
 import { AiActionType } from '../types/ai-chatbot.types';
@@ -131,7 +129,8 @@ export class TasksAiTools implements AiToolProvider {
           );
           return members.map((member) => ({
             id: member.id,
-            displayName: member.displayName,
+            displayName:
+              member.displayName ?? member.user.fullName ?? member.user.email,
             familyRole: member.familyRole,
             relationship: member.relationship,
           }));
@@ -172,7 +171,7 @@ export class TasksAiTools implements AiToolProvider {
         kind: 'write',
         allowedRoles: TASK_MANAGER_ROLES,
         actionType: AiActionType.CREATE_TASK,
-        buildActionPayload: (args, ctx) => {
+        buildActionPayload: (args) => {
           const { assignedToMemberId, ...taskArgs } = args;
           const task = validateActionArgs(CreateTaskDto, taskArgs);
           let assignment: CreateTaskAssignmentDto | undefined;

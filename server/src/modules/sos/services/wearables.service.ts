@@ -14,6 +14,7 @@ import {
   SosAlertStatus,
   SosSeverity,
   SosSourceType,
+  WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
 import type { FamilyMember, WearableDevice } from '@prisma/client';
@@ -43,6 +44,12 @@ const ownerInclude = {
 
 /** Latest sensor events returned per device. */
 const EVENT_HISTORY_LIMIT = 50;
+
+const WEARABLE_ERROR_CODES = {
+  WEARABLE_ALREADY_PAIRED: 'WEARABLE_ALREADY_PAIRED',
+  DEVICE_IDENTIFIER_TAKEN: 'DEVICE_IDENTIFIER_TAKEN',
+  WEARABLE_NOT_PAIRED: 'WEARABLE_NOT_PAIRED',
+} as const;
 
 /** Wearable / simulated device pairing + sensor event ingestion. */
 @Injectable()
@@ -95,16 +102,20 @@ export class WearablesService {
       });
       if (existingDevice) {
         if (existingDevice.ownerUserId !== ownerUserId) {
-          throw new ConflictException(
+          throw this.conflict(
+            WEARABLE_ERROR_CODES.DEVICE_IDENTIFIER_TAKEN,
             'Mã định danh thiết bị đã được dùng trong gia đình',
           );
         }
         if (existingDevice.pairingStatus === DevicePairingStatus.PAIRED) {
-          throw new ConflictException('Tai khoan nay da ket noi mot wearable');
+          throw this.conflict(
+            WEARABLE_ERROR_CODES.WEARABLE_ALREADY_PAIRED,
+            'Tai khoan nay da ket noi mot wearable',
+          );
         }
 
         await this.assertNoPairedWearable(ownerUserId, existingDevice.id);
-        return await this.prisma.wearableDevice.update({
+        const device = await this.prisma.wearableDevice.update({
           where: { id: existingDevice.id },
           data: {
             ownerMemberId,
@@ -117,10 +128,17 @@ export class WearablesService {
           },
           include: ownerInclude,
         });
+        await this.markActivationPaired(dto.deviceIdentifier, {
+          workspaceId,
+          ownerMemberId,
+          ownerUserId,
+          wearableDeviceId: device.id,
+        });
+        return device;
       }
 
       await this.assertNoPairedWearable(ownerUserId);
-      return await this.prisma.wearableDevice.create({
+      const device = await this.prisma.wearableDevice.create({
         data: {
           workspaceId,
           ownerMemberId,
@@ -134,6 +152,13 @@ export class WearablesService {
         },
         include: ownerInclude,
       });
+      await this.markActivationPaired(dto.deviceIdentifier, {
+        workspaceId,
+        ownerMemberId,
+        ownerUserId,
+        wearableDeviceId: device.id,
+      });
+      return device;
     } catch (error) {
       this.rethrowUniqueViolation(error);
     }
@@ -188,11 +213,18 @@ export class WearablesService {
     }
 
     try {
-      return await this.prisma.wearableDevice.update({
+      const updated = await this.prisma.wearableDevice.update({
         where: { id: device.id },
         data: { ...dto },
         include: ownerInclude,
       });
+      if (
+        dto.pairingStatus !== undefined &&
+        dto.pairingStatus !== DevicePairingStatus.PAIRED
+      ) {
+        await this.revokeWearableTokenSessions(device.id);
+      }
+      return updated;
     } catch (error) {
       this.rethrowUniqueViolation(error);
     }
@@ -205,7 +237,11 @@ export class WearablesService {
   ) {
     const device = await this.loadDevice(workspaceId, deviceId);
     this.assertOwnerOrManager(device, currentMember);
-    return this.prisma.wearableDevice.delete({ where: { id: device.id } });
+    const deleted = await this.prisma.wearableDevice.delete({
+      where: { id: device.id },
+    });
+    await this.revokeWearableTokenSessions(device.id);
+    return deleted;
   }
 
   // ---------------------------------------------------------------------------
@@ -229,7 +265,10 @@ export class WearablesService {
       );
     }
     if (device.pairingStatus !== DevicePairingStatus.PAIRED) {
-      throw new BadRequestException('Thiết bị chưa ở trạng thái ghép nối');
+      throw this.badRequest(
+        WEARABLE_ERROR_CODES.WEARABLE_NOT_PAIRED,
+        'Thiet bi chua o trang thai ghep noi',
+      );
     }
 
     const event = await this.prisma.sensorEvent.create({
@@ -327,15 +366,73 @@ export class WearablesService {
   }
 
   private buildAlertMessage(dto: CreateSensorEventDto) {
-    const heartRate = this.extractHeartRate(dto.rawValue);
+    const heartRate = this.extractNumber(dto.rawValue, 'heartRate');
+    const thresholdHigh = this.extractNumber(dto.rawValue, 'thresholdHigh');
+    const thresholdLow = this.extractNumber(dto.rawValue, 'thresholdLow');
+    const durationSeconds = this.extractNumber(dto.rawValue, 'durationSeconds');
+    const durationText =
+      durationSeconds === null ? '' : ` trong ${durationSeconds}s`;
     return heartRate === null
       ? 'Thiet bi phat hien nhip tim bat thuong'
-      : `Thiet bi phat hien nhip tim bat thuong (${heartRate} bpm)`;
+      : thresholdLow !== null && heartRate < thresholdLow
+        ? `Thiet bi phat hien nhip tim thap (${heartRate} bpm, nguong ${thresholdLow} bpm)${durationText}`
+        : thresholdHigh !== null && heartRate > thresholdHigh
+          ? `Thiet bi phat hien nhip tim cao (${heartRate} bpm, nguong ${thresholdHigh} bpm)${durationText}`
+          : `Thiet bi phat hien nhip tim bat thuong (${heartRate} bpm)${durationText}`;
   }
 
-  private extractHeartRate(rawValue?: Record<string, unknown>) {
-    const value = rawValue?.heartRate;
+  private extractNumber(
+    rawValue: Record<string, unknown> | undefined,
+    key: string,
+  ) {
+    const value = rawValue?.[key];
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  private async markActivationPaired(
+    code: string,
+    data: {
+      workspaceId: string;
+      ownerMemberId: string;
+      ownerUserId: string;
+      wearableDeviceId: string;
+    },
+  ) {
+    await this.prisma.wearableActivationSession.updateMany({
+      where: {
+        code,
+        status: WearableActivationStatus.PENDING,
+        expiresAt: { gt: new Date() },
+      },
+      data: {
+        status: WearableActivationStatus.PAIRED,
+        workspaceId: data.workspaceId,
+        ownerMemberId: data.ownerMemberId,
+        ownerUserId: data.ownerUserId,
+        wearableDeviceId: data.wearableDeviceId,
+      },
+    });
+  }
+
+  private async revokeWearableTokenSessions(deviceId: string) {
+    const sessions = await this.prisma.wearableActivationSession.findMany({
+      where: {
+        wearableDeviceId: deviceId,
+        claimedRefreshTokenId: { not: null },
+      },
+      select: { claimedRefreshTokenId: true },
+    });
+    const refreshTokenIds = sessions
+      .map((session) => session.claimedRefreshTokenId)
+      .filter((id): id is string => typeof id === 'string');
+    if (refreshTokenIds.length === 0) {
+      return;
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: { id: { in: refreshTokenIds }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   private async loadDevice(workspaceId: string, deviceId: string) {
@@ -371,7 +468,8 @@ export class WearablesService {
       },
     });
     if (count > 0) {
-      throw new ConflictException(
+      throw this.conflict(
+        WEARABLE_ERROR_CODES.WEARABLE_ALREADY_PAIRED,
         'Thành viên đã có một thiết bị SOS đang hoạt động',
       );
     }
@@ -400,12 +498,24 @@ export class WearablesService {
           ].includes(field),
         )
       ) {
-        throw new ConflictException('Tai khoan nay da ket noi mot wearable');
+        throw this.conflict(
+          WEARABLE_ERROR_CODES.WEARABLE_ALREADY_PAIRED,
+          'Tai khoan nay da ket noi mot wearable',
+        );
       }
-      throw new ConflictException(
+      throw this.conflict(
+        WEARABLE_ERROR_CODES.DEVICE_IDENTIFIER_TAKEN,
         'Mã định danh thiết bị đã được dùng trong gia đình',
       );
     }
     throw error;
+  }
+
+  private badRequest(code: string, message: string) {
+    return new BadRequestException({ message, code, errorCode: code });
+  }
+
+  private conflict(code: string, message: string) {
+    return new ConflictException({ message, code, errorCode: code });
   }
 }

@@ -40,6 +40,10 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+export interface AuthTokenSession extends AuthTokens {
+  refreshTokenId: string;
+}
+
 export interface AuthResult extends AuthTokens {
   user: SafeUser;
 }
@@ -279,7 +283,33 @@ export class AuthService {
     return sanitizeUser(user);
   }
 
-  /** Xác thực email bằng mã OTP; trả về user đã được cập nhật trạng thái. */
+  /** Cấp token nội bộ cho một user đã được backend xác thực qua luồng trusted khác. */
+  async issueTokensForUserId(userId: string): Promise<AuthResult> {
+    const { auth } = await this.issueTokenSessionForUserId(userId);
+    return auth;
+  }
+
+  async issueTokenSessionForUserId(
+    userId: string,
+  ): Promise<{ auth: AuthResult; refreshTokenId: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Không tìm thấy người dùng');
+    }
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException('Tài khoản đã bị khóa');
+    }
+
+    const loggedInUser = await this.usersService.updateLastLogin(user.id);
+    const tokenSession = await this.generateTokens(loggedInUser);
+    const { refreshTokenId, ...tokens } = tokenSession;
+    return {
+      auth: { user: sanitizeUser(loggedInUser), ...tokens },
+      refreshTokenId,
+    };
+  }
+
+  /** Cập nhật hồ sơ cá nhân của user hiện tại. */
   async updateProfile(
     userId: string,
     dto: UpdateMyProfileDto,
@@ -356,11 +386,12 @@ export class AuthService {
    * sanitized user together with the tokens.
    */
   private async buildAuthResult(user: User): Promise<AuthResult> {
-    const tokens = await this.generateTokens(user);
+    const { refreshTokenId: _refreshTokenId, ...tokens } =
+      await this.generateTokens(user);
     return { user: sanitizeUser(user), ...tokens };
   }
 
-  private async generateTokens(user: User): Promise<AuthTokens> {
+  private async generateTokens(user: User): Promise<AuthTokenSession> {
     const basePayload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -400,7 +431,7 @@ export class AuthService {
     const expiresAt = new Date(decoded.exp * 1000);
     await this.refreshTokenService.store(jti, user.id, refreshToken, expiresAt);
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, refreshTokenId: jti };
   }
 
   private get saltRounds(): number {

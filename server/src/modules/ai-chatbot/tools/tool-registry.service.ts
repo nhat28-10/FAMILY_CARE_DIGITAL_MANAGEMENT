@@ -5,6 +5,7 @@ import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 import type { AiToolContext } from '../types/ai-chatbot.types';
 import type { AiToolDefinition } from './tool.types';
 import { CalendarAiTools } from './calendar.tools';
+import { DailyBriefAiTools } from './daily-brief.tools';
 import { FinanceAiTools } from './finance.tools';
 import { SafetyAiTools } from './safety.tools';
 import { TasksAiTools } from './tasks.tools';
@@ -22,12 +23,14 @@ export class ToolRegistryService {
     tasksTools: TasksAiTools,
     calendarTools: CalendarAiTools,
     safetyTools: SafetyAiTools,
+    dailyBriefTools: DailyBriefAiTools,
   ) {
     for (const provider of [
       financeTools,
       tasksTools,
       calendarTools,
       safetyTools,
+      dailyBriefTools,
     ]) {
       for (const tool of provider.getTools()) {
         this.tools.set(tool.name, tool);
@@ -37,8 +40,10 @@ export class ToolRegistryService {
 
   /** Tool member này được dùng — tool ngoài quyền không gửi cho model. */
   getToolsForRole(familyRole: FamilyRole): AiToolDefinition[] {
-    return [...this.tools.values()].filter((tool) =>
-      tool.allowedRoles.includes(familyRole),
+    // Hide unauthorized read tools, but expose write tools so permission
+    // denials are explicit instead of being guessed by the model.
+    return [...this.tools.values()].filter(
+      (tool) => tool.kind === 'write' || tool.allowedRoles.includes(familyRole),
     );
   }
 

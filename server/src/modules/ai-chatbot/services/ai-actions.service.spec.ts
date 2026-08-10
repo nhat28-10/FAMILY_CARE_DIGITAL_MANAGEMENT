@@ -10,6 +10,7 @@ import type { FamilyMember } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CalendarService } from '../../calendar/calendar.service';
 import { FinanceService } from '../../finance/services/finance.service';
+import { FinancialGoalService } from '../../finance/services/financial-goal.service';
 import { TasksService } from '../../tasks/services/tasks.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { AiActionStatus, AiActionType } from '../types/ai-chatbot.types';
@@ -64,7 +65,17 @@ describe('AiActionsService', () => {
   };
   let conversations: { getOwnedConversationOrThrow: jest.Mock };
   let toolRegistry: { getTool: jest.Mock };
-  let financeService: { createLedgerEntry: jest.Mock };
+  let financeService: {
+    createLedgerEntry: jest.Mock;
+    createBudgetPlan: jest.Mock;
+    createBudgetLine: jest.Mock;
+    allocateFundByModel: jest.Mock;
+  };
+  let financialGoalService: {
+    createFinancialGoal: jest.Mock;
+    createGoalAllocation: jest.Mock;
+    confirmGoalContributionPlans: jest.Mock;
+  };
   let tasksService: { createTask: jest.Mock; createTaskAssignment: jest.Mock };
   let calendarService: { createEvent: jest.Mock };
   let service: AiActionsService;
@@ -97,6 +108,46 @@ describe('AiActionsService', () => {
             allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
           };
         }
+        if (name === 'propose_create_budget_plan') {
+          return {
+            actionType: AiActionType.CREATE_BUDGET_PLAN,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
+        if (name === 'propose_create_budget_line') {
+          return {
+            actionType: AiActionType.CREATE_BUDGET_LINE,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
+        if (name === 'propose_create_financial_goal') {
+          return {
+            actionType: AiActionType.CREATE_FINANCIAL_GOAL,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
+        if (name === 'propose_create_goal_allocation') {
+          return {
+            actionType: AiActionType.CREATE_GOAL_ALLOCATION,
+            allowedRoles: [
+              FamilyRole.FAMILY_MANAGER,
+              FamilyRole.DEPUTY_MEMBER,
+              FamilyRole.FAMILY_MEMBER,
+            ],
+          };
+        }
+        if (name === 'propose_create_goal_contribution_plan') {
+          return {
+            actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
+        if (name === 'propose_allocate_fund_by_model') {
+          return {
+            actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+            allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          };
+        }
         return {
           actionType: AiActionType.CREATE_TASK,
           allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
@@ -105,6 +156,25 @@ describe('AiActionsService', () => {
     };
     financeService = {
       createLedgerEntry: jest.fn().mockResolvedValue({ id: 'entry-1' }),
+      createBudgetPlan: jest.fn().mockResolvedValue({ id: 'budget-plan-1' }),
+      createBudgetLine: jest.fn().mockResolvedValue({ id: 'budget-line-1' }),
+      allocateFundByModel: jest.fn().mockResolvedValue({
+        sourceId: 'model-1:2026-08',
+        entries: [{ id: 'allocation-entry-1' }],
+      }),
+    };
+    financialGoalService = {
+      createFinancialGoal: jest
+        .fn()
+        .mockResolvedValue({ goal: { id: 'goal-1' }, progress: {} }),
+      createGoalAllocation: jest
+        .fn()
+        .mockResolvedValue({ allocation: { id: 'goal-allocation-1' } }),
+      confirmGoalContributionPlans: jest.fn().mockResolvedValue({
+        goalId: 'goal-1',
+        periodMonth: 8,
+        periodYear: 2026,
+      }),
     };
     tasksService = {
       createTask: jest.fn().mockResolvedValue({ id: 'task-1' }),
@@ -118,9 +188,15 @@ describe('AiActionsService', () => {
       conversations as unknown as AiConversationsService,
       toolRegistry as unknown as ToolRegistryService,
       financeService as unknown as FinanceService,
+      financialGoalService as unknown as FinancialGoalService,
       tasksService as unknown as TasksService,
       calendarService as unknown as CalendarService,
     );
+    (
+      service as unknown as {
+        logger: { error: (...args: unknown[]) => void };
+      }
+    ).logger = { error: jest.fn() };
   });
 
   const confirm = () =>
@@ -152,9 +228,304 @@ describe('AiActionsService', () => {
     });
     expect(prisma.aIMessage.create).toHaveBeenCalled();
     expect(result).toEqual({
+      actionIndex: 0,
       actionType: AiActionType.CREATE_LEDGER_ENTRY,
       result: { id: 'entry-1' },
     });
+  });
+
+  it('confirm CREATE_BUDGET_PLAN gọi FinanceService.createBudgetPlan', async () => {
+    const budgetPayload = {
+      planName: 'Ngân sách tháng 8/2026',
+      periodType: 'MONTHLY',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      expectedSharedIncome: 30000000,
+      expectedSharedExpense: 22000000,
+      lines: [],
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_BUDGET_PLAN,
+            payload: budgetPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(financeService.createBudgetPlan).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      budgetPayload,
+    );
+    expect(prisma.aIMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          messageContent:
+            'Đã tạo kế hoạch ngân sách "Ngân sách tháng 8/2026" thành công.',
+          relatedModule: 'FINANCE',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_BUDGET_PLAN,
+      result: { id: 'budget-plan-1' },
+    });
+  });
+
+  it('confirm CREATE_FINANCIAL_GOAL gọi FinancialGoalService.createFinancialGoal', async () => {
+    const goalPayload = {
+      goalName: 'Quỹ dự phòng',
+      targetAmount: 50000000,
+      deadline: '2026-12-31',
+      monthlyContributionTarget: 5000000,
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_FINANCIAL_GOAL,
+            payload: goalPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(financialGoalService.createFinancialGoal).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      goalPayload,
+    );
+    expect(prisma.aIMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          messageContent:
+            'Đã tạo mục tiêu tài chính "Quỹ dự phòng" thành công.',
+          relatedModule: 'FINANCE',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_FINANCIAL_GOAL,
+      result: { id: 'goal-1' },
+    });
+  });
+
+  it('confirm CREATE_BUDGET_LINE gọi FinanceService.createBudgetLine', async () => {
+    const budgetLinePayload = {
+      budgetPlanId: 'budget-plan-1',
+      line: {
+        categoryId: 'category-1',
+        plannedAmount: 5000000,
+        thresholdPercent: 80,
+      },
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_BUDGET_LINE,
+            payload: budgetLinePayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(financeService.createBudgetLine).toHaveBeenCalledWith(
+      familyId,
+      budgetLinePayload.budgetPlanId,
+      budgetLinePayload.line,
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_BUDGET_LINE,
+      result: { id: 'budget-line-1' },
+    });
+  });
+
+  it('confirm CREATE_GOAL_ALLOCATION gọi FinancialGoalService.createGoalAllocation', async () => {
+    const allocationPayload = {
+      goalId: 'goal-1',
+      allocation: { amount: 2000000 },
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_GOAL_ALLOCATION,
+            payload: allocationPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(financialGoalService.createGoalAllocation).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      allocationPayload.goalId,
+      allocationPayload.allocation,
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_GOAL_ALLOCATION,
+      result: { id: 'goal-allocation-1' },
+    });
+  });
+
+  it('confirm CREATE_GOAL_CONTRIBUTION_PLAN gọi FinancialGoalService.confirmGoalContributionPlans', async () => {
+    const contributionPayload = {
+      goalId: 'goal-1',
+      contributionPlan: {
+        periodMonth: 8,
+        periodYear: 2026,
+        dueDate: '2026-08-31',
+        members: [{ memberId: member.id, plannedAmount: 3000000 }],
+      },
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
+            payload: contributionPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(
+      financialGoalService.confirmGoalContributionPlans,
+    ).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      contributionPayload.goalId,
+      contributionPayload.contributionPlan,
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
+      result: { id: 'goal-1' },
+    });
+  });
+
+  it('confirm ALLOCATE_FUND_BY_MODEL gọi FinanceService.allocateFundByModel', async () => {
+    const allocationPayload = {
+      amount: 10000000,
+      periodMonth: 8,
+      periodYear: 2026,
+      note: 'Chia quỹ tháng 8',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+            payload: allocationPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await confirm();
+
+    expect(financeService.allocateFundByModel).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      allocationPayload,
+    );
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      result: { id: 'allocation-entry-1' },
+    });
+  });
+
+  it('confirm ALLOCATE_FUND_BY_MODEL loi thi tra action ve PENDING va ghi log chan doan', async () => {
+    const allocationPayload = {
+      amount: 100000,
+      periodMonth: 8,
+      periodYear: 2026,
+      note: 'Chia quy thang 8',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+            payload: allocationPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+    financeService.allocateFundByModel.mockRejectedValue(
+      new Error('database proxy timeout'),
+    );
+    const logger = { error: jest.fn() };
+    (
+      service as unknown as {
+        logger: { error: (...args: unknown[]) => void };
+      }
+    ).logger = logger;
+
+    await expect(confirm()).rejects.toThrow('database proxy timeout');
+
+    const lastUpdate = prisma.aIMessage.update.mock.calls.at(-1)[0];
+    expect(lastUpdate.data.permissionContext.pendingAction.status).toBe(
+      AiActionStatus.PENDING,
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('ALLOCATE_FUND_BY_MODEL'),
+      expect.any(String),
+    );
   });
 
   it('confirm CREATE_TASK kèm assignment gọi đủ 2 service', async () => {
@@ -228,6 +599,84 @@ describe('AiActionsService', () => {
       }),
     );
     expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      result: { id: 'event-1' },
+    });
+  });
+
+  it('confirmAtIndex xử lý đúng action thứ hai trong action plan', async () => {
+    const calendarPayload = {
+      title: 'Nhắc đóng góp quỹ',
+      startTime: '2026-08-15T02:00:00.000Z',
+      endTime: '2026-08-15T02:30:00.000Z',
+    };
+    prisma.aIMessage.findFirst.mockResolvedValue(
+      buildMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingActions: [
+            {
+              actionType: AiActionType.CREATE_LEDGER_ENTRY,
+              payload: ledgerPayload,
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: member.id,
+              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+            },
+            {
+              actionType: AiActionType.CREATE_CALENDAR_EVENT,
+              payload: calendarPayload,
+              status: AiActionStatus.PENDING,
+              proposedByMemberId: member.id,
+              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+            },
+          ],
+          pendingAction: {
+            actionType: AiActionType.CREATE_LEDGER_ENTRY,
+            payload: ledgerPayload,
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: member.id,
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          },
+        },
+      }),
+    );
+
+    const result = await service.confirmAtIndex(
+      familyId,
+      member,
+      conversationId,
+      messageId,
+      1,
+    );
+
+    expect(prisma.aIMessage.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          permissionContext: {
+            path: ['pendingActions', '1', 'status'],
+            equals: AiActionStatus.PENDING,
+          },
+        }),
+      }),
+    );
+    expect(calendarService.createEvent).toHaveBeenCalledWith(
+      familyId,
+      member.id,
+      calendarPayload,
+    );
+    const lastUpdate = prisma.aIMessage.update.mock.calls.at(-1)[0];
+    expect(lastUpdate.data.permissionContext.pendingActions[1]).toMatchObject({
+      status: AiActionStatus.CONFIRMED,
+      result: { id: 'event-1' },
+    });
+    expect(lastUpdate.data.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+    });
+    expect(result).toEqual({
+      actionIndex: 1,
       actionType: AiActionType.CREATE_CALENDAR_EVENT,
       result: { id: 'event-1' },
     });
@@ -303,7 +752,10 @@ describe('AiActionsService', () => {
       messageId,
     );
 
-    expect(result).toEqual({ actionType: AiActionType.CREATE_LEDGER_ENTRY });
+    expect(result).toEqual({
+      actionIndex: 0,
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+    });
     expect(financeService.createLedgerEntry).not.toHaveBeenCalled();
     const claim = prisma.aIMessage.updateMany.mock.calls[0][0];
     expect(claim.data.permissionContext.pendingAction.status).toBe(

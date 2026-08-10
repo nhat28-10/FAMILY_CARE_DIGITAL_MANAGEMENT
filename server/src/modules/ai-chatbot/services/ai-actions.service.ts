@@ -12,8 +12,15 @@ import type { AIMessage, FamilyMember } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { CreateCalendarEventDto } from '../../calendar/dto/create-calendar-event.dto';
 import { CalendarService } from '../../calendar/calendar.service';
+import type { ConfirmGoalContributionPlanDto } from '../../finance/dto/confirm-goal-contribution-plan.dto';
+import type { CreateBudgetLineDto } from '../../finance/dto/create-budget-line.dto';
+import type { CreateBudgetPlanDto } from '../../finance/dto/create-budget-plan.dto';
+import type { CreateFinancialGoalDto } from '../../finance/dto/create-financial-goal.dto';
+import type { CreateFundAllocationDto } from '../../finance/dto/create-fund-allocation.dto';
+import type { CreateGoalAllocationDto } from '../../finance/dto/create-goal-allocation.dto';
 import type { CreateLedgerEntryDto } from '../../finance/dto/create-ledger-entry.dto';
 import { FinanceService } from '../../finance/services/finance.service';
+import { FinancialGoalService } from '../../finance/services/financial-goal.service';
 import type { CreateTaskAssignmentDto } from '../../tasks/dto/create-task-assignment.dto';
 import type { CreateTaskDto } from '../../tasks/dto/create-task.dto';
 import { TasksService } from '../../tasks/services/tasks.service';
@@ -35,6 +42,7 @@ export class AiActionsService {
     private readonly conversations: AiConversationsService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly financeService: FinanceService,
+    private readonly financialGoalService: FinancialGoalService,
     private readonly tasksService: TasksService,
     private readonly calendarService: CalendarService,
   ) {}
@@ -45,16 +53,36 @@ export class AiActionsService {
     conversationId: string,
     messageId: string,
   ) {
+    return this.confirmAtIndex(familyId, member, conversationId, messageId, 0);
+  }
+
+  async confirmAtIndex(
+    familyId: string,
+    member: FamilyMember,
+    conversationId: string,
+    messageId: string,
+    actionIndex: number,
+  ) {
     const { message, context, action } = await this.getPendingActionOrThrow(
       familyId,
       member.id,
       conversationId,
       messageId,
+      actionIndex,
     );
+
+    if (action.status !== AiActionStatus.PENDING) {
+      throw new ConflictException('Đề xuất này đã được xử lý');
+    }
 
     // Hết hạn → đánh dấu EXPIRED rồi báo client.
     if (new Date(action.expiresAt).getTime() < Date.now()) {
-      await this.updateActionStatus(message, context, AiActionStatus.EXPIRED);
+      await this.updateActionStatus(
+        message,
+        context,
+        actionIndex,
+        AiActionStatus.EXPIRED,
+      );
       throw new GoneException('Đề xuất đã hết hạn, hãy yêu cầu trợ lý tạo lại');
     }
 
@@ -70,6 +98,7 @@ export class AiActionsService {
     const claimed = await this.claimPending(
       message,
       context,
+      actionIndex,
       AiActionStatus.CONFIRMED,
     );
     if (!claimed) {
@@ -85,14 +114,24 @@ export class AiActionsService {
       summary = executed.summary;
       relatedModule = executed.relatedModule;
     } catch (error) {
+      this.logger.error(
+        `AI action confirm failed actionType=${action.actionType} familyId=${familyId} memberId=${member.id} conversationId=${conversationId} messageId=${messageId} actionIndex=${actionIndex} payload=${this.safeJson(action.payload)} error=${this.errorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       // Thực thi lỗi → nhả claim về PENDING để user sửa/bấm lại được.
-      await this.updateActionStatus(message, context, AiActionStatus.PENDING);
+      await this.updateActionStatus(
+        message,
+        context,
+        actionIndex,
+        AiActionStatus.PENDING,
+      );
       throw error;
     }
 
     await this.updateActionStatus(
       message,
       context,
+      actionIndex,
       AiActionStatus.CONFIRMED,
       result,
     );
@@ -106,7 +145,7 @@ export class AiActionsService {
       },
     });
 
-    return { actionType: action.actionType, result };
+    return { actionIndex, actionType: action.actionType, result };
   }
 
   async reject(
@@ -115,21 +154,36 @@ export class AiActionsService {
     conversationId: string,
     messageId: string,
   ) {
+    return this.rejectAtIndex(familyId, member, conversationId, messageId, 0);
+  }
+
+  async rejectAtIndex(
+    familyId: string,
+    member: FamilyMember,
+    conversationId: string,
+    messageId: string,
+    actionIndex: number,
+  ) {
     const { message, context, action } = await this.getPendingActionOrThrow(
       familyId,
       member.id,
       conversationId,
       messageId,
+      actionIndex,
     );
+    if (action.status !== AiActionStatus.PENDING) {
+      throw new ConflictException('Đề xuất này đã được xử lý');
+    }
     const claimed = await this.claimPending(
       message,
       context,
+      actionIndex,
       AiActionStatus.REJECTED,
     );
     if (!claimed) {
       throw new ConflictException('Đề xuất này đã được xử lý');
     }
-    return { actionType: action.actionType };
+    return { actionIndex, actionType: action.actionType };
   }
 
   // ---------------------------------------------------------------------------
@@ -139,6 +193,7 @@ export class AiActionsService {
     memberId: string,
     conversationId: string,
     messageId: string,
+    actionIndex = 0,
   ): Promise<{
     message: AIMessage;
     context: AiPermissionContext;
@@ -158,10 +213,17 @@ export class AiActionsService {
       },
     });
     const context = message?.permissionContext as AiPermissionContext | null;
-    if (!message || !context?.pendingAction) {
+    const actions =
+      context?.pendingActions && context.pendingActions.length > 0
+        ? context.pendingActions
+        : context?.pendingAction
+          ? [context.pendingAction]
+          : [];
+    const action = actions[actionIndex];
+    if (!message || !context || !action) {
       throw new NotFoundException('Không tìm thấy đề xuất hành động');
     }
-    return { message, context, action: context.pendingAction };
+    return { message, context, action };
   }
 
   /**
@@ -171,19 +233,25 @@ export class AiActionsService {
   private async claimPending(
     message: AIMessage,
     context: AiPermissionContext,
+    actionIndex: number,
     target: AiActionStatus,
   ): Promise<boolean> {
+    const statusPath =
+      context.pendingActions && context.pendingActions.length > 0
+        ? ['pendingActions', String(actionIndex), 'status']
+        : ['pendingAction', 'status'];
     const updated = await this.prisma.aIMessage.updateMany({
       where: {
         id: message.id,
         permissionContext: {
-          path: ['pendingAction', 'status'],
+          path: statusPath,
           equals: AiActionStatus.PENDING,
         },
       },
       data: {
         permissionContext: this.buildContext(
           context,
+          actionIndex,
           target,
         ) as unknown as Prisma.InputJsonValue,
       },
@@ -194,6 +262,7 @@ export class AiActionsService {
   private async updateActionStatus(
     message: AIMessage,
     context: AiPermissionContext,
+    actionIndex: number,
     status: AiActionStatus,
     result?: { id: string },
   ): Promise<void> {
@@ -202,6 +271,7 @@ export class AiActionsService {
       data: {
         permissionContext: this.buildContext(
           context,
+          actionIndex,
           status,
           result,
         ) as unknown as Prisma.InputJsonValue,
@@ -211,22 +281,46 @@ export class AiActionsService {
 
   private buildContext(
     context: AiPermissionContext,
+    actionIndex: number,
     status: AiActionStatus,
     result?: { id: string },
   ): AiPermissionContext {
+    const pendingActions =
+      context.pendingActions && context.pendingActions.length > 0
+        ? context.pendingActions.map((action, index) =>
+            index === actionIndex
+              ? {
+                  ...action,
+                  status,
+                  ...(result ? { result } : {}),
+                }
+              : action,
+          )
+        : context.pendingAction
+          ? [
+              {
+                ...context.pendingAction,
+                status,
+                ...(result ? { result } : {}),
+              },
+            ]
+          : [];
     return {
       ...context,
-      pendingAction: {
-        ...context.pendingAction!,
-        status,
-        ...(result ? { result } : {}),
-      },
+      ...(pendingActions.length > 0 ? { pendingActions } : {}),
+      pendingAction: pendingActions[0],
     };
   }
 
   private findToolByActionType(actionType: AiActionType) {
     return [
       this.toolRegistry.getTool('propose_create_ledger_entry'),
+      this.toolRegistry.getTool('propose_create_budget_plan'),
+      this.toolRegistry.getTool('propose_create_budget_line'),
+      this.toolRegistry.getTool('propose_create_financial_goal'),
+      this.toolRegistry.getTool('propose_create_goal_allocation'),
+      this.toolRegistry.getTool('propose_create_goal_contribution_plan'),
+      this.toolRegistry.getTool('propose_allocate_fund_by_model'),
       this.toolRegistry.getTool('propose_create_task'),
       this.toolRegistry.getTool('propose_create_calendar_event'),
     ].find((tool) => tool?.actionType === actionType);
@@ -254,6 +348,102 @@ export class AiActionsService {
           summary: `Đã tạo giao dịch "${dto.description}" (${Number(
             dto.amount,
           ).toLocaleString('vi-VN')}đ) thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_BUDGET_PLAN: {
+        const dto = action.payload as unknown as CreateBudgetPlanDto;
+        const plan = await this.financeService.createBudgetPlan(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: plan.id },
+          summary: `Đã tạo kế hoạch ngân sách "${dto.planName}" thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_BUDGET_LINE: {
+        const payload = action.payload as unknown as {
+          budgetPlanId: string;
+          line: CreateBudgetLineDto;
+        };
+        const line = await this.financeService.createBudgetLine(
+          familyId,
+          payload.budgetPlanId,
+          payload.line,
+        );
+        return {
+          result: { id: line.id },
+          summary: `Đã thêm dòng ngân sách ${Number(
+            payload.line.plannedAmount,
+          ).toLocaleString('vi-VN')}đ thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_FINANCIAL_GOAL: {
+        const dto = action.payload as unknown as CreateFinancialGoalDto;
+        const created = await this.financialGoalService.createFinancialGoal(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: created.goal.id },
+          summary: `Đã tạo mục tiêu tài chính "${dto.goalName}" thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_GOAL_ALLOCATION: {
+        const payload = action.payload as unknown as {
+          goalId: string;
+          allocation: CreateGoalAllocationDto;
+        };
+        const created = await this.financialGoalService.createGoalAllocation(
+          familyId,
+          memberId,
+          payload.goalId,
+          payload.allocation,
+        );
+        return {
+          result: { id: created.allocation.id },
+          summary: `Đã phân bổ ${Number(
+            payload.allocation.amount,
+          ).toLocaleString('vi-VN')}đ vào mục tiêu tài chính thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN: {
+        const payload = action.payload as unknown as {
+          goalId: string;
+          contributionPlan: ConfirmGoalContributionPlanDto;
+        };
+        const created =
+          await this.financialGoalService.confirmGoalContributionPlans(
+            familyId,
+            memberId,
+            payload.goalId,
+            payload.contributionPlan,
+          );
+        return {
+          result: { id: created.goalId },
+          summary: `Đã lập kế hoạch đóng góp mục tiêu tháng ${payload.contributionPlan.periodMonth}/${payload.contributionPlan.periodYear} thành công.`,
+          relatedModule: AiRelatedModule.FINANCE,
+        };
+      }
+      case AiActionType.ALLOCATE_FUND_BY_MODEL: {
+        const dto = action.payload as unknown as CreateFundAllocationDto;
+        const allocation = await this.financeService.allocateFundByModel(
+          familyId,
+          memberId,
+          dto,
+        );
+        return {
+          result: { id: allocation.entries[0]?.id ?? allocation.sourceId },
+          summary: `Đã chia quỹ ${Number(dto.amount).toLocaleString(
+            'vi-VN',
+          )}đ theo mô hình hũ thành công.`,
           relatedModule: AiRelatedModule.FINANCE,
         };
       }
@@ -313,5 +503,18 @@ export class AiActionsService {
         );
         throw new NotFoundException('Loại hành động không được hỗ trợ');
     }
+  }
+
+  private safeJson(value: unknown): string {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
   }
 }

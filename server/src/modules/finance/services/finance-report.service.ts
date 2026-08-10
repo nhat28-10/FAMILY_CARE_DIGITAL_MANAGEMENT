@@ -489,6 +489,25 @@ export class FinanceReportService {
     }
 
     const jarIds = new Set(model.jars.map((jar) => jar.id));
+    const categoryMappings =
+      await this.prisma.financeCategoryJarMapping.findMany({
+        where: {
+          familyId,
+          financeModelId: model.id,
+          jarId: { in: [...jarIds] },
+        },
+        select: { categoryId: true, jarId: true },
+      });
+    const jarIdByCategoryId = new Map(
+      categoryMappings.map((mapping) => [mapping.categoryId, mapping.jarId]),
+    );
+    const allocationTargetByJar = await this.getFundAllocationTargetsByJar(
+      familyId,
+      model.id,
+      jarIds,
+      context.start,
+      context.end,
+    );
     const entries = await this.prisma.ledgerEntry.findMany({
       where: {
         ledger: { familyId },
@@ -520,15 +539,21 @@ export class FinanceReportService {
     let legacyJarEntryCount = 0;
 
     for (const entry of entries) {
-      if (entry.jarId && jarIds.has(entry.jarId)) {
+      const resolvedJarId =
+        entry.jarId && jarIds.has(entry.jarId)
+          ? entry.jarId
+          : !entry.jarId && entry.categoryId
+            ? jarIdByCategoryId.get(entry.categoryId)
+            : undefined;
+      if (resolvedJarId) {
         mappedAmount = mappedAmount.plus(entry.amount);
         totalsByJar.set(
-          entry.jarId,
-          (totalsByJar.get(entry.jarId) ?? zero).plus(entry.amount),
+          resolvedJarId,
+          (totalsByJar.get(resolvedJarId) ?? zero).plus(entry.amount),
         );
         const categoryKey = entry.categoryId ?? 'UNCATEGORIZED';
         const categoryMap =
-          categoryTotalsByJar.get(entry.jarId) ??
+          categoryTotalsByJar.get(resolvedJarId) ??
           new Map<
             string,
             {
@@ -545,7 +570,7 @@ export class FinanceReportService {
           amount: (current?.amount ?? zero).plus(entry.amount),
           entryCount: (current?.entryCount ?? 0) + 1,
         });
-        categoryTotalsByJar.set(entry.jarId, categoryMap);
+        categoryTotalsByJar.set(resolvedJarId, categoryMap);
       } else {
         unmappedAmount = unmappedAmount.plus(entry.amount);
         unmappedEntryCount += 1;
@@ -563,7 +588,9 @@ export class FinanceReportService {
       const actualPercentage = trackedAmount.equals(0)
         ? zero
         : actualAmount.dividedBy(trackedAmount).times(100);
-      const targetAmount = trackedAmount.times(targetPercentage).dividedBy(100);
+      const targetAmount =
+        allocationTargetByJar.get(jar.id) ??
+        trackedAmount.times(targetPercentage).dividedBy(100);
       const varianceAmount = actualAmount.minus(targetAmount);
       const variancePercentage = actualPercentage.minus(targetPercentage);
       const absVariancePercentage = variancePercentage.abs();
@@ -828,6 +855,19 @@ export class FinanceReportService {
     return `${year}-${month}`;
   }
 
+  private monthKeysBetween(start: Date, end: Date) {
+    const keys: string[] = [];
+    const cursor = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1),
+    );
+    const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+    while (cursor.getTime() <= last.getTime()) {
+      keys.push(this.monthKey(cursor));
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    return keys;
+  }
+
   private monthFiltersBetween(start: Date, end: Date) {
     const filters: Array<{ periodMonth: number; periodYear: number }> = [];
     const cursor = new Date(
@@ -862,6 +902,75 @@ export class FinanceReportService {
       jar: { select: { id: true, name: true, jarCode: true } },
       category: { select: { id: true, name: true, categoryType: true } },
     } as const;
+  }
+
+  private async getFundAllocationTargetsByJar(
+    familyId: string,
+    modelId: string,
+    jarIds: Set<string>,
+    start: Date,
+    end: Date,
+  ) {
+    const sourceIds = this.monthKeysBetween(start, end).map(
+      (periodKey) => `${modelId}:${periodKey}`,
+    );
+    if (sourceIds.length === 0) return new Map<string, Prisma.Decimal>();
+
+    const allocationEntries = await this.prisma.ledgerEntry.findMany({
+      where: {
+        ledger: { familyId },
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: MODEL_FUND_ALLOCATION_SOURCE,
+        sourceId: { in: sourceIds },
+      },
+      select: {
+        jarId: true,
+        amount: true,
+        metadata: true,
+      },
+    });
+    const targetsByJar = new Map<string, Prisma.Decimal>();
+    for (const entry of allocationEntries) {
+      const snapshot = this.readFundAllocationSnapshot(entry.metadata);
+      const jarId = snapshot?.jarId ?? entry.jarId;
+      if (!jarId || !jarIds.has(jarId)) continue;
+      const amount =
+        snapshot?.amount !== undefined
+          ? new Prisma.Decimal(snapshot.amount)
+          : entry.amount;
+      targetsByJar.set(
+        jarId,
+        (targetsByJar.get(jarId) ?? new Prisma.Decimal(0)).plus(amount),
+      );
+    }
+    return targetsByJar;
+  }
+
+  private readFundAllocationSnapshot(
+    metadata: Prisma.JsonValue | null,
+  ): { jarId: string; amount: number } | null {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return null;
+    }
+    const snapshot = (metadata as Record<string, unknown>)
+      .fundAllocationSnapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return null;
+    }
+    const candidate = snapshot as Record<string, unknown>;
+    const jar = candidate.jar;
+    if (
+      typeof candidate.amount !== 'number' ||
+      !jar ||
+      typeof jar !== 'object' ||
+      Array.isArray(jar)
+    ) {
+      return null;
+    }
+    const jarId = (jar as Record<string, unknown>).id;
+    return typeof jarId === 'string'
+      ? { jarId, amount: candidate.amount }
+      : null;
   }
 
   private assertQueryPeriod(start?: string, end?: string) {

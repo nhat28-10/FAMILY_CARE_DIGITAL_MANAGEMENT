@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   FinanceModelType,
   LedgerEntryStatus,
@@ -337,6 +337,18 @@ export class FundAllocationBadRequestResponseDto {
     example: 'INSUFFICIENT_AVAILABLE_FUND',
   })
   code!: string;
+
+  @ApiPropertyOptional({ example: 100000 })
+  requestedAmount?: number;
+
+  @ApiPropertyOptional({ example: 50000 })
+  availableAmount?: number;
+
+  @ApiPropertyOptional({ example: 12 })
+  periodMonth?: number;
+
+  @ApiPropertyOptional({ example: 2026 })
+  periodYear?: number;
 }
 
 export class FundAllocationConflictResponseDto {
@@ -344,7 +356,7 @@ export class FundAllocationConflictResponseDto {
   success!: false;
 
   @ApiProperty({
-    example: 'Ky nay da co lan chia quy',
+    example: 'Kỳ này đã có lần chia quỹ',
   })
   message!: string;
 

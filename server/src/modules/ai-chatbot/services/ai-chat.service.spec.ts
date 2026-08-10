@@ -83,10 +83,13 @@ describe('AiChatService', () => {
         .mockResolvedValue({ id: conversationId, conversationTitle: 'x' }),
       ensureTitle: jest.fn().mockResolvedValue(undefined),
       toMessageView: jest.fn((message: { id: string }) => message),
-      toPendingActionView: jest.fn((messageId: string, action: object) => ({
-        messageId,
-        ...action,
-      })),
+      toPendingActionView: jest.fn(
+        (messageId: string, action: object, actionIndex = 0) => ({
+          messageId,
+          actionIndex,
+          ...action,
+        }),
+      ),
     };
     openAiClient = {
       chat: jest.fn(),
@@ -109,9 +112,12 @@ describe('AiChatService', () => {
     );
   });
 
-  const send = () =>
-    service.sendMessage(familyId, member, conversationId, {
-      content: 'câu hỏi',
+  const send = (
+    currentMember: FamilyMember = member,
+    content = 'câu hỏi',
+  ) =>
+    service.sendMessage(familyId, currentMember, conversationId, {
+      content,
     });
 
   it('trả lời thường: lưu đúng 2 message USER + AI, relatedModule GENERAL', async () => {
@@ -147,7 +153,13 @@ describe('AiChatService', () => {
     expect(toolRegistry.executeReadTool).toHaveBeenCalledWith(
       'get_finance_overview',
       '{}',
-      { familyId, memberId: member.id, familyRole: member.familyRole },
+      expect.objectContaining({
+        familyId,
+        memberId: member.id,
+        familyRole: member.familyRole,
+        userContent: 'câu hỏi',
+        now: expect.any(Date),
+      }),
     );
     const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
     expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
@@ -187,12 +199,66 @@ describe('AiChatService', () => {
     expect(aiRow.permissionContext.pendingAction.proposedByMemberId).toBe(
       member.id,
     );
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(1);
     expect(result.pendingAction).not.toBeNull();
+    expect(result.pendingActions).toHaveLength(1);
     // Round 2 phải bị ép tool_choice 'none' vì đã có đề xuất.
     expect(openAiClient.chat.mock.calls[1][2]).toBe('none');
   });
 
-  it('write tool thứ hai trong cùng lượt bị từ chối', async () => {
+  it('recovers ALLOCATE_FUND_BY_MODEL when model wrongly answers no permission for manager', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({
+      amount: 100000,
+      periodMonth: 12,
+      periodYear: 2026,
+    });
+    toolRegistry.getTool.mockImplementation((name: string) => {
+      if (name === 'propose_allocate_fund_by_model') {
+        return {
+          name,
+          kind: 'write',
+          module: AiRelatedModule.FINANCE,
+          allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+          buildActionPayload,
+        };
+      }
+      return undefined;
+    });
+    openAiClient.chat.mockResolvedValue(
+      textCompletion(
+        'Hiện tại bạn không có quyền để thực hiện phân bổ quỹ cho tháng 12 năm 2026.',
+      ),
+    );
+
+    const result = await send(
+      member,
+      'Chia quỹ tháng 12 năm 2026 theo mô hình tài chính đang áp dụng với tổng tiền 100.000đ',
+    );
+
+    expect(buildActionPayload).toHaveBeenCalledWith(
+      { amount: 100000, periodMonth: 12, periodYear: 2026 },
+      expect.objectContaining({
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      status: AiActionStatus.PENDING,
+      payload: {
+        amount: 100000,
+        periodMonth: 12,
+        periodYear: 2026,
+      },
+    });
+    expect(result.pendingAction?.actionType).toBe(
+      AiActionType.ALLOCATE_FUND_BY_MODEL,
+    );
+  });
+
+  it('nhiều write tool trong cùng lượt được gom thành pendingActions', async () => {
     const buildActionPayload = jest.fn().mockResolvedValue({ a: 1 });
     toolRegistry.getTool.mockReturnValue({
       name: 'propose_create_ledger_entry',
@@ -221,11 +287,56 @@ describe('AiChatService', () => {
           },
         ],
       })
-      .mockResolvedValueOnce(textCompletion('Đã tạo 1 đề xuất.'));
+      .mockResolvedValueOnce(textCompletion('Đã tạo kế hoạch gồm 2 đề xuất.'));
 
-    await send();
+    const result = await send();
 
-    expect(buildActionPayload).toHaveBeenCalledTimes(1);
+    expect(buildActionPayload).toHaveBeenCalledTimes(2);
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(2);
+    expect(aiRow.permissionContext.pendingAction).toEqual(
+      aiRow.permissionContext.pendingActions[0],
+    );
+    expect(result.pendingAction?.actionIndex).toBe(0);
+    expect(result.pendingActions).toHaveLength(2);
+    expect(result.pendingActions[1].actionIndex).toBe(1);
+  });
+
+  it('member write tool bị từ chối quyền thì không trả pendingAction', async () => {
+    const normalMember = {
+      ...member,
+      id: 'member-normal',
+      familyRole: FamilyRole.FAMILY_MEMBER,
+    } as FamilyMember;
+    const buildActionPayload = jest.fn();
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_ledger_entry',
+      kind: 'write',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_ledger_entry', {
+          amount: 200000,
+          description: 'an toi',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion(
+          'Toi da ghi nhan khoan chi 200.000 VND, vui long xac nhan tren ung dung nhe.',
+        ),
+      );
+
+    const result = await send(normalMember);
+
+    expect(result.pendingAction).toBeNull();
+    expect(buildActionPayload).not.toHaveBeenCalled();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toContain('không có quyền ghi khoản thu/chi');
+    expect(aiRow.permissionContext.pendingAction).toBeUndefined();
   });
 
   it('hết round budget vẫn trả text (gọi cuối tool_choice none)', async () => {

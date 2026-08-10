@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -25,6 +26,11 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { generateInviteCode } from './invite-code.util';
+
+export const RELATIONSHIP_ERROR_CODES = {
+  FAMILY_ALREADY_HAS_FATHER: 'FAMILY_ALREADY_HAS_FATHER',
+  FAMILY_ALREADY_HAS_MOTHER: 'FAMILY_ALREADY_HAS_MOTHER',
+} as const;
 
 const memberUserSelect = {
   id: true,
@@ -317,6 +323,63 @@ export class FamiliesService {
     }
 
     return updated;
+  }
+
+  async changeMemberRelationship(
+    familyId: string,
+    targetUserId: string,
+    relationship: Relationship,
+  ): Promise<MemberWithUser> {
+    const target = await this.familyMembersService.findByFamilyAndUser(
+      familyId,
+      targetUserId,
+    );
+    if (!target || target.status !== MemberStatus.ACTIVE) {
+      throw new NotFoundException(
+        'Không tìm thấy thành viên trong gia đình này',
+      );
+    }
+    if (target.relationship === relationship) {
+      return this.prisma.familyMember.findUniqueOrThrow({
+        where: { familyId_userId: { familyId, userId: targetUserId } },
+        include: { user: { select: memberUserSelect } },
+      });
+    }
+
+    if (
+      relationship === Relationship.FATHER ||
+      relationship === Relationship.MOTHER
+    ) {
+      const existing = await this.prisma.familyMember.findFirst({
+        where: {
+          familyId,
+          status: MemberStatus.ACTIVE,
+          relationship,
+          id: { not: target.id },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        const code =
+          relationship === Relationship.FATHER
+            ? RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_FATHER
+            : RELATIONSHIP_ERROR_CODES.FAMILY_ALREADY_HAS_MOTHER;
+        throw new ConflictException({
+          message:
+            relationship === Relationship.FATHER
+              ? 'Gia đình đã có người giữ vai trò Bố'
+              : 'Gia đình đã có người giữ vai trò Mẹ',
+          code,
+          errorCode: code,
+        });
+      }
+    }
+
+    return this.prisma.familyMember.update({
+      where: { familyId_userId: { familyId, userId: targetUserId } },
+      data: { relationship },
+      include: { user: { select: memberUserSelect } },
+    });
   }
 
   /**

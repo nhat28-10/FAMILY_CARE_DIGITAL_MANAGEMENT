@@ -9,6 +9,7 @@ import {
   SensorEventType,
   SosSeverity,
   SosSourceType,
+  WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
 
@@ -60,6 +61,8 @@ describe('WearablesService', () => {
       delete: jest.Mock;
       count: jest.Mock;
     };
+    wearableActivationSession: { findMany: jest.Mock; updateMany: jest.Mock };
+    refreshToken: { updateMany: jest.Mock };
     familyMember: { findFirst: jest.Mock };
     sensorEvent: { create: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     sosAlert: { findFirst: jest.Mock };
@@ -87,6 +90,11 @@ describe('WearablesService', () => {
         delete: jest.fn().mockResolvedValue(pairedDevice),
         count: jest.fn().mockResolvedValue(0),
       },
+      wearableActivationSession: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       familyMember: { findFirst: jest.fn() },
       sensorEvent: {
         create: jest.fn().mockResolvedValue({ id: 'event-1' }),
@@ -207,6 +215,27 @@ describe('WearablesService', () => {
       );
       expect(prisma.wearableDevice.update).not.toHaveBeenCalled();
     });
+
+    it('marks a live activation session as paired when pairing by FCW code', async () => {
+      await service.pair(workspaceId, owner, {
+        ...pairDto,
+        deviceIdentifier: 'FCW-8SRERK',
+      });
+
+      expect(prisma.wearableActivationSession.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            code: 'FCW-8SRERK',
+            status: WearableActivationStatus.PENDING,
+          }),
+          data: expect.objectContaining({
+            status: WearableActivationStatus.PAIRED,
+            ownerUserId: owner.userId,
+            wearableDeviceId: pairedDevice.id,
+          }),
+        }),
+      );
+    });
   });
 
   describe('getMine', () => {
@@ -249,6 +278,25 @@ describe('WearablesService', () => {
         }),
       );
     });
+
+    it('revokes wearable refresh token sessions when unpairing', async () => {
+      prisma.wearableActivationSession.findMany.mockResolvedValue([
+        { claimedRefreshTokenId: 'refresh-session-1' },
+      ]);
+
+      await service.update(workspaceId, pairedDevice.id, owner, {
+        pairingStatus: DevicePairingStatus.UNPAIRED,
+      });
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: { in: ['refresh-session-1'] },
+            revokedAt: null,
+          },
+        }),
+      );
+    });
   });
 
   describe('ingestEvent', () => {
@@ -272,9 +320,21 @@ describe('WearablesService', () => {
         pairingStatus: DevicePairingStatus.UNPAIRED,
       });
 
-      await expect(
-        service.ingestEvent(workspaceId, pairedDevice.id, owner, buttonEvent),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      try {
+        await service.ingestEvent(
+          workspaceId,
+          pairedDevice.id,
+          owner,
+          buttonEvent,
+        );
+        fail('Expected WEARABLE_NOT_PAIRED');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).getResponse()).toMatchObject({
+          code: 'WEARABLE_NOT_PAIRED',
+          errorCode: 'WEARABLE_NOT_PAIRED',
+        });
+      }
     });
 
     it('creates an SOS alert on SOS_BUTTON_PRESSED and links the event', async () => {
@@ -355,6 +415,24 @@ describe('WearablesService', () => {
         pairedDevice.id,
       );
       expect(result.alertCreated).toBe(true);
+    });
+
+    it('creates a critical alert on low HEART_RATE_ABNORMAL with thresholdLow context', async () => {
+      await service.ingestEvent(workspaceId, pairedDevice.id, owner, {
+        eventType: SensorEventType.HEART_RATE_ABNORMAL,
+        rawValue: { heartRate: 38, thresholdLow: 50, durationSeconds: 30 },
+      });
+
+      expect(sosService.trigger).toHaveBeenCalledWith(
+        workspaceId,
+        owner.id,
+        expect.objectContaining({
+          severity: SosSeverity.CRITICAL,
+          message:
+            'Thiet bi phat hien nhip tim thap (38 bpm, nguong 50 bpm) trong 30s',
+        }),
+        pairedDevice.id,
+      );
     });
 
     it('does not create a duplicate alert while the owner already has one active', async () => {

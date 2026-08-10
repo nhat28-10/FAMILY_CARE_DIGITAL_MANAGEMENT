@@ -25,6 +25,7 @@ Table users {
   refreshTokens refresh_tokens [not null]
   deviceTokens device_tokens [not null]
   ownedWearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
   passwordResetTokens password_reset_tokens [not null]
   emailVerificationTokens email_verification_tokens [not null]
   joinRequests join_requests [not null]
@@ -82,6 +83,7 @@ Table refresh_tokens {
   revokedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   user users [not null]
+  wearableActivationSessions wearable_activation_sessions [not null]
 
   Note: 'One row per active refresh token (per device/session). The raw token is never stored — only its bcrypt hash. Supports multi-device + per-session revocation and rotation.'
 }
@@ -112,6 +114,7 @@ Table families {
   tasks tasks [not null]
   sosSetting sos_settings
   wearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
   sosAlerts sos_alerts [not null]
   memberLocationPoints member_location_points [not null]
   notifications notifications [not null]
@@ -167,6 +170,7 @@ Table family_members {
   resolvedRewardDisputes reward_disputes [not null]
   createdSosSettings sos_settings [not null]
   ownedWearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
   triggeredSosAlerts sos_alerts [not null]
   resolvedSosAlerts sos_alerts [not null]
   sosResponses sos_responses [not null]
@@ -802,12 +806,37 @@ Table wearable_devices {
   sosLocationPoints sos_location_points [not null]
   sensorEvents sensor_events [not null]
   memberLocationPoints member_location_points [not null]
+  activationSessions wearable_activation_sessions [not null]
 
   indexes {
     (workspaceId, deviceIdentifier) [unique]
   }
 
   Note: 'Wearable / tracking devices paired to a member within a workspace.'
+}
+
+Table wearable_activation_sessions {
+  id String [pk]
+  code String [not null]
+  status WearableActivationStatus [not null, default: 'PENDING']
+  deviceName String
+  deviceType WearableDeviceType [not null, default: 'SMARTWATCH']
+  workspaceId String
+  ownerMemberId String
+  ownerUserId String
+  wearableDeviceId String
+  claimedRefreshTokenId String
+  expiresAt DateTime [not null]
+  claimedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families
+  ownerMember family_members
+  ownerUser users
+  wearableDevice wearable_devices
+  claimedRefreshToken refresh_tokens
+
+  Note: 'Short-lived activation session used by Wear OS before it has a user token.'
 }
 
 Table sos_alerts {
@@ -1639,6 +1668,13 @@ Enum DevicePairingStatus {
   LOST
 }
 
+Enum WearableActivationStatus {
+  PENDING
+  PAIRED
+  CLAIMED
+  EXPIRED
+}
+
 Enum GpsSourceType {
   MOBILE_GPS
   WEARABLE_GPS
@@ -1983,6 +2019,16 @@ Ref: wearable_devices.workspaceId > families.id [delete: Cascade]
 Ref: wearable_devices.ownerUserId > users.id [delete: Cascade]
 
 Ref: wearable_devices.ownerMemberId > family_members.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.workspaceId > families.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.ownerMemberId > family_members.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.ownerUserId > users.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.wearableDeviceId > wearable_devices.id [delete: Set Null]
+
+Ref: wearable_activation_sessions.claimedRefreshTokenId > refresh_tokens.id [delete: Set Null]
 
 Ref: sos_alerts.workspaceId > families.id [delete: Cascade]
 

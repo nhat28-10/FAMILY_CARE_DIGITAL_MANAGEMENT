@@ -27,6 +27,7 @@ import { FamilyPermissionGuard } from '../family-members/guards/family-permissio
 import { CreateFamilyDto } from './dto/create-family.dto';
 import { UpdateFamilyDto } from './dto/update-family.dto';
 import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
+import { UpdateMemberRelationshipDto } from './dto/update-member-relationship.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { FamiliesService } from './families.service';
 
@@ -103,7 +104,10 @@ export class FamiliesController {
   @ApiOperation({
     summary: 'Bổ nhiệm/gỡ phó nhóm (FAMILY_MANAGER only)',
   })
-  @ApiResponse({ status: 400, description: 'Vượt giới hạn phó nhóm hoặc đổi vai trò quản lý' })
+  @ApiResponse({
+    status: 400,
+    description: 'Vượt giới hạn phó nhóm hoặc đổi vai trò quản lý',
+  })
   @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
   @ApiResponse({ status: 404, description: 'Member not found in this family' })
   changeMemberRole(
@@ -118,6 +122,33 @@ export class FamiliesController {
     );
   }
 
+  @Patch(':familyId/members/:userId/relationship')
+  @UseGuards(FamilyPermissionGuard)
+  @FamilyRoles(FamilyRole.FAMILY_MANAGER)
+  @ResponseMessage('Cập nhật quan hệ thành viên thành công')
+  @ApiOperation({
+    summary: 'Cập nhật quan hệ thành viên (FAMILY_MANAGER only)',
+  })
+  @ApiResponse({ status: 400, description: 'relationship không hợp lệ' })
+  @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
+  @ApiResponse({ status: 404, description: 'Member not found in this family' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Family already has an active FATHER or MOTHER. code/errorCode: FAMILY_ALREADY_HAS_FATHER | FAMILY_ALREADY_HAS_MOTHER',
+  })
+  changeMemberRelationship(
+    @Param('familyId') familyId: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateMemberRelationshipDto,
+  ) {
+    return this.familiesService.changeMemberRelationship(
+      familyId,
+      userId,
+      dto.relationship,
+    );
+  }
+
   @Post(':familyId/transfer-ownership')
   @UseGuards(FamilyPermissionGuard)
   @FamilyRoles(FamilyRole.FAMILY_MANAGER)
@@ -126,7 +157,10 @@ export class FamiliesController {
   @ApiOperation({
     summary: 'Trao quyền trưởng nhóm cho thành viên khác (FAMILY_MANAGER only)',
   })
-  @ApiResponse({ status: 400, description: 'Trao cho chính mình hoặc thiếu xác nhận' })
+  @ApiResponse({
+    status: 400,
+    description: 'Trao cho chính mình hoặc thiếu xác nhận',
+  })
   @ApiResponse({ status: 403, description: 'Requires family MANAGER role' })
   @ApiResponse({ status: 404, description: 'Member not found in this family' })
   transferOwnership(
