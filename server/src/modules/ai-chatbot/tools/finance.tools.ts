@@ -340,7 +340,11 @@ export class FinanceAiTools implements AiToolProvider {
         buildActionPayload: (args, ctx) => {
           const dto = validateActionArgs(
             CreateLedgerEntryDto,
-            normalizeLedgerEntryArgs(args, ctx.userContent, ctx.now),
+            normalizeLedgerEntryArgs(
+              args,
+              ctx.conversationText ?? ctx.userContent,
+              ctx.now,
+            ),
           );
           return Promise.resolve({ ...dto });
         },

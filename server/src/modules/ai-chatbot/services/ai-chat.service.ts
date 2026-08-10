@@ -1,5 +1,5 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { AiRelatedModule, AiSenderType, Prisma } from '@prisma/client';
+import { AiRelatedModule, AiSenderType, FamilyRole, Prisma } from '@prisma/client';
 import type { FamilyMember } from '@prisma/client';
 import type {
   ChatCompletionMessageParam,
@@ -65,6 +65,7 @@ export class AiChatService {
       memberId: member.id,
       familyRole: member.familyRole,
       userContent: dto.content,
+      conversationText: this.buildConversationText(history, dto.content),
       now: new Date(),
     };
 
@@ -152,6 +153,21 @@ export class AiChatService {
           call.type === 'function',
       );
       if (toolCalls.length === 0) {
+        const recoveredFundAllocation =
+          pendingActions.length === 0
+            ? await this.recoverFundAllocationProposal(ctx)
+            : null;
+        if (recoveredFundAllocation) {
+          pendingActions.push(recoveredFundAllocation);
+          modulesUsed.add(AiRelatedModule.FINANCE);
+          return {
+            finalText:
+              'Mình đã tạo đề xuất chia quỹ theo mô hình tài chính. Bạn xác nhận trên ứng dụng để thực hiện nhé.',
+            toolTrace,
+            pendingActions,
+            modulesUsed,
+          };
+        }
         if (pendingActions.length === 0 && deniedWriteAction) {
           return {
             finalText: this.writePermissionText(deniedWriteAction),
@@ -315,6 +331,22 @@ export class AiChatService {
     }));
   }
 
+  private buildConversationText(
+    history: ChatCompletionMessageParam[],
+    userContent: string,
+  ): string {
+    return [
+      ...history
+        .filter((message) => message.role === 'user')
+        .map((message) =>
+          typeof message.content === 'string' ? message.content : '',
+        ),
+      userContent,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
   private async buildSystemPrompt(
     ctx: AiToolContext,
     member: FamilyMember,
@@ -352,6 +384,7 @@ export class AiChatService {
       '- Nếu tool trả về lỗi thiếu quyền, giải thích lịch sự rằng tài khoản không có quyền xem/làm việc đó.',
       '- Câu hỏi ngoài phạm vi gia đình (kiến thức chung về tài chính, nuôi dạy con...) có thể trả lời ngắn gọn, thêm lưu ý đây là thông tin tham khảo.',
       '- Nếu tool propose_* trả lời thiếu quyền hoặc không tạo được đề xuất, TUYỆT ĐỐI không nói người dùng bấm xác nhận trên ứng dụng.',
+      '- Với FAMILY_MANAGER hoặc DEPUTY_MEMBER, yêu cầu chia quỹ theo mô hình hũ (ALLOCATE_FUND_BY_MODEL) là có quyền kể cả tháng tương lai. Không tự trả lời là thiếu quyền; hãy tạo đề xuất để bước xác nhận kiểm tra dữ liệu/quỹ khả dụng.',
       '- Với FAMILY_MEMBER, khi nói về dữ liệu tài chính cá nhân hãy dùng "bạn"; chỉ dùng "gia đình/nhà mình" khi tool trả về dữ liệu phạm vi gia đình.',
     ].join('\n');
   }
@@ -368,6 +401,96 @@ export class AiChatService {
   private fallbackText(): string {
     return 'Xin lỗi, tôi chưa thể trả lời câu hỏi này. Bạn thử diễn đạt lại giúp mình nhé.';
   }
+
+  private async recoverFundAllocationProposal(
+    ctx: AiToolContext,
+  ): Promise<AiPendingAction | null> {
+    if (
+      ctx.familyRole !== FamilyRole.FAMILY_MANAGER &&
+      ctx.familyRole !== FamilyRole.DEPUTY_MEMBER
+    ) {
+      return null;
+    }
+
+    const userContent = ctx.userContent ?? '';
+    const normalized = this.normalizeVietnamese(userContent);
+    if (!/\bchia quy\b/.test(normalized) || !/\bmo hinh\b/.test(normalized)) {
+      return null;
+    }
+
+    const amount = this.extractMoneyAmount(normalized);
+    const periodMonth = this.extractPeriodMonth(normalized);
+    if (amount === null || periodMonth === null) {
+      return null;
+    }
+    const periodYear =
+      this.extractPeriodYear(normalized) ?? this.vietnamYear(ctx.now);
+    const tool = this.toolRegistry.getTool('propose_allocate_fund_by_model');
+    if (
+      !tool?.buildActionPayload ||
+      !tool.allowedRoles.includes(ctx.familyRole)
+    ) {
+      return null;
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = await tool.buildActionPayload(
+        { amount, periodMonth, periodYear },
+        ctx,
+      );
+    } catch {
+      return null;
+    }
+    const expiresAt = new Date(
+      Date.now() + this.openAiClient.config.actionExpiresMinutes * 60_000,
+    ).toISOString();
+    return {
+      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      payload,
+      status: AiActionStatus.PENDING,
+      proposedByMemberId: ctx.memberId,
+      expiresAt,
+    };
+  }
+
+  private extractMoneyAmount(text: string): number | null {
+    const matches = [...text.matchAll(/(\d[\d.,]*)\s*(?:d|vnd|dong)\b/g)];
+    const raw = matches.at(-1)?.[1];
+    if (!raw) return null;
+    const amount = Number(raw.replace(/[.,]/g, ''));
+    return Number.isFinite(amount) && amount > 0 ? amount : null;
+  }
+
+  private extractPeriodMonth(text: string): number | null {
+    const match = text.match(/\bthang\s*(0?[1-9]|1[0-2])\b/);
+    if (!match) return null;
+    return Number(match[1]);
+  }
+
+  private extractPeriodYear(text: string): number | null {
+    const match = text.match(/\bnam\s*(\d{4})\b/);
+    if (!match) return null;
+    return Number(match[1]);
+  }
+
+  private vietnamYear(now = new Date()): number {
+    const value = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+    }).format(now);
+    return Number(value);
+  }
+
+  private normalizeVietnamese(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  }
+
   private writePermissionText(actionType: AiActionType): string {
     switch (actionType) {
       case AiActionType.CREATE_LEDGER_ENTRY:

@@ -65,4 +65,34 @@ describe('AllExceptionsFilter', () => {
       cooldownSeconds: 600,
     });
   });
+
+  it('giu metadata loi chia quy cho client', () => {
+    const { host, json } = hostWith();
+    filter.catch(
+      new HttpException(
+        {
+          message: 'So tien chia quy vuot qua quy kha dung cua ky nay',
+          code: 'INSUFFICIENT_AVAILABLE_FUND',
+          requestedAmount: 100000,
+          availableAmount: 50000,
+          periodMonth: 12,
+          periodYear: 2026,
+        },
+        HttpStatus.BAD_REQUEST,
+      ),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      statusCode: HttpStatus.BAD_REQUEST,
+      message: 'So tien chia quy vuot qua quy kha dung cua ky nay',
+      code: 'INSUFFICIENT_AVAILABLE_FUND',
+      errorCode: 'INSUFFICIENT_AVAILABLE_FUND',
+      requestedAmount: 100000,
+      availableAmount: 50000,
+      periodMonth: 12,
+      periodYear: 2026,
+    });
+  });
 });

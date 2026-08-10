@@ -19,6 +19,10 @@ export interface ApiErrorResponse {
   errors?: unknown;
   retryAfterSeconds?: number;
   cooldownSeconds?: number;
+  requestedAmount?: number;
+  availableAmount?: number;
+  periodMonth?: number;
+  periodYear?: number;
 }
 
 /**
@@ -44,6 +48,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let errors: unknown;
     let retryAfterSeconds: number | undefined;
     let cooldownSeconds: number | undefined;
+    let requestedAmount: number | undefined;
+    let availableAmount: number | undefined;
+    let periodMonth: number | undefined;
+    let periodYear: number | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -71,6 +79,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
         if (typeof body.cooldownSeconds === 'number') {
           cooldownSeconds = body.cooldownSeconds;
+        }
+        if (typeof body.requestedAmount === 'number') {
+          requestedAmount = body.requestedAmount;
+        }
+        if (typeof body.availableAmount === 'number') {
+          availableAmount = body.availableAmount;
+        }
+        if (typeof body.periodMonth === 'number') {
+          periodMonth = body.periodMonth;
+        }
+        if (typeof body.periodYear === 'number') {
+          periodYear = body.periodYear;
         }
       }
     } else if (exception instanceof Error) {
@@ -102,6 +122,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(errors !== undefined ? { errors } : {}),
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
       ...(cooldownSeconds !== undefined ? { cooldownSeconds } : {}),
+      ...(requestedAmount !== undefined ? { requestedAmount } : {}),
+      ...(availableAmount !== undefined ? { availableAmount } : {}),
+      ...(periodMonth !== undefined ? { periodMonth } : {}),
+      ...(periodYear !== undefined ? { periodYear } : {}),
     };
     response.status(statusCode).json(body);
   }

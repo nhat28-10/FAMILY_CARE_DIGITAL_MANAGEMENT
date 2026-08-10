@@ -594,7 +594,7 @@ export class FinanceService {
         });
         if (existingAllocation) {
           throw new ConflictException({
-            message: 'Ky nay da co lan chia quy',
+            message: 'Kỳ này đã có lần chia quỹ',
             code: FUND_ALLOCATION_ERROR_CODES.ALREADY_EXISTS,
           });
         }
@@ -620,6 +620,10 @@ export class FinanceService {
           throw new BadRequestException({
             message: 'Số tiền chia quỹ vượt quá quỹ khả dụng của kỳ này',
             code: FUND_ALLOCATION_ERROR_CODES.INSUFFICIENT_AVAILABLE_FUND,
+            requestedAmount: this.decimalToNumber(totalAmount),
+            availableAmount: this.decimalToNumber(availableFund),
+            periodMonth: dto.periodMonth,
+            periodYear: dto.periodYear,
           });
         }
 
