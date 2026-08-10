@@ -25,6 +25,6 @@ import { MessagesService } from './services/messages.service';
   ],
   controllers: [ConversationsController, MessagesController],
   providers: [ConversationsService, MessagesService, ChatsGateway],
-  exports: [ConversationsService, MessagesService],
+  exports: [ConversationsService, MessagesService, ChatsGateway],
 })
 export class ChatsModule {}

@@ -23,6 +23,7 @@ import { BillingsModule } from './modules/billing/billings.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { CallsModule } from './modules/calls/calls.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SosModule } from './modules/sos/sos.module';
 import { LocationsModule } from './modules/locations/locations.module';
@@ -81,6 +82,7 @@ import { AdminModule } from './modules/admin/admin.module';
     TasksModule,
     RewardsModule,
     ChatsModule,
+    CallsModule,
     NotificationsModule,
     SosModule,
     LocationsModule,
