@@ -147,7 +147,10 @@ export class AiChatService {
       const choice = completion.choices[0]?.message;
       if (!choice) {
         return {
-          finalText: this.fallbackText(),
+          finalText:
+            pendingActions.length > 0
+              ? this.pendingProposalText(pendingActions)
+              : this.fallbackText(),
           toolTrace,
           pendingActions,
           modulesUsed,
@@ -182,7 +185,10 @@ export class AiChatService {
           };
         }
         return {
-          finalText: this.safeFinalTextWithoutAction(choice.content?.trim()),
+          finalText:
+            pendingActions.length > 0
+              ? this.pendingProposalText(pendingActions)
+              : this.safeFinalTextWithoutAction(choice.content?.trim()),
           toolTrace,
           pendingActions,
           modulesUsed,
@@ -212,9 +218,11 @@ export class AiChatService {
 
     return {
       finalText:
-        pendingActions.length === 0 && deniedWriteAction
-          ? this.writePermissionText(deniedWriteAction)
-          : this.fallbackText(),
+        pendingActions.length > 0
+          ? this.pendingProposalText(pendingActions)
+          : deniedWriteAction
+            ? this.writePermissionText(deniedWriteAction)
+            : this.fallbackText(),
       toolTrace,
       pendingActions,
       modulesUsed,
@@ -547,13 +555,44 @@ export class AiChatService {
   }
 
   private recoveredProposalText(actionType: AiActionType): string {
-    if (actionType === AiActionType.CREATE_LEDGER_ENTRY) {
-      return 'Mình đã tạo đề xuất ghi khoản thu/chi. Bạn xác nhận trên ứng dụng để ghi sổ nhé.';
+    return this.proposalTextForActionType(actionType);
+  }
+
+  private pendingProposalText(pendingActions: AiPendingAction[]): string {
+    const pending = pendingActions.filter(
+      (action) => action.status === AiActionStatus.PENDING,
+    );
+    if (pending.length > 1) {
+      return 'Mình đã tạo các đề xuất cần xác nhận. Vui lòng kiểm tra từng thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
     }
-    if (actionType === AiActionType.ALLOCATE_FUND_BY_MODEL) {
-      return 'Mình đã tạo đề xuất chia quỹ theo mô hình tài chính. Bạn xác nhận trên ứng dụng để thực hiện nhé.';
+    return this.proposalTextForActionType(
+      (pending[0] ?? pendingActions[0]).actionType,
+    );
+  }
+
+  private proposalTextForActionType(actionType: AiActionType): string {
+    switch (actionType) {
+      case AiActionType.CREATE_LEDGER_ENTRY:
+        return 'Mình đã tạo đề xuất ghi khoản thu/chi. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để ghi sổ nhé.';
+      case AiActionType.CREATE_BUDGET_PLAN:
+        return 'Mình đã tạo đề xuất kế hoạch ngân sách. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_BUDGET_LINE:
+        return 'Mình đã tạo đề xuất dòng ngân sách. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_FINANCIAL_GOAL:
+        return 'Mình đã tạo đề xuất mục tiêu tài chính. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_GOAL_ALLOCATION:
+        return 'Mình đã tạo đề xuất phân bổ vào mục tiêu. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN:
+        return 'Mình đã tạo đề xuất kế hoạch đóng góp mục tiêu. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.ALLOCATE_FUND_BY_MODEL:
+        return 'Mình đã tạo đề xuất chia quỹ theo mô hình tài chính. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_TASK:
+        return 'Mình đã tạo đề xuất công việc. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      case AiActionType.CREATE_CALENDAR_EVENT:
+        return 'Mình đã tạo đề xuất lịch. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
+      default:
+        return 'Mình đã tạo đề xuất hành động. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.';
     }
-    return 'Mình đã tạo đề xuất hành động. Bạn xác nhận trên ứng dụng để thực hiện nhé.';
   }
 
   private extractMoneyAmount(text: string): number | null {
