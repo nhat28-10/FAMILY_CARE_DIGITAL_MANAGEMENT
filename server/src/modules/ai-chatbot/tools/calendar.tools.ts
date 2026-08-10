@@ -121,14 +121,14 @@ export class CalendarAiTools implements AiToolProvider {
             ...args,
             startTime: normalizeVietnamCalendarDateTime(
               args.startTime,
-              ctx.userContent,
+              ctx.conversationText ?? ctx.userContent,
               ctx.now,
             ),
             ...(args.endTime !== undefined
               ? {
                   endTime: normalizeVietnamCalendarDateTime(
                     args.endTime,
-                    ctx.userContent,
+                    ctx.conversationText ?? ctx.userContent,
                     ctx.now,
                   ),
                 }

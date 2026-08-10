@@ -726,6 +726,7 @@ describe('FinanceService budget planning', () => {
       }),
     ).rejects.toMatchObject({
       response: expect.objectContaining({
+        message: 'Kỳ này đã có lần chia quỹ',
         code: 'FUND_ALLOCATION_ALREADY_EXISTS',
       }),
     });
@@ -812,6 +813,10 @@ describe('FinanceService budget planning', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({
         code: 'INSUFFICIENT_AVAILABLE_FUND',
+        requestedAmount: 10000000,
+        availableAmount: 1000000,
+        periodMonth: 7,
+        periodYear: 2026,
       }),
     });
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();

@@ -112,9 +112,12 @@ describe('AiChatService', () => {
     );
   });
 
-  const send = (currentMember: FamilyMember = member) =>
+  const send = (
+    currentMember: FamilyMember = member,
+    content = 'câu hỏi',
+  ) =>
     service.sendMessage(familyId, currentMember, conversationId, {
-      content: 'câu hỏi',
+      content,
     });
 
   it('trả lời thường: lưu đúng 2 message USER + AI, relatedModule GENERAL', async () => {
@@ -201,6 +204,58 @@ describe('AiChatService', () => {
     expect(result.pendingActions).toHaveLength(1);
     // Round 2 phải bị ép tool_choice 'none' vì đã có đề xuất.
     expect(openAiClient.chat.mock.calls[1][2]).toBe('none');
+  });
+
+  it('recovers ALLOCATE_FUND_BY_MODEL when model wrongly answers no permission for manager', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({
+      amount: 100000,
+      periodMonth: 12,
+      periodYear: 2026,
+    });
+    toolRegistry.getTool.mockImplementation((name: string) => {
+      if (name === 'propose_allocate_fund_by_model') {
+        return {
+          name,
+          kind: 'write',
+          module: AiRelatedModule.FINANCE,
+          allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+          buildActionPayload,
+        };
+      }
+      return undefined;
+    });
+    openAiClient.chat.mockResolvedValue(
+      textCompletion(
+        'Hiện tại bạn không có quyền để thực hiện phân bổ quỹ cho tháng 12 năm 2026.',
+      ),
+    );
+
+    const result = await send(
+      member,
+      'Chia quỹ tháng 12 năm 2026 theo mô hình tài chính đang áp dụng với tổng tiền 100.000đ',
+    );
+
+    expect(buildActionPayload).toHaveBeenCalledWith(
+      { amount: 100000, periodMonth: 12, periodYear: 2026 },
+      expect.objectContaining({
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      status: AiActionStatus.PENDING,
+      payload: {
+        amount: 100000,
+        periodMonth: 12,
+        periodYear: 2026,
+      },
+    });
+    expect(result.pendingAction?.actionType).toBe(
+      AiActionType.ALLOCATE_FUND_BY_MODEL,
+    );
   });
 
   it('nhiều write tool trong cùng lượt được gom thành pendingActions', async () => {

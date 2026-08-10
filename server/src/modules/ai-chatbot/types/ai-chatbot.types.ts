@@ -26,6 +26,7 @@ export interface AiToolContext {
   memberId: string;
   familyRole: FamilyRole;
   userContent?: string;
+  conversationText?: string;
   now?: Date;
 }
 
