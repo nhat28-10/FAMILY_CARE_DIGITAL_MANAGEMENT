@@ -515,32 +515,55 @@ describe('FinanceService budget planning', () => {
     ).findMany.mockResolvedValue([
       { categoryId: 'food-category', jarId: 'spending-jar' },
     ]);
-    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany.mockResolvedValue([
-      {
-        jarId: 'spending-jar',
-        categoryId: 'food-category',
-        amount: new Prisma.Decimal(110),
-        category: { name: 'Food' },
-      },
-      {
-        jarId: 'savings-jar',
-        categoryId: 'saving-category',
-        amount: new Prisma.Decimal(0),
-        category: { name: 'Saving' },
-      },
-      {
-        jarId: null,
-        categoryId: 'food-category',
-        amount: new Prisma.Decimal(100),
-        category: { name: 'Food' },
-      },
-      {
-        jarId: null,
-        categoryId: null,
-        amount: new Prisma.Decimal(10),
-        category: null,
-      },
-    ]);
+    (prisma.ledgerEntry as { findMany: jest.Mock })
+      .findMany.mockResolvedValueOnce([
+        {
+          jarId: 'spending-jar',
+          amount: new Prisma.Decimal(2400000),
+          metadata: {
+            fundAllocationSnapshot: {
+              jar: { id: 'spending-jar' },
+              amount: 2400000,
+            },
+          },
+        },
+        {
+          jarId: 'savings-jar',
+          amount: new Prisma.Decimal(600000),
+          metadata: {
+            fundAllocationSnapshot: {
+              jar: { id: 'savings-jar' },
+              amount: 600000,
+            },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          jarId: 'spending-jar',
+          categoryId: 'food-category',
+          amount: new Prisma.Decimal(110),
+          category: { name: 'Food' },
+        },
+        {
+          jarId: 'savings-jar',
+          categoryId: 'saving-category',
+          amount: new Prisma.Decimal(0),
+          category: { name: 'Saving' },
+        },
+        {
+          jarId: null,
+          categoryId: 'food-category',
+          amount: new Prisma.Decimal(100),
+          category: { name: 'Food' },
+        },
+        {
+          jarId: null,
+          categoryId: null,
+          amount: new Prisma.Decimal(10),
+          category: null,
+        },
+      ]);
 
     const report = await reportService.getJarTargetActualReport(
       familyId,
@@ -554,7 +577,7 @@ describe('FinanceService budget planning', () => {
     expect(report.totals.trackedAmount.toString()).toBe('220');
     expect(report.totals.mappedAmount.toString()).toBe('210');
     expect(report.totals.unmappedAmount.toString()).toBe('10');
-    expect(report.items[0].targetAmount.toString()).toBe('176');
+    expect(report.items[0].targetAmount.toString()).toBe('2400000');
     expect(report.items[0].actualAmount.toString()).toBe('210');
     expect(report.items[0].actualPercentage.toNumber()).toBeCloseTo(95.454, 2);
     expect(report.items[0].variancePercentage.toNumber()).toBeCloseTo(
@@ -568,6 +591,7 @@ describe('FinanceService budget planning', () => {
     });
     expect(report.items[0].categories[0].amount.toString()).toBe('210');
     expect(report.items[0].status).toBe('OVER_TARGET');
+    expect(report.items[1].targetAmount.toString()).toBe('600000');
     expect(report.items[1].status).toBe('UNDER_TARGET');
     expect(report.unmapped.percentage.toNumber()).toBeCloseTo(4.545, 2);
     expect(
@@ -580,11 +604,20 @@ describe('FinanceService budget planning', () => {
       },
       select: { categoryId: true, jarId: true },
     });
-    const jarReportQuery = (
+    const allocationTargetQuery = (
       prisma.ledgerEntry as {
         findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
       }
     ).findMany.mock.calls[0][0];
+    expect(allocationTargetQuery.where).toMatchObject({
+      sourceType: 'MODEL_FUND_ALLOCATION',
+      sourceId: { in: ['model-id:2026-06'] },
+    });
+    const jarReportQuery = (
+      prisma.ledgerEntry as {
+        findMany: jest.Mock<unknown, [Prisma.LedgerEntryFindManyArgs]>;
+      }
+    ).findMany.mock.calls[1][0];
     expect(jarReportQuery.where?.sourceType).toBeUndefined();
     expect(
       (prisma.ledgerEntry as { findMany: jest.Mock }).findMany,
