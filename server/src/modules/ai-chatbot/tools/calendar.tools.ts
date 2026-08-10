@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   AiRelatedModule,
   CalendarEventStatus,
@@ -8,6 +8,8 @@ import {
 import { CalendarService } from '../../calendar/calendar.service';
 import { CalendarEventQueryDto } from '../../calendar/dto/calendar-event-query.dto';
 import { CreateCalendarEventDto } from '../../calendar/dto/create-calendar-event.dto';
+import { FamilyMembersService } from '../../family-members/family-members.service';
+import type { AiToolContext } from '../types/ai-chatbot.types';
 import { AiActionType } from '../types/ai-chatbot.types';
 import type { AiToolDefinition, AiToolProvider } from './tool.types';
 import { validateActionArgs } from './validate-action-args';
@@ -26,7 +28,10 @@ const CALENDAR_MANAGER_ROLES = [
 
 @Injectable()
 export class CalendarAiTools implements AiToolProvider {
-  constructor(private readonly calendarService: CalendarService) {}
+  constructor(
+    private readonly calendarService: CalendarService,
+    private readonly familyMembersService: FamilyMembersService,
+  ) {}
 
   getTools(): AiToolDefinition[] {
     return [
@@ -116,7 +121,7 @@ export class CalendarAiTools implements AiToolProvider {
         kind: 'write',
         allowedRoles: CALENDAR_MANAGER_ROLES,
         actionType: AiActionType.CREATE_CALENDAR_EVENT,
-        buildActionPayload: (args, ctx) => {
+        buildActionPayload: async (args, ctx) => {
           const normalizedArgs = {
             ...args,
             startTime: normalizeVietnamCalendarDateTime(
@@ -135,9 +140,65 @@ export class CalendarAiTools implements AiToolProvider {
               : {}),
           };
           const dto = validateActionArgs(CreateCalendarEventDto, normalizedArgs);
-          return Promise.resolve({ ...dto });
+          const participantMemberIds =
+            await this.resolveProposalParticipantMemberIds(args, ctx);
+          return { ...dto, participantMemberIds };
         },
       },
     ];
+  }
+
+  private async resolveProposalParticipantMemberIds(
+    args: Record<string, unknown>,
+    ctx: AiToolContext,
+  ): Promise<string[]> {
+    const activeMemberIds = (await this.familyMembersService.listByFamily(
+      ctx.familyId,
+    )).map((member) => member.id);
+    if (activeMemberIds.length === 0) {
+      throw new BadRequestException('Sự kiện cần ít nhất một người tham gia');
+    }
+
+    const requestedIds = this.asStringArray(args.participantMemberIds);
+    if (requestedIds && requestedIds.length > 0) {
+      const uniqueIds = [...new Set(requestedIds)];
+      const invalidIds = uniqueIds.filter((id) => !activeMemberIds.includes(id));
+      if (invalidIds.length > 0) {
+        throw new BadRequestException(
+          'Danh sách người tham gia chứa thành viên không hợp lệ',
+        );
+      }
+      return uniqueIds;
+    }
+
+    if (this.isWholeFamilyRequest(ctx)) {
+      return activeMemberIds;
+    }
+
+    return activeMemberIds.includes(ctx.memberId)
+      ? [ctx.memberId]
+      : [activeMemberIds[0]];
+  }
+
+  private asStringArray(value: unknown): string[] | undefined {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : undefined;
+  }
+
+  private isWholeFamilyRequest(ctx: AiToolContext): boolean {
+    const text = this.normalizeVietnamese(
+      [ctx.userContent, ctx.conversationText].filter(Boolean).join('\n'),
+    );
+    return /\b(ca nha|ca gia dinh|tat ca|moi nguoi|nha minh)\b/.test(text);
+  }
+
+  private normalizeVietnamese(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
   }
 }
