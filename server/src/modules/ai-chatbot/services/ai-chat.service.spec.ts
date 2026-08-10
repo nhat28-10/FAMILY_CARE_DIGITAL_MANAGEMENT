@@ -206,6 +206,59 @@ describe('AiChatService', () => {
     expect(openAiClient.chat.mock.calls[1][2]).toBe('none');
   });
 
+  it('calendar pendingAction không dùng nhầm fallback thu/chi làm content', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({
+      title: 'Đi dã ngoại',
+      startTime: '2026-08-15T15:00:00+07:00',
+      endTime: '2026-08-15T18:00:00+07:00',
+      location: 'Công viên Ánh Sáng',
+    });
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_calendar_event',
+      kind: 'write',
+      module: AiRelatedModule.CALENDAR,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_calendar_event', {
+          title: 'Đi dã ngoại',
+          startTime: '2026-08-15T15:00:00+07:00',
+          endTime: '2026-08-15T18:00:00+07:00',
+          location: 'Công viên Ánh Sáng',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion(
+          'Mình chưa tạo được thẻ xác nhận cho yêu cầu này. Bạn vui lòng nói rõ loại giao dịch, số tiền và ngày ghi nhận để mình tạo đề xuất nhé.',
+        ),
+      );
+
+    const result = await send(
+      member,
+      'Tạo lịch đi dã ngoại 15h đến 18h ngày 15/08/2026 tại Công viên Ánh Sáng cho cả nhà.',
+    );
+
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toBe(
+      'Mình đã tạo đề xuất lịch. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.',
+    );
+    expect(aiRow.messageContent).not.toContain('loại giao dịch');
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      status: AiActionStatus.PENDING,
+      payload: {
+        title: 'Đi dã ngoại',
+        location: 'Công viên Ánh Sáng',
+      },
+    });
+    expect(result.pendingAction?.actionType).toBe(
+      AiActionType.CREATE_CALENDAR_EVENT,
+    );
+  });
+
   it('recovers ALLOCATE_FUND_BY_MODEL when model wrongly answers no permission for manager', async () => {
     const buildActionPayload = jest.fn().mockResolvedValue({
       amount: 100000,
