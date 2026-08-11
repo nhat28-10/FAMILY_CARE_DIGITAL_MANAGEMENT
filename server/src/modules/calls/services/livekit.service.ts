@@ -11,6 +11,8 @@ import {
 } from 'livekit-server-sdk';
 import type { WebhookEvent } from 'livekit-server-sdk';
 
+import { CALL_ERROR_CODES } from '../calls.types';
+
 /**
  * Bọc LiveKit Server SDK: sinh access token cho client join room, verify
  * webhook, và đóng room khi call kết thúc (ngắt kết nối mọi participant còn
@@ -81,9 +83,11 @@ export class LiveKitService {
 
   private assertConfigured(): void {
     if (!this.apiKey || !this.apiSecret || !this.wsUrl) {
-      throw new ServiceUnavailableException(
-        'Tính năng gọi video chưa được cấu hình',
-      );
+      throw new ServiceUnavailableException({
+        message: 'Tính năng gọi video chưa được cấu hình',
+        code: CALL_ERROR_CODES.LIVEKIT_NOT_CONFIGURED,
+        errorCode: CALL_ERROR_CODES.LIVEKIT_NOT_CONFIGURED,
+      });
     }
   }
 
