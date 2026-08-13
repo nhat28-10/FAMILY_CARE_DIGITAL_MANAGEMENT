@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,6 +8,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import type { Queue } from 'bullmq';
 import {
   CallParticipantStatus,
   CallStatus,
@@ -24,6 +26,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ChatsGateway } from '../../chats/chats.gateway';
 import { ConversationsService } from '../../chats/services/conversations.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import {
+  CALL_ERROR_CODES,
+  CALLS_QUEUE,
+  CALL_TIMEOUT_JOB,
+} from '../calls.types';
+import type { CallTimeoutJobData } from '../calls.types';
 import type { InitiateCallDto } from '../dto/initiate-call.dto';
 import type { ListCallsQueryDto } from '../dto/list-calls-query.dto';
 import { LiveKitService } from './livekit.service';
@@ -69,6 +77,9 @@ const ACTIVE_CALL_STATUSES: CallStatus[] = [
   CallStatus.ONGOING,
 ];
 
+/** Không ai bắt máy trong ngần này thì tự chuyển MISSED — áp dụng cho cả 1-1 và nhóm. */
+const RINGING_TIMEOUT_MS = 30_000;
+
 /** Tối thiểu các field CallsService cần để finalize/summary một cuộc gọi. */
 interface FinalizableCall {
   id: string;
@@ -96,6 +107,7 @@ export class CallsService {
     private readonly notificationsService: NotificationsService,
     private readonly liveKitService: LiveKitService,
     private readonly chatsGateway: ChatsGateway,
+    @InjectQueue(CALLS_QUEUE) private readonly queue: Queue,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -108,7 +120,10 @@ export class CallsService {
       userId,
     );
     if (conversation.status !== ConversationStatus.ACTIVE) {
-      throw new BadRequestException('Hội thoại đã được lưu trữ, không thể gọi');
+      throw this.badRequest(
+        CALL_ERROR_CODES.CONVERSATION_ARCHIVED,
+        'Hội thoại đã được lưu trữ, không thể gọi',
+      );
     }
 
     const existing = await this.prisma.call.findFirst({
@@ -119,7 +134,8 @@ export class CallsService {
       select: { id: true },
     });
     if (existing) {
-      throw new BadRequestException(
+      throw this.badRequest(
+        CALL_ERROR_CODES.CALL_ALREADY_ACTIVE,
         'Đang có cuộc gọi diễn ra trong hội thoại này',
       );
     }
@@ -136,7 +152,8 @@ export class CallsService {
         },
       });
     if (activeParticipants.length < 2) {
-      throw new BadRequestException(
+      throw this.badRequest(
+        CALL_ERROR_CODES.CONVERSATION_TOO_FEW_MEMBERS,
         'Hội thoại cần ít nhất 2 thành viên để gọi',
       );
     }
@@ -182,10 +199,32 @@ export class CallsService {
         body: 'Cuộc gọi video đến',
         referenceType: 'CALL',
         referenceId: call.id,
+        // Data-only: FE tự vẽ IncomingCallScreen full-screen (kể cả khi app
+        // nền/khoá máy) thay vì để Android tự hiện thông báo trơn.
+        dataOnly: true,
+        data: {
+          callId: call.id,
+          conversationId: conversation.id,
+          callerName,
+          conversationType: conversation.conversationType,
+          conversationName: conversation.conversationName ?? '',
+          callEventType: 'incoming',
+        },
       });
     } catch (err) {
       this.logger.error(
         `Không thể gửi thông báo cuộc gọi đến (call ${call.id}): ${(err as Error).message}`,
+      );
+    }
+
+    try {
+      const jobData: CallTimeoutJobData = { callId: call.id };
+      await this.queue.add(CALL_TIMEOUT_JOB, jobData, {
+        delay: RINGING_TIMEOUT_MS,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể lên lịch timeout cho cuộc gọi ${call.id}: ${(err as Error).message}`,
       );
     }
 
@@ -207,7 +246,10 @@ export class CallsService {
       where: { callId_memberId: { callId, memberId: member.id } },
     });
     if (!participant) {
-      throw new ForbiddenException('Bạn không được mời vào cuộc gọi này');
+      throw this.forbidden(
+        CALL_ERROR_CODES.NOT_INVITED,
+        'Bạn không được mời vào cuộc gọi này',
+      );
     }
 
     const callerName = this.displayNameOf(member);
@@ -232,10 +274,13 @@ export class CallsService {
       where: { callId_memberId: { callId, memberId: member.id } },
     });
     if (!participant) {
-      throw new ForbiddenException('Bạn không được mời vào cuộc gọi này');
+      throw this.forbidden(
+        CALL_ERROR_CODES.NOT_INVITED,
+        'Bạn không được mời vào cuộc gọi này',
+      );
     }
     if (participant.status !== CallParticipantStatus.INVITED) {
-      return { callId };
+      return { callId, status: call.status };
     }
 
     await this.prisma.callParticipant.update({
@@ -248,6 +293,7 @@ export class CallsService {
     });
 
     // Chưa từng có ai join + không còn ai chờ phản hồi → tự kết thúc cuộc gọi.
+    let finalStatus = call.status;
     if (!call.connectedAt) {
       const stillPending = await this.prisma.callParticipant.count({
         where: {
@@ -258,9 +304,10 @@ export class CallsService {
       });
       if (stillPending === 0) {
         await this.finalizeCall(call, CallStatus.DECLINED, 'declined');
+        finalStatus = CallStatus.DECLINED;
       }
     }
-    return { callId };
+    return { callId, status: finalStatus };
   }
 
   async leave(userId: string, callId: string) {
@@ -271,8 +318,22 @@ export class CallsService {
       where: { callId_memberId: { callId, memberId: member.id } },
     });
     if (!participant) {
-      throw new ForbiddenException('Bạn không ở trong cuộc gọi này');
+      throw this.forbidden(
+        CALL_ERROR_CODES.NOT_IN_CALL,
+        'Bạn không ở trong cuộc gọi này',
+      );
     }
+
+    // Người khởi tạo rời lúc cuộc gọi còn đổ chuông (chưa ai từng join) —
+    // tương đương chủ động huỷ, dùng chung `end()` để tránh kẹt RINGING.
+    if (
+      member.id === call.initiatedByMemberId &&
+      call.status === CallStatus.RINGING
+    ) {
+      await this.finalizeCall(call, CallStatus.CANCELED, 'hangup');
+      return { callId, status: CallStatus.CANCELED };
+    }
+
     if (participant.status === CallParticipantStatus.JOINED) {
       await this.prisma.callParticipant.update({
         where: { id: participant.id },
@@ -285,31 +346,40 @@ export class CallsService {
       });
     }
 
+    let finalStatus = call.status;
     if (call.status === CallStatus.ONGOING) {
       const remainingJoined = await this.prisma.callParticipant.count({
         where: { callId, status: CallParticipantStatus.JOINED },
       });
       if (remainingJoined === 0) {
         await this.finalizeCall(call, CallStatus.ENDED, 'all_left');
+        finalStatus = CallStatus.ENDED;
       }
     }
-    return { callId };
+    return { callId, status: finalStatus };
   }
 
   async end(userId: string, callId: string) {
     const call = await this.getCallOrThrow(callId);
     const { member } = await this.resolveCaller(call.conversationId, userId);
     if (member.id !== call.initiatedByMemberId) {
-      throw new ForbiddenException(
+      throw this.forbidden(
+        CALL_ERROR_CODES.NOT_INITIATOR,
         'Chỉ người khởi tạo mới được kết thúc cuộc gọi cho tất cả',
       );
     }
     if (ENDED_STATUSES.has(call.status)) {
-      return { callId };
+      return { callId, status: call.status };
     }
     const status = call.connectedAt ? CallStatus.ENDED : CallStatus.CANCELED;
     await this.finalizeCall(call, status, 'hangup');
-    return { callId };
+    return { callId, status };
+  }
+
+  async getOne(userId: string, callId: string) {
+    const call = await this.getCallOrThrow(callId);
+    await this.resolveCaller(call.conversationId, userId);
+    return call;
   }
 
   async listHistory(
@@ -336,6 +406,19 @@ export class CallsService {
   }
 
   // ---------------------------------------------------------------------------
+  // Timeout job (BullMQ, xem `calls.processor.ts`) — không ai bắt máy sau
+  // `RINGING_TIMEOUT_MS` thì tự chuyển MISSED, áp dụng như nhau cho 1-1/nhóm.
+  // ---------------------------------------------------------------------------
+
+  async handleCallTimeout(callId: string): Promise<void> {
+    const call = await this.prisma.call.findUnique({ where: { id: callId } });
+    if (!call || call.status !== CallStatus.RINGING) {
+      return;
+    }
+    await this.finalizeCall(call, CallStatus.MISSED, 'timeout');
+  }
+
+  // ---------------------------------------------------------------------------
   // Webhook LiveKit — nguồn sự thật cho trạng thái "ai thực sự đang trong phòng".
   // ---------------------------------------------------------------------------
 
@@ -345,6 +428,7 @@ export class CallsService {
         await this.handleParticipantJoined(event);
         break;
       case 'participant_left':
+      case 'participant_connection_aborted':
         await this.handleParticipantLeft(event);
         break;
       case 'room_finished':
@@ -503,6 +587,63 @@ export class CallsService {
     });
 
     void this.liveKitService.closeRoom(call.roomName).catch(() => undefined);
+
+    if (status === CallStatus.MISSED) {
+      await this.notifyMissedCall(call);
+    }
+  }
+
+  /** Push "Cuộc gọi nhỡ" cho những ai chưa từng bắt máy. Best-effort. */
+  private async notifyMissedCall(call: FinalizableCall): Promise<void> {
+    try {
+      const [initiator, pendingParticipants, conversation] = await Promise.all([
+        this.prisma.familyMember.findUnique({
+          where: { id: call.initiatedByMemberId },
+          select: {
+            displayName: true,
+            user: { select: { fullName: true } },
+          },
+        }),
+        this.prisma.callParticipant.findMany({
+          where: { callId: call.id, status: CallParticipantStatus.INVITED },
+          select: { member: { select: { userId: true } } },
+        }),
+        this.prisma.conversation.findUnique({
+          where: { id: call.conversationId },
+          select: {
+            workspaceId: true,
+            conversationType: true,
+            conversationName: true,
+          },
+        }),
+      ]);
+      const userIds = pendingParticipants.map((p) => p.member.userId);
+      if (!initiator || !conversation || userIds.length === 0) {
+        return;
+      }
+      await this.notificationsService.notifyUsersEphemeral(userIds, {
+        familyId: conversation.workspaceId,
+        type: NotificationType.CALL,
+        priority: NotificationPriority.NORMAL,
+        title: this.displayNameOf(initiator),
+        body: 'Cuộc gọi nhỡ',
+        referenceType: 'CALL',
+        referenceId: call.id,
+        // Không set dataOnly — cuộc gọi nhỡ chỉ mang tính thông tin, giữ
+        // notification message để Android tự hiện thông báo như bình thường.
+        data: {
+          callId: call.id,
+          conversationId: call.conversationId,
+          conversationType: conversation.conversationType,
+          conversationName: conversation.conversationName ?? '',
+          callEventType: 'missed',
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Không thể gửi thông báo cuộc gọi nhỡ (call ${call.id}): ${(err as Error).message}`,
+      );
+    }
   }
 
   private buildCallSummary(
@@ -526,8 +667,23 @@ export class CallsService {
 
   private assertCallJoinable(call: { status: CallStatus }): void {
     if (ENDED_STATUSES.has(call.status)) {
-      throw new BadRequestException('Cuộc gọi đã kết thúc');
+      throw this.badRequest(
+        CALL_ERROR_CODES.CALL_ALREADY_ENDED,
+        'Cuộc gọi đã kết thúc',
+      );
     }
+  }
+
+  private badRequest(code: string, message: string): BadRequestException {
+    return new BadRequestException({ message, code, errorCode: code });
+  }
+
+  private forbidden(code: string, message: string): ForbiddenException {
+    return new ForbiddenException({ message, code, errorCode: code });
+  }
+
+  private notFound(code: string, message: string): NotFoundException {
+    return new NotFoundException({ message, code, errorCode: code });
   }
 
   private async getCallOrThrow(callId: string): Promise<CallWithInclude> {
@@ -536,7 +692,10 @@ export class CallsService {
       include: callInclude,
     });
     if (!call) {
-      throw new NotFoundException('Không tìm thấy cuộc gọi');
+      throw this.notFound(
+        CALL_ERROR_CODES.CALL_NOT_FOUND,
+        'Không tìm thấy cuộc gọi',
+      );
     }
     return call;
   }
@@ -547,7 +706,10 @@ export class CallsService {
       where: { id: conversationId },
     });
     if (!conversation) {
-      throw new NotFoundException('Không tìm thấy hội thoại');
+      throw this.notFound(
+        CALL_ERROR_CODES.CONVERSATION_NOT_FOUND,
+        'Không tìm thấy hội thoại',
+      );
     }
     const member = await this.prisma.familyMember.findUnique({
       where: {
@@ -562,7 +724,8 @@ export class CallsService {
       },
     });
     if (!member || member.status !== MemberStatus.ACTIVE) {
-      throw new ForbiddenException(
+      throw this.forbidden(
+        CALL_ERROR_CODES.NOT_FAMILY_MEMBER,
         'Bạn không thuộc gia đình của hội thoại này',
       );
     }

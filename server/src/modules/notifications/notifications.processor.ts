@@ -56,6 +56,8 @@ export class NotificationsProcessor extends WorkerHost {
           referenceType: row.referenceType,
           referenceId: row.referenceId,
           createdAt: row.createdAt.toISOString(),
+          data: null,
+          dataOnly: false,
         },
       }));
       return this.dispatcher.dispatch(deliveries);
@@ -75,6 +77,8 @@ export class NotificationsProcessor extends WorkerHost {
         referenceType: data.payload.referenceType ?? null,
         referenceId: data.payload.referenceId ?? null,
         createdAt: now,
+        data: data.payload.data ?? null,
+        dataOnly: data.payload.dataOnly ?? false,
       },
     }));
     return this.dispatcher.dispatch(deliveries);

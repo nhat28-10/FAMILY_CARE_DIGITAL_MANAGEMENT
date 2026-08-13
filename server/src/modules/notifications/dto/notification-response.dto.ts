@@ -40,6 +40,7 @@ export class NotificationResponseDto {
       'FINANCIAL_GOAL',
       'CONVERSATION',
       'SUPPORT_REQUEST',
+      'CALL',
     ],
   })
   referenceType!: string | null;

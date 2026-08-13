@@ -131,4 +131,42 @@ describe('FcmNotificationChannel', () => {
     await makeChannel().deliver([delivery]);
     expect(sendEach).not.toHaveBeenCalled();
   });
+
+  it('dataOnly:true → không có khối notification/android.notification, data merge field riêng', async () => {
+    sendEach.mockResolvedValue({
+      responses: [{ success: true }, { success: true }],
+    });
+    await makeChannel().deliver([
+      {
+        ...delivery,
+        notification: {
+          ...delivery.notification,
+          type: NotificationType.CALL,
+          priority: NotificationPriority.HIGH,
+          referenceType: 'CALL',
+          dataOnly: true,
+          data: { callId: 'c1', callEventType: 'incoming' },
+        },
+      },
+    ]);
+    const messages = sendEach.mock.calls[0][0];
+    expect(messages[0]).not.toHaveProperty('notification');
+    expect(messages[0].android).not.toHaveProperty('notification');
+    expect(messages[0].android).toMatchObject({ priority: 'high' });
+    expect(messages[0].data).toMatchObject({
+      callId: 'c1',
+      callEventType: 'incoming',
+      referenceType: 'CALL',
+    });
+  });
+
+  it('dataOnly không set (mặc định) → vẫn có khối notification như cũ', async () => {
+    sendEach.mockResolvedValue({
+      responses: [{ success: true }, { success: true }],
+    });
+    await makeChannel().deliver([delivery]);
+    const messages = sendEach.mock.calls[0][0];
+    expect(messages[0]).toHaveProperty('notification');
+    expect(messages[0].android).toHaveProperty('notification');
+  });
 });

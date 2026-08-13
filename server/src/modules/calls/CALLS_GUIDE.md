@@ -113,17 +113,25 @@ tạo call). `400` nếu call đã kết thúc.
 
 ### `POST /calls/:callId/decline` — từ chối cuộc gọi đến
 
-Không body, không cần connect LiveKit. Response: `{ "callId": "uuid" }`.
+Không body, không cần connect LiveKit. Response: `{ "callId": "uuid", "status": "RINGING" }` —
+`status` là trạng thái **sau** thao tác (vd 1-1: callee decline → `status: "DECLINED"` ngay lập
+tức vì không còn ai khác chờ phản hồi; gọi nhóm còn người khác chưa trả lời thì `status` vẫn
+`RINGING`/`ONGOING`).
 
 ### `POST /calls/:callId/leave` — rời cuộc gọi đang diễn ra
 
 Gọi **song song** với `room.disconnect()` phía LiveKit SDK (2 việc độc lập — 1 báo backend, 1 rời
-phòng media). Response: `{ "callId": "uuid" }`.
+phòng media). Response: `{ "callId": "uuid", "status": "..." }`.
+
+Lưu ý: nếu bạn là **người khởi tạo** và gọi `leave` lúc cuộc gọi còn `RINGING` (chưa ai bắt máy),
+backend coi như bạn huỷ cuộc gọi — `status` trả về sẽ là `"CANCELED"`, tương đương gọi `end`. Dùng
+`leave` hay `end` trong tình huống này đều an toàn, không còn cần phân biệt.
 
 ### `POST /calls/:callId/end` — kết thúc cho tất cả
 
 Chỉ **người khởi tạo** gọi được (`403` nếu không phải). Buộc mọi participant còn lại rời phòng
-(backend tự đóng room LiveKit). Response: `{ "callId": "uuid" }`.
+(backend tự đóng room LiveKit). Response: `{ "callId": "uuid", "status": "ENDED" | "CANCELED" }`
+(`CANCELED` nếu chưa từng ai kết nối, `ENDED` nếu đã có người trong phòng).
 
 ### `GET /calls/conversations/:conversationId` — lịch sử cuộc gọi
 
@@ -133,6 +141,12 @@ Query: `?cursor=<callId>&limit=30` (cursor pagination, mới → cũ, giống
 ```json
 { "items": [ /* Call[], cùng shape như field "call" ở POST /calls */ ], "nextCursor": "uuid|null" }
 ```
+
+### `GET /calls/:callId` — lấy 1 cuộc gọi theo id
+
+Response: `Call` object (đúng shape field `call` ở `POST /calls`). Dùng để phục hồi trạng thái sau
+khi socket `/chat` reconnect (vd rớt mạng đúng lúc đang đổ chuông) — gọi endpoint này với `callId`
+đã lưu ở client để biết cuộc gọi hiện `RINGING`/`ONGOING`/đã kết thúc.
 
 ## 3. WS events (namespace `/chat`, room `conversation:<id>`)
 
@@ -188,35 +202,102 @@ React Native: cùng API `Room`/`room.connect(url, token)`, chỉ khác import t�
 ## 5. Enum trạng thái
 
 `CallStatus`: `RINGING` (đang đổ chuông, chưa ai join) → `ONGOING` (đã có người join) →
-`ENDED` (kết thúc bình thường) | `MISSED` (không dùng ở bản hiện tại — dành cho phase timeout sau
-này) | `DECLINED` (bị từ chối, chưa ai từng join) | `CANCELED` (người gọi tự huỷ trước khi ai bắt
-máy).
+`ENDED` (kết thúc bình thường) | `MISSED` (**không ai bắt máy trong 30 giây** — tự động, xem mục
+7) | `DECLINED` (bị từ chối, chưa ai từng join) | `CANCELED` (người gọi tự huỷ trước khi ai bắt
+máy — qua `end` hoặc `leave`, xem mục 2).
 
 `CallParticipantStatus` (trong `participants[]`): `INVITED` → `JOINED` → `LEFT`, hoặc `DECLINED`.
-`NO_ANSWER` cũng chưa dùng ở bản hiện tại (dành cho gọi nhóm + timeout — chưa triển khai).
+`NO_ANSWER` **chưa dùng** ở bản hiện tại — timeout hiện xử lý ở cấp **cả cuộc gọi** (`Call.status`
+→ `MISSED`), chưa đánh dấu riêng từng participant không trả lời trong gọi nhóm (để phase sau).
 
 ## 6. Push notification khi app ở nền
 
-Khi có cuộc gọi đến, các thành viên khác nhận FCM data payload chuẩn (giống mọi loại
-notification khác — xem `server/src/modules/notifications/NOTIFICATIONS_REALTIME.md`):
+**Push "cuộc gọi đến" là data-only message** (khác với mọi loại notification khác trong hệ thống —
+xem `server/src/modules/notifications/NOTIFICATIONS_REALTIME.md` cho hành vi mặc định). Nghĩa là
+FCM payload **không có khối `notification`** — Android **không tự vẽ** thông báo, toàn quyền hiển
+thị (kể cả full-screen-intent khi máy khoá) thuộc về app, qua background message handler
+(`firebaseBackgroundHandler` phía Flutter). Khối `data` nhận được:
 
 ```json
 {
   "referenceType": "CALL",
   "referenceId": "<callId>",
+  "callId": "<callId>",
+  "conversationId": "<conversationId>",
+  "callerName": "<tên người gọi, tiếng Việt>",
+  "conversationType": "PRIVATE hoặc GROUP",
+  "conversationName": "<tên hội thoại — rỗng nếu PRIVATE>",
+  "callEventType": "incoming",
   "title": "<tên người gọi>",
-  "body": "Cuộc gọi video đến"
+  "body": "Cuộc gọi video đến",
+  "notificationId": "",
+  "type": "CALL",
+  "familyId": "<familyId>"
 }
 ```
 
-FE bấm vào push → điều hướng thẳng tới màn hình cuộc gọi với `callId` đó, gọi
-`POST /calls/:callId/join` nếu người dùng chọn "Nghe máy".
+FE tự dựng nội dung hiển thị (không dùng `title`/`body` của hệ thống notification tray), điều
+hướng thẳng tới `IncomingCallScreen` với `callId`, gọi `POST /calls/:callId/join` nếu người dùng
+chọn "Nghe máy" hoặc `POST /calls/:callId/decline` nếu "Từ chối".
 
-## 7. Giới hạn hiện tại (bản MVP — chỉ 1-1)
+**Push "Cuộc gọi nhỡ"** — **vẫn là notification message bình thường** (Android tự vẽ, không cần
+full-screen-intent). Gửi khi không ai bắt máy trong 30 giây, riêng cho những người **chưa từng bắt
+máy** (participant còn `status: "INVITED"` lúc timeout). Khối `data` cũng có cấu trúc tương tự,
+phân biệt bằng `callEventType: "missed"` (thay vì `"incoming"`) — không có `callerName` (không cần
+thiết cho cuộc gọi nhỡ):
 
-- Chỉ hỗ trợ ổn định cuộc gọi **1-1**. Gọi nhóm dùng chung API nhưng **chưa có** timeout tự động
-  cho người không bắt máy (`NO_ANSWER`) — để phase sau.
-- Không có endpoint `GET /calls/:callId` lấy 1 call theo id. Nếu FE cần biết trạng thái call hiện
-  tại sau khi socket reconnect (vd rớt mạng đúng lúc đang đổ chuông), tạm dùng
-  `GET /calls/conversations/:conversationId?limit=1` rồi kiểm tra `items[0].status`.
-- Nếu server chưa cấu hình `LIVEKIT_API_KEY/SECRET/URL`, `POST /calls` và `.../join` trả `503`.
+```json
+{
+  "referenceType": "CALL",
+  "referenceId": "<callId>",
+  "callId": "<callId>",
+  "conversationId": "<conversationId>",
+  "conversationType": "PRIVATE hoặc GROUP",
+  "conversationName": "<tên hội thoại>",
+  "callEventType": "missed",
+  "title": "<tên người gọi>",
+  "body": "Cuộc gọi nhỡ"
+}
+```
+
+**Giới hạn**: thiết kế data-only này chỉ có hiệu lực thật sự trên **Android**. iOS không có cơ chế
+tương đương qua FCM thường — muốn full-screen CallKit khi máy khoá trên iOS cần **VoIP Push
+(PushKit)**, một luồng kỹ thuật khác hẳn (APNs riêng, entitlement `voip`, code iOS-native), chưa
+nằm trong phạm vi hiện tại.
+
+## 7. Mã lỗi ổn định
+
+Mọi lỗi từ `/calls/*` giờ có `code`/`errorCode` trong response body (không chỉ `message` tiếng
+Việt) — bắt theo `code`, không bắt theo chuỗi `message`:
+
+| `code` | HTTP | Endpoint áp dụng |
+|---|---|---|
+| `CALL_ALREADY_ACTIVE` | 400 | `POST /calls` |
+| `CONVERSATION_ARCHIVED` | 400 | `POST /calls` |
+| `CONVERSATION_TOO_FEW_MEMBERS` | 400 | `POST /calls` |
+| `CALL_ALREADY_ENDED` | 400 | `.../join` |
+| `NOT_FAMILY_MEMBER` | 403 | mọi endpoint |
+| `NOT_INVITED` | 403 | `.../join`, `.../decline` |
+| `NOT_IN_CALL` | 403 | `.../leave` |
+| `NOT_INITIATOR` | 403 | `.../end` |
+| `CALL_NOT_FOUND` | 404 | mọi endpoint có `:callId` |
+| `CONVERSATION_NOT_FOUND` | 404 | `POST /calls`, `GET .../conversations/:id` |
+| `LIVEKIT_NOT_CONFIGURED` | 503 | `POST /calls`, `.../join` |
+
+## 8. Timeout & webhook — đã xử lý triệt để cho cả 1-1 và nhóm
+
+- Không ai bắt máy trong **30 giây** kể từ `POST /calls` → `Call.status` tự chuyển `MISSED`,
+  backend tự ghi Message "Cuộc gọi nhỡ" + bắn `call:ended` + push riêng (xem mục 6) — hội thoại
+  **không còn bị khoá** (`POST /calls` gọi lại được ngay sau đó). Áp dụng như nhau cho hội thoại
+  `PRIVATE` và `GROUP`.
+- App bị kill/rớt mạng đột ngột giữa cuộc gọi: backend nhận cả 2 loại webhook LiveKit
+  (`participant_left` và `participant_connection_aborted`) và xử lý giống nhau — dọn dẹp participant
+  đó ngay, không cần chờ.
+- Đa thiết bị cùng tài khoản join 1 call: backend **không** chặn — dùng mặc định của LiveKit (thiết
+  bị join sau sẽ ngắt kết nối thiết bị cũ cùng `identity`).
+- Gọi hội thoại `GROUP`: backend **không chặn** — quyết định có hiện nút gọi cho hội thoại nhóm hay
+  không là lựa chọn UI của FE. Phần còn thiếu cho gọi nhóm (chỉ mang tính UX, không phải bug chặn):
+  chưa có timeout/`NO_ANSWER` **riêng từng người**, chỉ có timeout **chung cho cả cuộc gọi** như
+  mục trên.
+- Nếu server chưa cấu hình `LIVEKIT_API_KEY/SECRET/URL`: `POST /calls` và `.../join` trả `503`
+  (`code: "LIVEKIT_NOT_CONFIGURED"`).
