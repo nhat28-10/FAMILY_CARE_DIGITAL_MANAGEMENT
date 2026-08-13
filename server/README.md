@@ -96,3 +96,21 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
++
+## Album moderation Phase 2
+
+Album media mới được lưu private trong R2, đưa vào Cloudflare Queue và được NestJS pull để kiểm duyệt bằng Workers AI. Video MP4 được trích frame tạm bằng FFmpeg; original và frame không bị thay đổi hoặc lưu lại.
+
+Thiết lập:
+
+1. Tạo Cloudflare Queue và bật **HTTP Pull consumer** trong Dashboard.
+2. Ghi Queue ID vào `CLOUDFLARE_QUEUE_ID`.
+3. Tạo API token Workers AI với quyền chạy Workers AI.
+4. Tạo Queue token có cả **Queues Read** và **Queues Write**; không dùng Global API Key.
+5. Với model Meta mặc định, chấp nhận Meta License/AUP một lần theo tài liệu Cloudflare bằng request setup `{"prompt":"agree"}`. Ứng dụng không tự gửi request này.
+6. Cấu hình các biến `CLOUDFLARE_*`, `ALBUM_MODERATION_*`, R2 và FFmpeg theo `.env.example`.
+7. Kiểm tra local bằng `ffmpeg -version` và `ffprobe -version`; Docker image đã cài cả hai.
+8. Chỉ đặt `ALBUM_MODERATION_CONSUMER_ENABLED=true` sau khi Queue HTTP Pull và credentials sẵn sàng.
+9. Upload media rồi dùng endpoint moderation của Manager/Deputy để theo dõi `PENDING → PROCESSING → SAFE | NEED_REVIEW | FLAGGED`.
+
+`FLAGGED` không tự động xóa media. Scores từ AI chỉ là heuristic; Manager/Deputy có quyền review cuối bằng `MARK_SAFE` hoặc `KEEP_FLAGGED`.

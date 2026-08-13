@@ -1,22 +1,29 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './modules/mail/mail.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { FamiliesModule } from './modules/families/families.module';
 import { FamilyMembersModule } from './modules/family-members/family-members.module';
-import { InvitationsModule } from './modules/invitations/invitations.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { JoinRequestsModule } from './modules/join-requests/join-requests.module';
 import { RolesPermissionsModule } from './modules/roles-permissions/roles-permissions.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { BillingsModule } from './modules/billing/billings.module';
 
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ChatsModule } from './modules/chats/chats.module';
-import { MessagesModule } from './modules/messages/messages.module';
+import { CallsModule } from './modules/calls/calls.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SosModule } from './modules/sos/sos.module';
 import { LocationsModule } from './modules/locations/locations.module';
@@ -33,20 +40,49 @@ import { AdminModule } from './modules/admin/admin.module';
       load: [configuration],
     }),
 
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('redis.host'),
+          port: config.get<number>('redis.port'),
+          // BullMQ Worker yêu cầu null (nếu không sẽ throw khi khởi tạo).
+          maxRetriesPerRequest: null,
+        },
+      }),
+    }),
+
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            // @nestjs/throttler dùng ttl theo MILLIGIÂY.
+            ttl: config.get<number>('throttle.ttl', 60) * 1000,
+            limit: config.get<number>('throttle.limit', 100),
+          },
+        ],
+      }),
+    }),
+    ScheduleModule.forRoot(),
+
     PrismaModule,
+    MailModule,
 
     AuthModule,
     UsersModule,
     FamiliesModule,
     FamilyMembersModule,
-    InvitationsModule,
+    FinanceModule,
+    JoinRequestsModule,
     RolesPermissionsModule,
     SubscriptionPlansModule,
     SubscriptionsModule,
+    BillingsModule,
     TasksModule,
     RewardsModule,
     ChatsModule,
-    MessagesModule,
+    CallsModule,
     NotificationsModule,
     SosModule,
     LocationsModule,
@@ -56,5 +92,6 @@ import { AdminModule } from './modules/admin/admin.module';
     AiChatbotModule,
     AdminModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule { }
+export class AppModule {}

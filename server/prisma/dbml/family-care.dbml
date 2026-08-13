@@ -1,0 +1,2229 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Project "Family Care Digital Management" {
+  database_type: 'PostgreSQL'
+  Note: ''
+}
+
+Table users {
+  id String [pk]
+  email String [unique, not null]
+  passwordHash String
+  firebaseUid String [unique, note: 'Firebase Auth UID — set khi user đăng nhập Google (social login). Null = chưa liên kết.']
+  fullName String
+  phone String [unique, note: 'ERD: phone_number — optional, unique when present.']
+  avatarUrl String [note: 'ERD: avatar_url.']
+  userType UserType [not null, default: 'NORMAL_USER', note: 'ERD: user_type — NORMAL_USER vs SYSTEM_ADMIN (not a family role).']
+  accountStatus AccountStatus [not null, default: 'ACTIVE', note: 'ERD: account_status.']
+  verificationStatus VerificationStatus [not null, default: 'UNVERIFIED', note: 'ERD: verification_status.']
+  lastLoginAt DateTime [note: 'ERD: last_login_at — set on each successful login.']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  memberships family_members [not null]
+  refreshTokens refresh_tokens [not null]
+  deviceTokens device_tokens [not null]
+  ownedWearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
+  passwordResetTokens password_reset_tokens [not null]
+  emailVerificationTokens email_verification_tokens [not null]
+  joinRequests join_requests [not null]
+  provisioningLogs workspace_provisioning_logs [not null]
+  purchasedSubscriptions family_subscriptions [not null]
+}
+
+Table admin_audit_logs {
+  id String [pk]
+  adminUserId String [not null]
+  adminEmail String
+  adminName String
+  action String [not null]
+  targetType String [not null]
+  targetId String
+  result String [not null]
+  ipAddress String
+  userAgent String
+  metadata Json
+  errorMessage String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table email_verification_tokens {
+  id String [pk]
+  userId String [not null]
+  codeHash String [not null]
+  expiresAt DateTime [not null]
+  usedAt DateTime
+  attempts Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+
+  Note: 'Mã OTP xác thực email (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng; `attempts` đếm số lần nhập sai để khóa tạm.'
+}
+
+Table password_reset_tokens {
+  id String [pk]
+  userId String [not null]
+  codeHash String [not null]
+  expiresAt DateTime [not null]
+  usedAt DateTime
+  attempts Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+
+  Note: 'Mã OTP đặt lại mật khẩu (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng/vô hiệu; `attempts` đếm số lần nhập sai để khóa tạm.'
+}
+
+Table refresh_tokens {
+  id String [pk]
+  userId String [not null]
+  tokenHash String [not null]
+  expiresAt DateTime [not null]
+  revokedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+  wearableActivationSessions wearable_activation_sessions [not null]
+
+  Note: 'One row per active refresh token (per device/session). The raw token is never stored — only its bcrypt hash. Supports multi-device + per-session revocation and rotation.'
+}
+
+Table families {
+  id String [pk]
+  name String [not null]
+  description String [note: 'ERD: description.']
+  avatarUrl String [note: 'ERD: avatar_url.']
+  status WorkspaceStatus [not null, default: 'ACTIVE', note: 'ERD: workspace_status.']
+  activationStatus ActivationStatus [not null, default: 'ACTIVE', note: 'ERD: activation_status.']
+  inviteCode String [unique, note: 'Mã mời ngắn của gia đình (kiểu Zalo). Null = manager chưa tạo mã.']
+  createdById String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  members family_members [not null]
+  joinRequests join_requests [not null]
+  financeLedger finance_ledgers
+  financeCategories finance_categories [not null]
+  financeModels finance_models [not null]
+  financeCategoryJarMappings finance_category_jar_mappings [not null]
+  budgetPlans budget_plans [not null]
+  financialGoals financial_goals [not null]
+  goalContributionPlans goal_contribution_plans [not null]
+  budgetAlerts budget_alerts [not null]
+  spendingSupportRequests spending_support_requests [not null]
+  taskCategories task_categories [not null]
+  tasks tasks [not null]
+  sosSetting sos_settings
+  wearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
+  sosAlerts sos_alerts [not null]
+  memberLocationPoints member_location_points [not null]
+  notifications notifications [not null]
+  subscription family_subscriptions
+  paymentTransactions payment_transactions [not null]
+  provisioningLogs workspace_provisioning_logs [not null]
+  conversations conversations [not null]
+  familyAnnouncements family_announcements [not null]
+  calendarEvents calendar_events [not null]
+  albumMedia album_media [not null]
+  storageCleanupJobs storage_cleanup_jobs [not null]
+  memberFaceProfiles member_face_profiles [not null]
+  faceScanJobs face_scan_jobs [not null]
+  albumFaceDetections album_face_detections [not null]
+  albumTagSuggestions album_tag_suggestions [not null]
+  aiConversations ai_conversations [not null]
+}
+
+Table family_members {
+  id String [pk]
+  familyId String [not null]
+  userId String [not null]
+  displayName String [note: 'ERD: display_name — per-family display name override.']
+  familyRole FamilyRole [not null, default: 'FAMILY_MEMBER']
+  relationship Relationship [not null, default: 'OTHER']
+  status MemberStatus [not null, default: 'ACTIVE', note: 'ERD: member_status.']
+  locationSharingEnabled Boolean [not null, default: false, note: 'Opt-in daily location sharing on the family map (separate from SOS tracking).']
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime [note: 'ERD: left_at — set when the member leaves/is removed.']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  family families [not null]
+  user users [not null]
+  decidedJoinRequests join_requests [not null]
+  monthlyFinances member_monthly_finances [not null]
+  createdLedgerEntries ledger_entries [not null]
+  createdBudgetPlans budget_plans [not null]
+  createdFinancialGoals financial_goals [not null]
+  goalAllocations goal_allocations [not null]
+  requestedSpendingSupportRequests spending_support_requests [not null]
+  reviewedSpendingSupportRequests spending_support_requests [not null]
+  createdTasks tasks [not null]
+  assignedTasks task_assignments [not null]
+  givenTaskAssignments task_assignments [not null]
+  submittedTaskSubmissions task_submissions [not null]
+  reviewedTaskSubmissions task_submissions [not null]
+  reportedTaskUnavailabilities task_unavailabilities [not null]
+  handledTaskUnavailabilities task_unavailabilities [not null]
+  receivedRewardSettlements reward_settlements [not null]
+  settledRewardSettlements reward_settlements [not null]
+  rewardAllocations reward_allocations [not null]
+  reportedRewardDisputes reward_disputes [not null]
+  resolvedRewardDisputes reward_disputes [not null]
+  createdSosSettings sos_settings [not null]
+  ownedWearableDevices wearable_devices [not null]
+  wearableActivations wearable_activation_sessions [not null]
+  triggeredSosAlerts sos_alerts [not null]
+  resolvedSosAlerts sos_alerts [not null]
+  sosResponses sos_responses [not null]
+  memberLocationPoints member_location_points [not null]
+  notifications notifications [not null]
+  createdConversations conversations [not null]
+  conversationParticipations conversation_participants [not null]
+  sentMessages messages [not null]
+  pinnedMessages messages [not null]
+  messageReactions message_reactions [not null]
+  initiatedCalls calls [not null]
+  callParticipations call_participants [not null]
+  createdAnnouncements family_announcements [not null]
+  createdCalendarEvents calendar_events [not null]
+  calendarEventParticipations calendar_event_participants [not null]
+  uploadedAlbumMedia album_media [not null]
+  deletedAlbumMedia album_media [not null]
+  reviewedModerationChecks media_moderation_checks [not null]
+  taggedAlbumMediaTags album_media_tags [not null]
+  createdAlbumMediaTags album_media_tags [not null]
+  faceProfiles member_face_profiles [not null]
+  consentedFaceProfiles member_face_profiles [not null]
+  requestedFaceScanJobs face_scan_jobs [not null]
+  suggestedAlbumTagSuggestions album_tag_suggestions [not null]
+  confirmedAlbumTagSuggestions album_tag_suggestions [not null]
+  rejectedAlbumTagSuggestions album_tag_suggestions [not null]
+  aiConversations ai_conversations [not null]
+  goalContributionPlans goal_contribution_plans [not null]
+  reviewedGoalContributionPlans goal_contribution_plans [not null]
+
+  indexes {
+    (familyId, userId) [unique]
+  }
+}
+
+Table join_requests {
+  id String [pk]
+  familyId String [not null]
+  userId String [not null]
+  status JoinRequestStatus [not null, default: 'PENDING']
+  message String [note: 'Lời nhắn của người xin vào (vd "Con là út của bố").']
+  decidedByMemberId String [note: 'Thành viên (manager) đã duyệt/từ chối yêu cầu.']
+  decidedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  family families [not null]
+  user users [not null]
+  decidedByMember family_members
+
+  Note: 'Yêu cầu tham gia gia đình: user nhập mã mời của family và chờ manager duyệt.'
+}
+
+Table member_monthly_finances {
+  id String [pk]
+  memberId String [not null]
+  periodMonth Int [not null]
+  periodYear Int [not null]
+  expectedIncome Decimal
+  actualIncome Decimal
+  expectedPersonalExpense Decimal
+  actualPersonalExpense Decimal
+  expectedSharedContribution Decimal
+  actualSharedContribution Decimal
+  incomeVisibility FinanceVisibility [not null, default: 'PRIVATE']
+  expenseVisibility FinanceVisibility [not null, default: 'PRIVATE']
+  note String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  member family_members [not null]
+
+  indexes {
+    (memberId, periodMonth, periodYear) [unique]
+  }
+
+  Note: 'Monthly personal income and expense summary for a family member. This is a summary only; personal ledger entries are intentionally not modeled.'
+}
+
+Table finance_ledgers {
+  id String [pk]
+  familyId String [unique, not null]
+  ledgerName String [not null]
+  status FinanceLedgerStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  entries ledger_entries [not null]
+  budgetLines budget_lines [not null]
+  budgetAlerts budget_alerts [not null]
+
+  Note: 'The single shared finance ledger for a family workspace. Family finance is an internal record system and does not represent a real-money wallet.'
+}
+
+Table finance_categories {
+  id String [pk]
+  familyId String [not null]
+  name String [not null]
+  categoryType FinanceCategoryType [not null]
+  essentialType EssentialType [not null, default: 'NEUTRAL']
+  status FinanceCategoryStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  entries ledger_entries [not null]
+  budgetLines budget_lines [not null]
+  budgetAlerts budget_alerts [not null]
+  jarMappings finance_category_jar_mappings [not null]
+  spendingSupportRequests spending_support_requests [not null]
+
+  indexes {
+    (familyId, name, categoryType) [unique]
+  }
+
+  Note: 'Family-defined classification for shared ledger entries.'
+}
+
+Table finance_models {
+  id String [pk]
+  familyId String [not null]
+  modelType FinanceModelType [not null]
+  name String [not null]
+  status FinanceModelStatus [not null, default: 'DRAFT']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  jars finance_jars [not null]
+  categoryJarMappings finance_category_jar_mappings [not null]
+
+  Note: 'Historical finance allocation configuration for a family. Only one model may be active for a family at a time.'
+}
+
+Table finance_jars {
+  id String [pk]
+  financeModelId String [not null]
+  name String [not null]
+  jarCode String [not null]
+  allocationPercentage Decimal [not null]
+  description String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  financeModel finance_models [not null]
+  budgetLines budget_lines [not null]
+  financialGoals financial_goals [not null]
+  ledgerEntries ledger_entries [not null]
+  budgetAlerts budget_alerts [not null]
+  rewardAllocations reward_allocations [not null]
+  categoryMappings finance_category_jar_mappings [not null]
+
+  indexes {
+    (financeModelId, jarCode) [unique]
+  }
+
+  Note: 'Jar/fund allocation belonging to one finance model. Percentages are planning values only and never represent stored real money.'
+}
+
+Table finance_category_jar_mappings {
+  id String [pk]
+  familyId String [not null]
+  financeModelId String [not null]
+  categoryId String [not null]
+  jarId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  financeModel finance_models [not null]
+  category finance_categories [not null]
+  jar finance_jars [not null]
+
+  indexes {
+    (financeModelId, categoryId) [unique]
+  }
+
+  Note: 'Default jar assignment for a category inside one finance model.
+The same category can point to different jars in FIVE_JARS vs EIGHTY_TWENTY.'
+}
+
+Table ledger_entries {
+  id String [pk]
+  ledgerId String [not null]
+  categoryId String
+  jarId String
+  createdByMemberId String [not null]
+  entryType LedgerEntryType [not null]
+  amount Decimal [not null]
+  description String [not null]
+  note String
+  entryDate DateTime [not null]
+  status LedgerEntryStatus [not null, default: 'ACTIVE']
+  sourceType String
+  sourceId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  ledger finance_ledgers [not null]
+  category finance_categories
+  jar finance_jars
+  createdByMember family_members [not null]
+  goalAllocations goal_allocations [not null]
+  rewardAllocations reward_allocations [not null]
+
+  Note: 'Immutable-style record in the shared family ledger. Corrections should be represented by voiding or adjustment entries rather than deleting history.'
+}
+
+Table subscription_plans {
+  id String [pk]
+  planCode String [unique, not null, note: 'Unique plan code, e.g. FREE / PLUS / PREMIUM / GOLD. `FREE` is reserved as the default plan for new families.']
+  name String [not null]
+  annualPrice Decimal [not null, note: 'ERD: annual_price — paid plans are billed yearly.']
+  billingPeriod BillingPeriod [not null, default: 'YEARLY', note: 'Canonical billing cadence used by Admin and Stripe price creation.']
+  monthlyPrice Decimal [note: 'Monthly price for MONTHLY plans. Null for FREE/YEARLY unless configured for display.']
+  yearlyPrice Decimal [note: 'Yearly price for YEARLY plans. Null for FREE/MONTHLY unless configured for display.']
+  maxMembers Int [not null, note: 'ERD: max_members — member cap enforced per workspace subscription.']
+  storageLimit Int [not null, note: 'ERD: storage_limit — storage allowance in megabytes.']
+  featureAccess Json [note: 'ERD: feature_access — feature flags/limits map for the tier.']
+  stripePriceId String [unique, note: 'Stripe recurring (annual) Price id — required for paid tiers (PLUS/PREMIUM).']
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  familySubscriptions family_subscriptions [not null]
+
+  Note: 'Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only; admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.'
+}
+
+Table family_subscriptions {
+  id String [pk]
+  familyId String [unique, not null]
+  planId String [not null]
+  status FamilySubscriptionStatus [not null, default: 'ACTIVE']
+  stripeCustomerId String
+  stripeSubscriptionId String [unique]
+  currentPeriodStart DateTime [note: 'null for FREE (no expiry); set from Stripe current_period_start for paid plans.']
+  currentPeriodEnd DateTime [note: 'null for FREE (no expiry); set from Stripe current_period_end for paid plans.']
+  cancelAtPeriodEnd Boolean [not null, default: false]
+  purchasedByUserId String [note: 'User accountable for the current paid plan (who bought/renewed it). Null for FREE / auto-seeded rows. SetNull on user delete so billing history survives. Only a FAMILY_MANAGER can become the purchaser (enforced in the API).']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  plan subscription_plans [not null]
+  purchasedBy users
+
+  Note: 'One row per family (always present). New families start on FREE with no expiry; buying a paid plan moves the row to PLUS/PREMIUM and fills the Stripe ids. Webhooks are the source of truth for status/period changes.'
+}
+
+Table payment_transactions {
+  id String [pk]
+  familyId String [not null]
+  stripeEventId String [unique, not null]
+  type String [not null]
+  amount Decimal
+  currency String
+  status String [not null]
+  rawPayload Json [not null]
+  createdAt DateTime [default: `now()`, not null]
+  family families [not null]
+
+  Note: 'Payment/webhook history. `stripeEventId` is unique so replayed Stripe webhook events are idempotent (duplicate inserts fail and are skipped).'
+}
+
+Table spending_support_requests {
+  id String [pk]
+  familyId String [not null]
+  requesterMemberId String [not null]
+  amount Decimal [not null]
+  categoryId String
+  purpose String [not null]
+  status SpendingSupportRequestStatus [not null, default: 'PENDING']
+  reviewedByMemberId String
+  reviewedAt DateTime
+  decisionNote String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  requesterMember family_members [not null]
+  reviewedByMember family_members
+  category finance_categories
+}
+
+Table budget_plans {
+  id String [pk]
+  familyId String [not null]
+  planName String [not null]
+  periodType BudgetPeriodType [not null]
+  periodStart DateTime [not null]
+  periodEnd DateTime [not null]
+  expectedSharedIncome Decimal
+  expectedSharedExpense Decimal
+  status BudgetPlanStatus [not null, default: 'DRAFT']
+  createdByMemberId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  createdByMember family_members [not null]
+  lines budget_lines [not null]
+  budgetAlerts budget_alerts [not null]
+
+  Note: 'Family-level budget plan for an internal planning period.'
+}
+
+Table budget_lines {
+  id String [pk]
+  budgetPlanId String [not null]
+  categoryId String
+  jarId String
+  plannedAmount Decimal [not null]
+  thresholdAmount Decimal
+  thresholdPercent Decimal
+  essentialType EssentialType
+  note String
+  budgetPlan budget_plans [not null]
+  category finance_categories
+  jar finance_jars
+  financeLedger finance_ledgers
+  financeLedgerId String
+
+  Note: 'Planned amount assigned to a family category, finance jar, or both.'
+}
+
+Table financial_goals {
+  id String [pk]
+  familyId String [not null]
+  goalName String [not null]
+  targetAmount Decimal [not null]
+  deadline DateTime
+  monthlyContributionTarget Decimal
+  relatedJarId String
+  status FinancialGoalStatus [not null, default: 'ACTIVE']
+  createdByMemberId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  relatedJar finance_jars
+  createdByMember family_members [not null]
+  allocations goal_allocations [not null]
+  contributionPlans goal_contribution_plans [not null]
+  budgetAlerts budget_alerts [not null]
+  rewardAllocations reward_allocations [not null]
+}
+
+Table goal_allocations {
+  id String [pk]
+  goalId String [not null]
+  ledgerEntryId String [not null]
+  amount Decimal [not null]
+  allocatedByMemberId String [not null]
+  allocatedAt DateTime [default: `now()`, not null]
+  goal financial_goals [not null]
+  ledgerEntry ledger_entries [not null]
+  allocatedByMember family_members [not null]
+}
+
+Table goal_contribution_plans {
+  id String [pk]
+  familyId String [not null]
+  goalId String [not null]
+  memberId String [not null]
+  periodMonth Int [not null]
+  periodYear Int [not null]
+  plannedAmount Decimal [not null]
+  pendingAmount Decimal
+  dueDate DateTime [not null]
+  status GoalContributionPlanStatus [not null, default: 'PLANNED']
+  submittedAt DateTime
+  submittedNote String
+  reviewedByMemberId String
+  reviewedAt DateTime
+  reviewNote String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  goal financial_goals [not null]
+  member family_members [not null]
+  reviewedByMember family_members
+
+  indexes {
+    (goalId, memberId, periodMonth, periodYear) [unique]
+  }
+}
+
+Table budget_alerts {
+  id String [pk]
+  familyId String [not null]
+  sourceKey String [not null]
+  budgetPlanId String
+  goalId String
+  jarId String
+  categoryId String
+  alertType BudgetAlertType [not null]
+  severity BudgetAlertSeverity [not null]
+  thresholdValue Decimal
+  actualValue Decimal
+  message String
+  resolutionNote String
+  status BudgetAlertStatus [not null, default: 'NEW']
+  createdAt DateTime [default: `now()`, not null]
+  resolvedAt DateTime
+  family families [not null]
+  budgetPlan budget_plans
+  goal financial_goals
+  jar finance_jars
+  category finance_categories
+  financeLedger finance_ledgers
+  financeLedgerId String
+}
+
+Table task_categories {
+  id String [pk]
+  familyId String [not null]
+  name String [not null]
+  description String
+  status TaskCategoryStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  tasks tasks [not null]
+
+  indexes {
+    (familyId, name) [unique]
+  }
+}
+
+Table tasks {
+  id String [pk]
+  familyId String [not null]
+  taskCategoryId String
+  title String [not null]
+  description String
+  taskType TaskType [not null, default: 'AD_HOC']
+  priority TaskPriority [not null, default: 'MEDIUM']
+  status TaskStatus [not null, default: 'ACTIVE']
+  createdByMemberId String [not null]
+  dueAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  family families [not null]
+  category task_categories
+  createdByMember family_members [not null]
+  assignments task_assignments [not null]
+  schedule task_schedules
+  rewardSetting reward_settings
+}
+
+Table task_schedules {
+  id String [pk]
+  taskId String [unique, not null]
+  repeatType TaskRepeatType [not null]
+  repeatInterval Int [not null]
+  startDate DateTime [not null]
+  endDate DateTime
+  dayOfWeek Int
+  status TaskScheduleStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  task tasks [not null]
+}
+
+Table task_assignments {
+  id String [pk]
+  taskId String [not null]
+  assignedToMemberId String [not null]
+  assignedByMemberId String [not null]
+  status TaskAssignmentStatus [not null, default: 'ASSIGNED']
+  assignedAt DateTime [default: `now()`, not null]
+  startAt DateTime
+  dueAt DateTime
+  reminderSentAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  task tasks [not null]
+  assignedToMember family_members [not null]
+  assignedByMember family_members [not null]
+  submissions task_submissions [not null]
+  unavailabilities task_unavailabilities [not null]
+}
+
+Table task_submissions {
+  id String [pk]
+  assignmentId String [not null]
+  submittedByMemberId String [not null]
+  submissionNote String
+  status TaskSubmissionStatus [not null, default: 'WAITING_REVIEW']
+  reviewedByMemberId String
+  reviewNote String
+  submittedAt DateTime [default: `now()`, not null]
+  reviewedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  assignment task_assignments [not null]
+  submittedByMember family_members [not null]
+  reviewedByMember family_members
+  proofs task_proofs [not null]
+  rewardSettlement reward_settlements
+}
+
+Table reward_settings {
+  id String [pk]
+  taskId String [unique, not null]
+  rewardType RewardType [not null]
+  rewardAmount Decimal
+  rewardDescription String
+  autoCreateSettlement Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  task tasks [not null]
+  settlements reward_settlements [not null]
+}
+
+Table reward_settlements {
+  id String [pk]
+  taskSubmissionId String [unique, not null]
+  rewardSettingId String [not null]
+  receiverMemberId String [not null]
+  settledByMemberId String
+  amount Decimal [not null]
+  status RewardSettlementStatus [not null, default: 'PENDING_SETTLEMENT']
+  externalMethod RewardExternalMethod
+  externalNote String
+  settledAt DateTime
+  confirmedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  taskSubmission task_submissions [not null]
+  rewardSetting reward_settings [not null]
+  receiverMember family_members [not null]
+  settledByMember family_members
+  allocations reward_allocations [not null]
+  disputes reward_disputes [not null]
+}
+
+Table reward_allocations {
+  id String [pk]
+  rewardSettlementId String [not null]
+  jarId String
+  goalId String
+  ledgerEntryId String
+  amount Decimal [not null]
+  allocatedByMemberId String [not null]
+  allocatedAt DateTime [default: `now()`, not null]
+  rewardSettlement reward_settlements [not null]
+  jar finance_jars
+  goal financial_goals
+  ledgerEntry ledger_entries
+  allocatedByMember family_members [not null]
+}
+
+Table reward_disputes {
+  id String [pk]
+  rewardSettlementId String [not null]
+  reportedByMemberId String [not null]
+  reason String [not null]
+  status RewardDisputeStatus [not null, default: 'OPEN']
+  resolvedByMemberId String
+  createdAt DateTime [default: `now()`, not null]
+  resolvedAt DateTime
+  rewardSettlement reward_settlements [not null]
+  reportedByMember family_members [not null]
+  resolvedByMember family_members
+}
+
+Table task_unavailabilities {
+  id String [pk]
+  assignmentId String [not null]
+  reportedByMemberId String [not null]
+  reason String [not null]
+  status TaskUnavailabilityStatus [not null, default: 'REPORTED']
+  reportedAt DateTime [default: `now()`, not null]
+  handledByMemberId String
+  handledAt DateTime
+  assignment task_assignments [not null]
+  reportedByMember family_members [not null]
+  handledByMember family_members
+}
+
+Table task_proofs {
+  id String [pk]
+  submissionId String [not null]
+  proofType TaskProofType [not null]
+  fileUrl String
+  thumbnailUrl String
+  note String
+  uploadedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  submission task_submissions [not null]
+}
+
+Table sos_settings {
+  id String [pk]
+  workspaceId String [unique, not null]
+  isEnabled Boolean [not null, default: true]
+  notifyAllMembers Boolean [not null, default: true]
+  autoCreateAlertFromFall Boolean [not null, default: false]
+  locationRequired Boolean [not null, default: true]
+  createdByMemberId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  createdByMember family_members
+  emergencyContacts emergency_contacts [not null]
+
+  Note: 'Per-workspace SOS configuration (1-1 with a family workspace).'
+}
+
+Table emergency_contacts {
+  id String [pk]
+  sosSettingId String [not null]
+  contactName String [not null]
+  phoneNumber String [not null]
+  relationshipNote String
+  priorityOrder Int [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  sosSetting sos_settings [not null]
+
+  Note: 'Emergency contacts attached to a workspace\'s SOS settings.'
+}
+
+Table wearable_devices {
+  id String [pk]
+  workspaceId String [not null]
+  ownerMemberId String [not null]
+  ownerUserId String [not null]
+  deviceName String [not null]
+  deviceType WearableDeviceType [not null]
+  deviceIdentifier String [not null]
+  pairingStatus DevicePairingStatus [not null]
+  gpsEnabled Boolean [not null]
+  sosEnabled Boolean [not null]
+  lastSeenAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  ownerUser users [not null]
+  ownerMember family_members [not null]
+  sosAlerts sos_alerts [not null]
+  sosLocationPoints sos_location_points [not null]
+  sensorEvents sensor_events [not null]
+  memberLocationPoints member_location_points [not null]
+  activationSessions wearable_activation_sessions [not null]
+
+  indexes {
+    (workspaceId, deviceIdentifier) [unique]
+  }
+
+  Note: 'Wearable / tracking devices paired to a member within a workspace.'
+}
+
+Table wearable_activation_sessions {
+  id String [pk]
+  code String [not null]
+  status WearableActivationStatus [not null, default: 'PENDING']
+  deviceName String
+  deviceType WearableDeviceType [not null, default: 'SMARTWATCH']
+  workspaceId String
+  ownerMemberId String
+  ownerUserId String
+  wearableDeviceId String
+  claimedRefreshTokenId String
+  expiresAt DateTime [not null]
+  claimedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families
+  ownerMember family_members
+  ownerUser users
+  wearableDevice wearable_devices
+  claimedRefreshToken refresh_tokens
+
+  Note: 'Short-lived activation session used by Wear OS before it has a user token.'
+}
+
+Table sos_alerts {
+  id String [pk]
+  workspaceId String [not null]
+  triggeredByMemberId String [not null]
+  deviceId String
+  sourceType SosSourceType [not null]
+  status SosAlertStatus [not null, default: 'ACTIVE']
+  severity SosSeverity
+  initialLatitude Decimal
+  initialLongitude Decimal
+  message String
+  triggeredAt DateTime [default: `now()`, not null]
+  resolvedByMemberId String
+  resolvedAt DateTime
+  resolutionNote String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  triggeredByMember family_members [not null]
+  device wearable_devices
+  resolvedByMember family_members
+  locationPoints sos_location_points [not null]
+  responses sos_responses [not null]
+  sensorEvents sensor_events [not null]
+
+  Note: 'Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.'
+}
+
+Table sos_location_points {
+  id String [pk]
+  sosAlertId String [not null]
+  deviceId String
+  latitude Decimal [not null]
+  longitude Decimal [not null]
+  accuracy Decimal
+  sourceType GpsSourceType [not null]
+  recordedAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  sosAlert sos_alerts [not null]
+  device wearable_devices
+
+  Note: 'GPS route points captured during a single SOS event.'
+}
+
+Table sos_responses {
+  id String [pk]
+  sosAlertId String [not null]
+  responderMemberId String [not null]
+  responseType SosResponseType [not null]
+  message String
+  respondedAt DateTime [default: `now()`, not null]
+  sosAlert sos_alerts [not null]
+  responderMember family_members [not null]
+
+  Note: 'Member responses to a SOS alert (viewed / safe / need help / resolved / canceled).'
+}
+
+Table sensor_events {
+  id String [pk]
+  deviceId String [not null]
+  eventType SensorEventType [not null]
+  rawValue Json
+  severity SosSeverity
+  detectedAt DateTime [not null]
+  createdSosAlertId String
+  createdAt DateTime [default: `now()`, not null]
+  device wearable_devices [not null]
+  createdSosAlert sos_alerts
+
+  Note: 'Raw sensor events emitted by wearable / simulated devices.'
+}
+
+Table member_location_points {
+  id String [pk]
+  workspaceId String [not null]
+  memberId String [not null]
+  deviceId String
+  latitude Decimal [not null]
+  longitude Decimal [not null]
+  accuracy Decimal
+  sourceType GpsSourceType [not null]
+  recordedAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  member family_members [not null]
+  device wearable_devices
+
+  Note: 'Everyday member location tracking — separate from SOS-event route points.'
+}
+
+Table notifications {
+  id String [pk]
+  familyId String [not null]
+  recipientMemberId String [not null]
+  type NotificationType [not null]
+  priority NotificationPriority [not null, default: 'NORMAL']
+  title String [not null]
+  body String [not null]
+  referenceType String
+  referenceId String
+  isRead Boolean [not null, default: false]
+  readAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  family families [not null]
+  recipientMember family_members [not null]
+
+  Note: 'Shared in-app notifications (reused across modules; SOS uses type=SOS).'
+}
+
+Table device_tokens {
+  id String [pk]
+  userId String [not null]
+  token String [unique, not null]
+  platform DevicePlatform [not null]
+  deviceName String
+  lastSeenAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+
+  Note: 'Thiết bị nhận FCM push — gắn theo USER (nhận noti của mọi family mình tham gia).'
+}
+
+Table workspace_provisioning_logs {
+  id String [pk]
+  workspaceId String [not null]
+  actionType ProvisioningActionType [not null]
+  status ProvisioningStatus [not null, default: 'PENDING']
+  message String
+  startedAt DateTime
+  finishedAt DateTime
+  createdByUserId String
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  createdByUser users
+
+  Note: 'Provisioning/activation audit log của một family workspace (admin).'
+}
+
+Table conversations {
+  id String [pk]
+  workspaceId String [not null]
+  conversationType ConversationType [not null, default: 'GROUP']
+  conversationName String
+  createdByMemberId String [not null]
+  status ConversationStatus [not null, default: 'ACTIVE']
+  isDefault Boolean [not null, default: false, note: 'Nhóm chat chung mặc định của family (duy nhất 1/workspace — partial unique index trong migration).']
+  directKey String [unique, note: 'Dedupe chat 1-1: "<memberIdNhỏ>:<memberIdLớn>" (sort 2 memberId). GROUP = null.']
+  lastMessageAt DateTime [note: 'Thời điểm tin nhắn cuối — sort danh sách hội thoại.']
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  createdByMember family_members [not null]
+  participants conversation_participants [not null]
+  messages messages [not null]
+  calls calls [not null]
+
+  Note: 'Hội thoại nhóm/riêng trong một family workspace (chat).'
+}
+
+Table conversation_participants {
+  id String [pk]
+  conversationId String [not null]
+  memberId String [not null]
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  participantStatus ParticipantStatus [not null, default: 'ACTIVE']
+  lastReadAt DateTime [note: 'Read receipt: đã đọc tới thời điểm này (đếm unread = message sentAt > lastReadAt).']
+  conversation conversations [not null]
+  member family_members [not null]
+
+  indexes {
+    (conversationId, memberId) [unique]
+  }
+
+  Note: 'Thành viên tham gia một hội thoại.'
+}
+
+Table messages {
+  id String [pk]
+  conversationId String [not null]
+  senderMemberId String [not null]
+  messageType MessageType [not null, default: 'TEXT']
+  content String
+  replyToMessageId String [note: 'Reply/quote: tin nhắn được trả lời (cùng hội thoại).']
+  pinnedAt DateTime [note: 'Ghim tin nhắn trong hội thoại.']
+  pinnedByMemberId String
+  relatedCallId String [note: 'Cuộc gọi liên quan (chỉ set khi messageType = CALL) — tin nhắn hệ thống ghi log cuộc gọi.']
+  sentAt DateTime [default: `now()`, not null]
+  editedAt DateTime
+  deletedAt DateTime
+  conversation conversations [not null]
+  senderMember family_members [not null]
+  replyTo messages
+  replies messages [not null]
+  pinnedByMember family_members
+  relatedCall calls
+  attachments message_attachments [not null]
+  reactions message_reactions [not null]
+
+  Note: 'Tin nhắn trong một hội thoại.'
+}
+
+Table calls {
+  id String [pk]
+  conversationId String [not null]
+  initiatedByMemberId String [not null]
+  roomName String [unique, not null, note: 'Tên phòng LiveKit, dạng `call-<uuid>`.']
+  status CallStatus [not null, default: 'RINGING']
+  startedAt DateTime [default: `now()`, not null]
+  connectedAt DateTime [note: 'Thời điểm người đầu tiên join phòng (khác startedAt = lúc bắt đầu đổ chuông).']
+  endedAt DateTime
+  endedReason String [note: '\'hangup\' | \'timeout\' | \'all_left\'.']
+  conversation conversations [not null]
+  initiatedByMember family_members [not null]
+  participants call_participants [not null]
+  relatedMessages messages [not null]
+
+  Note: 'Cuộc gọi video/audio trong một hội thoại (LiveKit room 1-1 hoặc nhóm).'
+}
+
+Table call_participants {
+  id String [pk]
+  callId String [not null]
+  memberId String [not null]
+  status CallParticipantStatus [not null, default: 'INVITED']
+  invitedAt DateTime [default: `now()`, not null]
+  joinedAt DateTime
+  leftAt DateTime
+  call calls [not null]
+  member family_members [not null]
+
+  indexes {
+    (callId, memberId) [unique]
+  }
+
+  Note: 'Thành viên tham gia (được mời/đã join/đã rời) một cuộc gọi.'
+}
+
+Table message_reactions {
+  id String [pk]
+  messageId String [not null]
+  memberId String [not null]
+  emoji String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  message messages [not null]
+  member family_members [not null]
+
+  indexes {
+    (messageId, memberId, emoji) [unique]
+  }
+
+  Note: 'Reaction (thả cảm xúc) trên một tin nhắn.'
+}
+
+Table message_attachments {
+  id String [pk]
+  messageId String [not null]
+  fileType String [not null]
+  fileUrl String [not null]
+  fileName String
+  fileSize Int
+  uploadedAt DateTime [default: `now()`, not null]
+  message messages [not null]
+
+  Note: 'Tệp đính kèm của một tin nhắn.'
+}
+
+Table family_announcements {
+  id String [pk]
+  workspaceId String [not null]
+  createdByMemberId String [not null]
+  title String [not null]
+  content String [not null]
+  priority NotificationPriority [not null, default: 'NORMAL']
+  status AnnouncementStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  createdByMember family_members [not null]
+
+  Note: 'Thông báo/announcement do member tạo trong family workspace.'
+}
+
+Table calendar_events {
+  id String [pk]
+  workspaceId String [not null]
+  title String [not null]
+  description String
+  location String
+  startTime DateTime [not null]
+  endTime DateTime
+  isRecurring Boolean [not null, default: false]
+  createdByMemberId String [not null]
+  status CalendarEventStatus [not null, default: 'ACTIVE']
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  createdByMember family_members [not null]
+  participants calendar_event_participants [not null]
+
+  Note: 'Sự kiện lịch của family workspace.'
+}
+
+Table calendar_event_participants {
+  id String [pk]
+  eventId String [not null]
+  memberId String [not null]
+  responseStatus EventResponseStatus [not null, default: 'INVITED']
+  reminderEnabled Boolean [not null, default: true]
+  reminderSentAt DateTime
+  event calendar_events [not null]
+  member family_members [not null]
+
+  indexes {
+    (eventId, memberId) [unique]
+  }
+
+  Note: 'Thành viên được mời tham gia một sự kiện lịch.'
+}
+
+Table album_media {
+  id String [pk]
+  workspaceId String [not null]
+  uploadedByMemberId String [not null]
+  mediaType AlbumMediaType [not null]
+  mediaUrl String
+  storageKey String
+  originalFileName String
+  mimeType String
+  fileSize Int
+  thumbnailUrl String
+  caption String
+  visibilityScope AlbumVisibilityScope [not null, default: 'FAMILY']
+  moderationStatus MediaModerationStatus [not null, default: 'PENDING']
+  uploadedAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  deletedByMemberId String
+  deleteReason String
+  moderationStartedAt DateTime
+  moderationCompletedAt DateTime
+  moderationAttemptCount Int [not null, default: 0]
+  lastModerationError String
+  latestModerationJobId String
+  moderationQueuedAt DateTime
+  workspace families [not null]
+  uploadedByMember family_members [not null]
+  deletedByMember family_members
+  tags album_media_tags [not null]
+  moderationChecks media_moderation_checks [not null]
+  cleanupJobs storage_cleanup_jobs [not null]
+  faceScanJobs face_scan_jobs [not null]
+  faceDetections album_face_detections [not null]
+  tagSuggestions album_tag_suggestions [not null]
+
+  Note: 'Ảnh/video trong album gia đình.'
+}
+
+Table album_media_tags {
+  id String [pk]
+  mediaId String [not null]
+  taggedMemberId String [not null]
+  taggedByMemberId String [not null]
+  tagNote String
+  createdAt DateTime [default: `now()`, not null]
+  media album_media [not null]
+  taggedMember family_members [not null]
+  taggedByMember family_members [not null]
+
+  indexes {
+    (mediaId, taggedMemberId) [unique]
+  }
+
+  Note: 'Tag gắn thành viên vào một media (manual tagging cho MVP).'
+}
+
+Table face_scan_jobs {
+  scanJobId String [pk]
+  workspaceId String [not null]
+  mediaId String [not null]
+  requestedByMemberId String [not null]
+  status FaceScanJobStatus [not null, default: 'PENDING']
+  attemptCount Int [not null, default: 0]
+  lastError String
+  startedAt DateTime
+  completedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  media album_media [not null]
+  requestedByMember family_members [not null]
+  detections album_face_detections [not null]
+
+  Note: 'Async scan record for album face detection and workspace-scoped matching.'
+}
+
+Table album_face_detections {
+  detectionId String [pk]
+  workspaceId String [not null]
+  scanJobId String [not null]
+  mediaId String [not null]
+  faceIndex Int [not null]
+  boundingBox Json [not null]
+  detectionScore Decimal
+  qualityScore Decimal
+  modelName String [not null]
+  modelVersion String [not null]
+  status AlbumFaceDetectionStatus [not null, default: 'UNMATCHED']
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  scanJob face_scan_jobs [not null]
+  media album_media [not null]
+  suggestions album_tag_suggestions [not null]
+
+  indexes {
+    (scanJobId, faceIndex) [unique]
+  }
+
+  Note: 'Face detected in an album photo. No plaintext biometric embedding is stored.'
+}
+
+Table album_tag_suggestions {
+  suggestionId String [pk]
+  workspaceId String [not null]
+  detectionId String [not null]
+  mediaId String [not null]
+  suggestedMemberId String [not null]
+  similarityScore Decimal [not null]
+  secondBestScore Decimal
+  scoreMargin Decimal
+  status AlbumTagSuggestionStatus [not null, default: 'PENDING']
+  confirmedByMemberId String
+  confirmedAt DateTime
+  rejectedByMemberId String
+  rejectedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families [not null]
+  detection album_face_detections [not null]
+  media album_media [not null]
+  suggestedMember family_members [not null]
+  confirmedByMember family_members
+  rejectedByMember family_members
+
+  indexes {
+    (detectionId, suggestedMemberId) [unique]
+  }
+
+  Note: 'Human-confirmed candidate tag proposed from a face detection.'
+}
+
+Table storage_cleanup_jobs {
+  id String [pk]
+  workspaceId String
+  mediaId String
+  storageKey String [unique, not null]
+  reason StorageCleanupReason [not null]
+  status StorageCleanupStatus [not null, default: 'PENDING']
+  attemptCount Int [not null, default: 0]
+  lastError String
+  nextRetryAt DateTime [default: `now()`]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  workspace families
+  media album_media
+
+  Note: 'Durable retry record for R2/database cleanup; never stores signed URLs or credentials.'
+}
+
+Table media_moderation_checks {
+  id String [pk]
+  mediaId String [not null]
+  jobId String [unique]
+  checkType MediaCheckType [not null]
+  provider String
+  modelName String
+  resultStatus MediaCheckResult [not null]
+  confidenceScore Decimal
+  categories Json
+  reasonCode String
+  summary String
+  errorCode String
+  errorMessage String
+  reviewedByMemberId String
+  reviewNote String
+  reviewedAt DateTime
+  checkedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  media album_media [not null]
+  reviewedByMember family_members
+
+  Note: 'Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).'
+}
+
+Table member_face_profiles {
+  profileId String [pk]
+  workspaceId String [not null]
+  memberId String [not null]
+  status FaceProfileStatus [not null, default: 'ACTIVE']
+  consentedAt DateTime [not null]
+  consentedByMemberId String [not null]
+  modelName String [not null]
+  modelVersion String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  workspace families [not null]
+  member family_members [not null]
+  consentedByMember family_members [not null]
+  embeddings member_face_embeddings [not null]
+
+  indexes {
+    (workspaceId, memberId) [unique]
+  }
+
+  Note: 'Consent-backed face profile for a family member. Stores metadata only; biometric vectors live encrypted in MemberFaceEmbedding.'
+}
+
+Table member_face_embeddings {
+  embeddingId String [pk]
+  profileId String [not null]
+  encryptedEmbedding Bytes [not null]
+  encryptionIv Bytes [not null]
+  encryptionAuthTag Bytes [not null]
+  embeddingDimension Int [not null]
+  detectionScore Decimal
+  qualityScore Decimal
+  modelName String [not null]
+  modelVersion String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  revokedAt DateTime
+  profile member_face_profiles [not null]
+
+  Note: 'Encrypted face embedding sample. Plaintext embedding values are never stored.'
+}
+
+Table ai_conversations {
+  id String [pk]
+  workspaceId String [not null]
+  memberId String [not null]
+  conversationTitle String
+  createdAt DateTime [default: `now()`, not null]
+  workspace families [not null]
+  member family_members [not null]
+  messages ai_messages [not null]
+
+  Note: 'Phiên hội thoại với AI assistant (theo từng member trong workspace).'
+}
+
+Table ai_messages {
+  id String [pk]
+  aiConversationId String [not null]
+  senderType AiSenderType [not null]
+  messageContent String [not null]
+  relatedModule AiRelatedModule
+  permissionContext Json
+  createdAt DateTime [default: `now()`, not null]
+  aiConversation ai_conversations [not null]
+
+  Note: 'Tin nhắn trong một phiên AIConversation.'
+}
+
+Enum UserType {
+  NORMAL_USER
+  SYSTEM_ADMIN
+}
+
+Enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+Enum FamilyRole {
+  FAMILY_MANAGER
+  DEPUTY_MEMBER
+  FAMILY_MEMBER
+}
+
+Enum Relationship {
+  FATHER
+  MOTHER
+  SPOUSE
+  CHILD
+  SISTER
+  BROTHER
+  GRANDPARENT
+  OTHER
+}
+
+Enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+Enum WorkspaceStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  EXPIRED
+}
+
+Enum ActivationStatus {
+  ACTIVE
+  PENDING
+  FAILED
+}
+
+Enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+Enum FinanceVisibility {
+  PRIVATE
+  FAMILY
+}
+
+Enum FinanceLedgerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum FinanceCategoryType {
+  INCOME
+  EXPENSE
+}
+
+Enum EssentialType {
+  ESSENTIAL
+  NON_ESSENTIAL
+  NEUTRAL
+}
+
+Enum FinanceCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum LedgerEntryType {
+  INCOME
+  EXPENSE
+  CONTRIBUTION
+  ALLOWANCE
+  REWARD
+  SUPPORT
+  ADJUSTMENT
+}
+
+Enum LedgerEntryStatus {
+  ACTIVE
+  VOIDED
+}
+
+Enum FinanceModelType {
+  FIVE_JARS
+  EIGHTY_TWENTY
+  CUSTOM
+}
+
+Enum FinanceModelStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+Enum BudgetPeriodType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+Enum BudgetPlanStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  CANCELED
+}
+
+Enum FinancialGoalStatus {
+  ACTIVE
+  ACHIEVED
+  CANCELED
+  AT_RISK
+}
+
+Enum GoalContributionPlanStatus {
+  PLANNED
+  PENDING_CONFIRMATION
+  PARTIAL
+  PAID
+  MISSED
+  REJECTED
+}
+
+Enum BudgetAlertType {
+  OVER_BUDGET
+  GOAL_AT_RISK
+  NON_ESSENTIAL_TOO_HIGH
+}
+
+Enum BudgetAlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+Enum BudgetAlertStatus {
+  NEW
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+Enum SpendingSupportRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+Enum TaskCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum TaskType {
+  AD_HOC
+  RECURRING
+}
+
+Enum TaskRepeatType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+Enum TaskScheduleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+Enum TaskStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+Enum TaskAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+Enum TaskSubmissionStatus {
+  WAITING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+Enum TaskUnavailabilityStatus {
+  REPORTED
+  HANDLED
+  CANCELED
+}
+
+Enum RewardType {
+  MONEY_RECORD
+  POINT
+  OTHER
+}
+
+Enum RewardSettlementStatus {
+  PENDING_SETTLEMENT
+  WAITING_CONFIRMATION
+  SETTLED
+  DISPUTED
+  CANCELED
+}
+
+Enum RewardDisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+Enum RewardExternalMethod {
+  CASH
+  BANK_TRANSFER
+  THIRD_PARTY_WALLET
+  OTHER
+}
+
+Enum TaskProofType {
+  IMAGE
+  VIDEO
+  NOTE
+  FILE
+}
+
+Enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+Enum FamilySubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+Enum BillingPeriod {
+  FREE
+  MONTHLY
+  YEARLY
+}
+
+Enum SosSourceType {
+  MOBILE_APP
+  WEARABLE
+  SIMULATED_DEVICE
+}
+
+Enum SosAlertStatus {
+  ACTIVE
+  RESOLVED
+  CANCELED
+  FALSE_ALARM
+}
+
+Enum SosSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+Enum SosResponseType {
+  VIEWED
+  ON_THE_WAY
+  CONFIRM_SAFE
+  NEED_HELP
+  RESOLVED
+  CANCELED
+}
+
+Enum WearableDeviceType {
+  SMARTWATCH
+  GPS_TRACKER
+  BLE_DEVICE
+  SIMULATED_DEVICE
+}
+
+Enum DevicePairingStatus {
+  PAIRED
+  UNPAIRED
+  LOST
+}
+
+Enum WearableActivationStatus {
+  PENDING
+  PAIRED
+  CLAIMED
+  EXPIRED
+}
+
+Enum GpsSourceType {
+  MOBILE_GPS
+  WEARABLE_GPS
+  SIMULATED_GPS
+}
+
+Enum SensorEventType {
+  SOS_BUTTON_PRESSED
+  FALL_DETECTED
+  HEART_RATE_ABNORMAL
+  HARD_IMPACT
+  ABNORMAL_MOVEMENT
+}
+
+Enum NotificationType {
+  SOS
+  GENERAL
+  ALBUM_TAG
+  JOIN_REQUEST
+  MEMBER
+  TASK
+  CALENDAR
+  FINANCE
+  CHAT
+  CALL
+}
+
+Enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+Enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+Enum ProvisioningActionType {
+  CREATE
+  ACTIVATE
+  RETRY
+  SUSPEND
+}
+
+Enum ProvisioningStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+Enum ConversationType {
+  GROUP
+  PRIVATE
+}
+
+Enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+Enum ParticipantStatus {
+  ACTIVE
+  LEFT
+}
+
+Enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  LOCATION
+  SOS_QUICK_MESSAGE
+  CALL
+}
+
+Enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  CANCELED
+}
+
+Enum CallParticipantStatus {
+  INVITED
+  JOINED
+  DECLINED
+  LEFT
+  NO_ANSWER
+}
+
+Enum AnnouncementStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+Enum CalendarEventStatus {
+  ACTIVE
+  CANCELED
+  COMPLETED
+}
+
+Enum EventResponseStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  MAYBE
+}
+
+Enum AlbumMediaType {
+  PHOTO
+  VIDEO
+}
+
+Enum AlbumVisibilityScope {
+  FAMILY
+  PRIVATE
+  MANAGER_ONLY
+}
+
+Enum MediaModerationStatus {
+  PENDING
+  PROCESSING
+  SAFE
+  NEED_REVIEW
+  FLAGGED
+}
+
+Enum MediaCheckType {
+  SENSITIVE_CONTENT
+  FACE_GROUPING
+}
+
+Enum MediaCheckResult {
+  SAFE
+  FLAGGED
+  NEED_REVIEW
+}
+
+Enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
+}
+
+Enum FaceProfileStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+Enum FaceScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum AlbumFaceDetectionStatus {
+  MATCHED
+  UNMATCHED
+  SUPERSEDED
+}
+
+Enum AlbumTagSuggestionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
+Enum AiSenderType {
+  USER
+  AI
+}
+
+Enum AiRelatedModule {
+  FINANCE
+  TASK
+  SOS
+  CALENDAR
+  GENERAL
+}
+
+Ref: email_verification_tokens.userId > users.id [delete: Cascade]
+
+Ref: password_reset_tokens.userId > users.id [delete: Cascade]
+
+Ref: refresh_tokens.userId > users.id [delete: Cascade]
+
+Ref: family_members.familyId > families.id [delete: Cascade]
+
+Ref: family_members.userId > users.id [delete: Cascade]
+
+Ref: join_requests.familyId > families.id [delete: Cascade]
+
+Ref: join_requests.userId > users.id [delete: Cascade]
+
+Ref: join_requests.decidedByMemberId > family_members.id [delete: Set Null]
+
+Ref: member_monthly_finances.memberId > family_members.id [delete: Cascade]
+
+Ref: finance_ledgers.familyId - families.id [delete: Cascade]
+
+Ref: finance_categories.familyId > families.id [delete: Cascade]
+
+Ref: finance_models.familyId > families.id [delete: Cascade]
+
+Ref: finance_jars.financeModelId > finance_models.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.familyId > families.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.financeModelId > finance_models.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.categoryId > finance_categories.id [delete: Cascade]
+
+Ref: finance_category_jar_mappings.jarId > finance_jars.id [delete: Cascade]
+
+Ref: ledger_entries.ledgerId > finance_ledgers.id [delete: Cascade]
+
+Ref: ledger_entries.categoryId > finance_categories.id [delete: Set Null]
+
+Ref: ledger_entries.jarId > finance_jars.id [delete: Set Null]
+
+Ref: ledger_entries.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: family_subscriptions.familyId - families.id [delete: Cascade]
+
+Ref: family_subscriptions.planId > subscription_plans.id
+
+Ref: family_subscriptions.purchasedByUserId > users.id [delete: Set Null]
+
+Ref: payment_transactions.familyId > families.id [delete: Cascade]
+
+Ref: spending_support_requests.familyId > families.id [delete: Cascade]
+
+Ref: spending_support_requests.requesterMemberId > family_members.id [delete: Restrict]
+
+Ref: spending_support_requests.reviewedByMemberId > family_members.id [delete: Restrict]
+
+Ref: spending_support_requests.categoryId > finance_categories.id [delete: Set Null]
+
+Ref: budget_plans.familyId > families.id [delete: Cascade]
+
+Ref: budget_plans.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: budget_lines.budgetPlanId > budget_plans.id [delete: Cascade]
+
+Ref: budget_lines.categoryId > finance_categories.id [delete: Set Null]
+
+Ref: budget_lines.jarId > finance_jars.id [delete: Set Null]
+
+Ref: budget_lines.financeLedgerId > finance_ledgers.id
+
+Ref: financial_goals.familyId > families.id [delete: Cascade]
+
+Ref: financial_goals.relatedJarId > finance_jars.id [delete: Set Null]
+
+Ref: financial_goals.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: goal_allocations.goalId > financial_goals.id [delete: Cascade]
+
+Ref: goal_allocations.ledgerEntryId > ledger_entries.id [delete: Restrict]
+
+Ref: goal_allocations.allocatedByMemberId > family_members.id [delete: Restrict]
+
+Ref: goal_contribution_plans.familyId > families.id [delete: Cascade]
+
+Ref: goal_contribution_plans.goalId > financial_goals.id [delete: Cascade]
+
+Ref: goal_contribution_plans.memberId > family_members.id [delete: Cascade]
+
+Ref: goal_contribution_plans.reviewedByMemberId > family_members.id [delete: Cascade]
+
+Ref: budget_alerts.familyId > families.id [delete: Cascade]
+
+Ref: budget_alerts.budgetPlanId > budget_plans.id [delete: Set Null]
+
+Ref: budget_alerts.goalId > financial_goals.id [delete: Set Null]
+
+Ref: budget_alerts.jarId > finance_jars.id [delete: Set Null]
+
+Ref: budget_alerts.categoryId > finance_categories.id [delete: Set Null]
+
+Ref: budget_alerts.financeLedgerId > finance_ledgers.id
+
+Ref: task_categories.familyId > families.id [delete: Cascade]
+
+Ref: tasks.familyId > families.id [delete: Cascade]
+
+Ref: tasks.taskCategoryId > task_categories.id [delete: Set Null]
+
+Ref: tasks.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_schedules.taskId - tasks.id [delete: Cascade]
+
+Ref: task_assignments.taskId > tasks.id [delete: Cascade]
+
+Ref: task_assignments.assignedToMemberId > family_members.id [delete: Restrict]
+
+Ref: task_assignments.assignedByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_submissions.assignmentId > task_assignments.id [delete: Cascade]
+
+Ref: task_submissions.submittedByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_submissions.reviewedByMemberId > family_members.id [delete: Restrict]
+
+Ref: reward_settings.taskId - tasks.id [delete: Cascade]
+
+Ref: reward_settlements.taskSubmissionId - task_submissions.id [delete: Cascade]
+
+Ref: reward_settlements.rewardSettingId > reward_settings.id [delete: Restrict]
+
+Ref: reward_settlements.receiverMemberId > family_members.id [delete: Restrict]
+
+Ref: reward_settlements.settledByMemberId > family_members.id [delete: Restrict]
+
+Ref: reward_allocations.rewardSettlementId > reward_settlements.id [delete: Cascade]
+
+Ref: reward_allocations.jarId > finance_jars.id [delete: Set Null]
+
+Ref: reward_allocations.goalId > financial_goals.id [delete: Set Null]
+
+Ref: reward_allocations.ledgerEntryId > ledger_entries.id [delete: Set Null]
+
+Ref: reward_allocations.allocatedByMemberId > family_members.id [delete: Restrict]
+
+Ref: reward_disputes.rewardSettlementId > reward_settlements.id [delete: Cascade]
+
+Ref: reward_disputes.reportedByMemberId > family_members.id [delete: Restrict]
+
+Ref: reward_disputes.resolvedByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_unavailabilities.assignmentId > task_assignments.id [delete: Cascade]
+
+Ref: task_unavailabilities.reportedByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_unavailabilities.handledByMemberId > family_members.id [delete: Restrict]
+
+Ref: task_proofs.submissionId > task_submissions.id [delete: Cascade]
+
+Ref: sos_settings.workspaceId - families.id [delete: Cascade]
+
+Ref: sos_settings.createdByMemberId > family_members.id [delete: Set Null]
+
+Ref: emergency_contacts.sosSettingId > sos_settings.id [delete: Cascade]
+
+Ref: wearable_devices.workspaceId > families.id [delete: Cascade]
+
+Ref: wearable_devices.ownerUserId > users.id [delete: Cascade]
+
+Ref: wearable_devices.ownerMemberId > family_members.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.workspaceId > families.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.ownerMemberId > family_members.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.ownerUserId > users.id [delete: Cascade]
+
+Ref: wearable_activation_sessions.wearableDeviceId > wearable_devices.id [delete: Set Null]
+
+Ref: wearable_activation_sessions.claimedRefreshTokenId > refresh_tokens.id [delete: Set Null]
+
+Ref: sos_alerts.workspaceId > families.id [delete: Cascade]
+
+Ref: sos_alerts.triggeredByMemberId > family_members.id [delete: Cascade]
+
+Ref: sos_alerts.deviceId > wearable_devices.id [delete: Set Null]
+
+Ref: sos_alerts.resolvedByMemberId > family_members.id [delete: Cascade]
+
+Ref: sos_location_points.sosAlertId > sos_alerts.id [delete: Cascade]
+
+Ref: sos_location_points.deviceId > wearable_devices.id [delete: Set Null]
+
+Ref: sos_responses.sosAlertId > sos_alerts.id [delete: Cascade]
+
+Ref: sos_responses.responderMemberId > family_members.id [delete: Cascade]
+
+Ref: sensor_events.deviceId > wearable_devices.id [delete: Cascade]
+
+Ref: sensor_events.createdSosAlertId > sos_alerts.id [delete: Set Null]
+
+Ref: member_location_points.workspaceId > families.id [delete: Cascade]
+
+Ref: member_location_points.memberId > family_members.id [delete: Cascade]
+
+Ref: member_location_points.deviceId > wearable_devices.id [delete: Set Null]
+
+Ref: notifications.familyId > families.id [delete: Cascade]
+
+Ref: notifications.recipientMemberId > family_members.id [delete: Cascade]
+
+Ref: device_tokens.userId > users.id [delete: Cascade]
+
+Ref: workspace_provisioning_logs.workspaceId > families.id [delete: Cascade]
+
+Ref: workspace_provisioning_logs.createdByUserId > users.id [delete: Set Null]
+
+Ref: conversations.workspaceId > families.id [delete: Cascade]
+
+Ref: conversations.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: conversation_participants.conversationId > conversations.id [delete: Cascade]
+
+Ref: conversation_participants.memberId > family_members.id [delete: Cascade]
+
+Ref: messages.conversationId > conversations.id [delete: Cascade]
+
+Ref: messages.senderMemberId > family_members.id [delete: Cascade]
+
+Ref: messages.replyToMessageId - messages.id [delete: Set Null]
+
+Ref: messages.pinnedByMemberId > family_members.id [delete: Cascade]
+
+Ref: messages.relatedCallId > calls.id [delete: Set Null]
+
+Ref: calls.conversationId > conversations.id [delete: Cascade]
+
+Ref: calls.initiatedByMemberId > family_members.id [delete: Restrict]
+
+Ref: call_participants.callId > calls.id [delete: Cascade]
+
+Ref: call_participants.memberId > family_members.id [delete: Cascade]
+
+Ref: message_reactions.messageId > messages.id [delete: Cascade]
+
+Ref: message_reactions.memberId > family_members.id [delete: Cascade]
+
+Ref: message_attachments.messageId > messages.id [delete: Cascade]
+
+Ref: family_announcements.workspaceId > families.id [delete: Cascade]
+
+Ref: family_announcements.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: calendar_events.workspaceId > families.id [delete: Cascade]
+
+Ref: calendar_events.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: calendar_event_participants.eventId > calendar_events.id [delete: Cascade]
+
+Ref: calendar_event_participants.memberId > family_members.id [delete: Cascade]
+
+Ref: album_media.workspaceId > families.id [delete: Cascade]
+
+Ref: album_media.uploadedByMemberId > family_members.id [delete: Cascade]
+
+Ref: album_media.deletedByMemberId > family_members.id [delete: Cascade]
+
+Ref: album_media_tags.mediaId > album_media.id [delete: Cascade]
+
+Ref: album_media_tags.taggedMemberId > family_members.id [delete: Cascade]
+
+Ref: album_media_tags.taggedByMemberId > family_members.id [delete: Cascade]
+
+Ref: face_scan_jobs.workspaceId > families.id [delete: Cascade]
+
+Ref: face_scan_jobs.mediaId > album_media.id [delete: Cascade]
+
+Ref: face_scan_jobs.requestedByMemberId > family_members.id [delete: Restrict]
+
+Ref: album_face_detections.workspaceId > families.id [delete: Cascade]
+
+Ref: album_face_detections.scanJobId > face_scan_jobs.scanJobId [delete: Cascade]
+
+Ref: album_face_detections.mediaId > album_media.id [delete: Cascade]
+
+Ref: album_tag_suggestions.workspaceId > families.id [delete: Cascade]
+
+Ref: album_tag_suggestions.detectionId > album_face_detections.detectionId [delete: Cascade]
+
+Ref: album_tag_suggestions.mediaId > album_media.id [delete: Cascade]
+
+Ref: album_tag_suggestions.suggestedMemberId > family_members.id [delete: Restrict]
+
+Ref: album_tag_suggestions.confirmedByMemberId > family_members.id [delete: Restrict]
+
+Ref: album_tag_suggestions.rejectedByMemberId > family_members.id [delete: Restrict]
+
+Ref: storage_cleanup_jobs.workspaceId > families.id [delete: Set Null]
+
+Ref: storage_cleanup_jobs.mediaId > album_media.id [delete: Set Null]
+
+Ref: media_moderation_checks.mediaId > album_media.id [delete: Cascade]
+
+Ref: media_moderation_checks.reviewedByMemberId > family_members.id [delete: Set Null]
+
+Ref: member_face_profiles.workspaceId > families.id [delete: Cascade]
+
+Ref: member_face_profiles.memberId > family_members.id [delete: Cascade]
+
+Ref: member_face_profiles.consentedByMemberId > family_members.id [delete: Cascade]
+
+Ref: member_face_embeddings.profileId > member_face_profiles.profileId [delete: Cascade]
+
+Ref: ai_conversations.workspaceId > families.id [delete: Cascade]
+
+Ref: ai_conversations.memberId > family_members.id [delete: Cascade]
+
+Ref: ai_messages.aiConversationId > ai_conversations.id [delete: Cascade]

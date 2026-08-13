@@ -24,7 +24,7 @@ Nền tảng **quản lý tài chính & chăm sóc gia đình số**. Đây là 
 - **Auth**: JWT (Passport-JWT) + **bcrypt**. Access token **15 phút**, refresh token
   **7 ngày**, **2 secret riêng biệt** (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`).
   Refresh token lưu **hash trong bảng `refresh_tokens`** (1 row/phiên-thiết bị, rotate +
-  thu hồi từng phiên) — KHÔNG lưu trên `User`. JWT payload: `{ sub, email, systemRole }`
+  thu hồi từng phiên) — KHÔNG lưu trên `User`. JWT payload: `{ sub, email, userType }`
   (refresh token thêm `jti` = id row `refresh_tokens`).
 - **Validation**: `class-validator` + `class-transformer` qua DTO.
 - **Docs**: Swagger (`@nestjs/swagger`).
@@ -38,7 +38,7 @@ Nền tảng **quản lý tài chính & chăm sóc gia đình số**. Đây là 
 src/
 ├── main.ts                  # Bootstrap: global prefix, ValidationPipe, interceptor, filter, Swagger
 ├── app.module.ts            # Root module (ConfigModule global + PrismaModule + 21 feature module)
-├── config/configuration.ts  # Đọc ENV → object config (app/database/jwt/bcrypt/invitation)
+├── config/configuration.ts  # Đọc ENV → object config (app/database/jwt/bcrypt/mail...)
 ├── prisma/                  # PrismaModule (@Global) + PrismaService
 ├── common/                  # Dùng chung: interceptors / filters / decorators
 └── modules/<feature>/       # 21 feature module
@@ -51,28 +51,69 @@ src/
 
 ## 4. Trạng thái hiện tại
 
-**Đã hoàn thiện:** `prisma`, `common`, `auth`, `users`, `families`, `family-members`
-(gồm `FamilyPermissionGuard` + `@FamilyRoles`), và `invitations` (module mới, không nằm
-trong 20 stub gốc).
+**Đã hoàn thiện:**
+- Hạ tầng: `prisma`, `common`.
+- Auth/định danh: `auth`, `users`.
+- Gia đình: `families`, `family-members` (gồm `FamilyPermissionGuard` + `@FamilyRoles`),
+  `join-requests` (mã mời family kiểu Zalo + yêu cầu tham gia có duyệt).
+- `finance` — **module lớn, đầy đủ**: ledger gia đình + ledger entry, `FinanceModel`/`FinanceJar`,
+  `FinanceCategory`, `MemberMonthlyFinance`, **budget plan/line, financial goal + goal allocation,
+  budget alert, spending support request** (controller trong `finance/controllers/`, service trong
+  `finance/services/`). Route workspace-scoped dưới `families/:familyId/finance/...`.
+- `admin` — **CRUD hệ thống** (SYSTEM_ADMIN) cho users / families / join-requests / family-members
+  (controller tách trong `admin/controllers/`).
+- `subscription-plans` — **CRUD gói** (SYSTEM_ADMIN quản lý qua `admin/subscription-plans`; user đã
+  đăng nhập xem gói active qua `subscription-plans`). Export `SubscriptionPlansService` cho module
+  `subscriptions` dùng sau.
+- `notifications` — **funnel `notify()`/`dispatch()`** dùng chung cho mọi module (SOS, join-requests,
+  families, tasks, calendar, finance, albums, chats gọi vào). Quy ước tx: `notify(..., { tx })` bên
+  trong transaction **chỉ persist**, caller tự gọi `dispatch(ids)` SAU KHI transaction commit (enqueue
+  trong tx = bug, rollback vẫn đẩy noti "ma"). Có nhánh push-only (`notifyUsersEphemeral`, `id` trả về
+  `null`, không persist — dùng cho chat và các thông báo cá nhân ngoài phạm vi 1 family cụ thể). Đẩy
+  realtime qua **WS gateway namespace `/notifications`** (connect → tự auto-join room `user:<userId>`,
+  event `notification:new` / `notification:unread-count` / `notification:error` — xem
+  `notifications/NOTIFICATIONS_REALTIME.md`), fan-out qua BullMQ (Redis, queue `notifications`) tới 2
+  channel WS + FCM (`dispatcher/`). `reminders.service.ts` là job quét định kỳ (BullMQ repeatable) nhắc
+  task/lịch sắp đến hạn.
+- `devices` — CRUD `device_tokens` (đăng ký/hủy FCM token theo user, không theo family) để kênh FCM
+  của `notifications` gửi push khi app ở background.
 
-**Bảng DB đã có:** `users`, `refresh_tokens`, `families`, `family_members`, `invitations`.
+**Bảng DB đã có** (xem `prisma/schema.prisma`): `users`, `password_reset_tokens`, `refresh_tokens`,
+`families`, `family_members`, `join_requests`, `member_monthly_finances`, `finance_ledgers`,
+`finance_categories`, `finance_models`, `finance_jars`, `ledger_entries`, `subscription_plans`,
+`spending_support_requests`, `budget_plans`, `budget_lines`, `financial_goals`, `goal_allocations`,
+`budget_alerts`, `device_tokens`.
 
-**16 module còn lại là stub rỗng** (`@Module({})`): admin, ai-chatbot, albums, calendar,
-chats, devices, locations, messages, notifications, rewards, roles-permissions, sos,
-subscription-plans, subscriptions, tasks, transactions, wallets.
-→ Khi build, **theo đúng pattern của `auth`/`families`** và các convention mục 5.
+**Module còn là stub rỗng** (`@Module({})`): ai-chatbot, albums, billing, calendar, chats,
+locations, messages, rewards, roles-permissions, sos, subscriptions, tasks.
+→ Khi build, **theo đúng pattern của `auth`/`families`/`finance`** và các convention mục 5.
+
+> ⚠️ Lưu ý vận hành (rút ra từ phiên gần đây): khi **merge/giải xung đột `schema.prisma`**, dễ rơi
+> mất định nghĩa `model`/`enum` nhưng vẫn giữ relations + code → schema invalid, `tsc` lỗi hàng loạt
+> ("Module '@prisma/client' has no exported member …"). Sau merge luôn chạy `npx prisma validate` +
+> `npx prisma generate` + `npx tsc --noEmit` để phát hiện sớm; nếu thiếu model, khôi phục từ commit cũ
+> đã có (đừng định nghĩa lại theo trí nhớ).
 
 ## 5. Convention BẮT BUỘC
 
 ### 5.1 Response envelope (đã đăng ký global ở `main.ts`)
+> ⚠️ **Mọi `message` trả ra client MẶC ĐỊNH là TIẾNG VIỆT** (cả thành công lẫn lỗi). Khi
+> viết API mới, luôn đặt message tiếng Việt — KHÔNG để tiếng Anh.
+
 - **Thành công**: `{ "success": true, "message": "...", "data": <payload> }`
-  - Do `common/interceptors/transform.interceptor.ts` bọc tự động.
-  - Đặt message bằng decorator `@ResponseMessage('Login successfully')` trên handler.
+  - Do `common/interceptors/transform.interceptor.ts` bọc tự động (default `'Thành công'`).
+  - Đặt message bằng decorator `@ResponseMessage('Đăng nhập thành công')` trên handler — **tiếng Việt**.
   - **Controller chỉ cần `return data`** — KHÔNG tự bọc `{ success, ... }`.
 - **Lỗi**: `{ "success": false, "message": "...", "statusCode": <number> }`
-  - Do `common/filters/all-exceptions.filter.ts` xử lý. Cứ `throw` các
-    `HttpException` chuẩn của Nest (`ConflictException`, `UnauthorizedException`,
-    `ForbiddenException`, `BadRequestException`...).
+  - Do `common/filters/all-exceptions.filter.ts` xử lý (fallback 500 = `'Lỗi hệ thống'`). Cứ
+    `throw` các `HttpException` chuẩn của Nest với **message tiếng Việt**
+    (`throw new ConflictException('Số điện thoại đã được sử dụng')`), tránh
+    `throw new XxxException()` không có message (sẽ ra message tiếng Anh mặc định của Nest).
+- **Lỗi validation (DTO)**: KHÔNG cần đặt `message` tiếng Việt trên từng decorator
+  class-validator. `ValidationPipe` dùng `common/validation/vi-validation.factory.ts`
+  (`viValidationExceptionFactory`) tự dịch sang tiếng Việt theo constraint key + nhãn field.
+  Khi thêm field/constraint mới mà cần câu chữ riêng, bổ sung nhãn vào `FIELD_LABELS` hoặc
+  case mới trong factory đó (đây là **nguồn chân lý** cho message validation).
 
 ### 5.2 Routing & docs
 - **Mọi route có prefix `/api/v1`** (set ở `main.ts`). Ví dụ: `POST /api/v1/auth/login`.
@@ -83,37 +124,49 @@ subscription-plans, subscriptions, tasks, transactions, wallets.
 - **TUYỆT ĐỐI không trả `passwordHash`** ra client. Luôn dùng `sanitizeUser()` và type
   `SafeUser = Omit<User,'passwordHash'>` trong `modules/users/users.types.ts`.
 - Hash password & refresh token bằng **bcrypt**; refresh token **rotate** mỗi lần refresh
-  (revoke row cũ, tạo row mới trong `refresh_tokens`). Invitation token là chuỗi opaque,
-  lưu **sha256** (`modules/invitations`) — raw token chỉ trả 1 lần.
+  (revoke row cũ, tạo row mới trong `refresh_tokens`). Mã mời gia đình (`Family.inviteCode`,
+  `modules/join-requests`) là chuỗi ngắn 8 ký tự lưu **plaintext** (không phải token bí mật
+  dùng 1 lần) — bảo vệ bằng bước manager duyệt join request, không phải bằng độ khó đoán mã;
+  đổi/thu hồi mã qua endpoint regenerate (mã cũ vô hiệu ngay).
 - Secret/khoá đọc từ ENV qua `ConfigService` — **không hardcode**.
 
 ### 5.4 Data access
 - Dùng **Prisma**: inject `PrismaService` (đã `@Global`, không cần import PrismaModule).
 - Không tự mở kết nối DB; không thêm ORM khác.
+- **Đặt tên ID (chuẩn hóa 2026-07)**: PK của **mọi model** là field `id` trong Prisma
+  (cột DB vẫn snake_case qua `@map`, vd `sos_alert_id` — đổi tên field KHÔNG cần migration).
+  Foreign key giữ dạng `<entity>Id` (`conversationId` trên `Message`, `sosAlertId` trên
+  `SosLocationPoint`...). Response API cũng trả `id` cho chính resource. Model mới
+  TUYỆT ĐỐI không đặt PK kiểu `<entity>Id`. Ngoại lệ: payload WebSocket SOS/chat vẫn dùng
+  key ngữ cảnh (`{ sosAlertId, point }`) — đó là tham chiếu, không phải PK của payload.
 
 ### 5.5 Validation
 - Mỗi input có **DTO + class-validator**. `ValidationPipe` global đã bật
   `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` → field thừa sẽ bị
   từ chối (400). Quy tắc mật khẩu: ≥8 ký tự, có chữ hoa + thường + số + ký tự đặc biệt.
 
-### 5.6 Phân quyền 3 lớp (tái sử dụng cho mọi module)
-Mô hình quyền chia **3 lớp** (đừng trộn lẫn):
-- **`SystemRole`** `{ADMIN, FAMILY_MANAGER, FAMILY_MEMBER}` — quyền cấp hệ thống, nằm trên
-  `User.systemRole`. Mặc định khi register = **`FAMILY_MEMBER`**; tạo family lần đầu thì tự
-  nâng lên `FAMILY_MANAGER`.
-- **`FamilyRole`** `{MANAGER, MEMBER}` — quyền **trong từng family**, nằm trên
-  `FamilyMember.familyRole`.
-- **`Relationship`** `{FATHER, MOTHER, CHILD, GRANDFATHER, GRANDMOTHER, OTHER}` — chỉ hiển thị.
+### 5.6 Phân quyền 2 lớp (tái sử dụng cho mọi module)
+Quyền chia **2 lớp tách biệt** (đừng trộn lẫn) — vai trò gia đình KHÔNG nằm trên User:
+- **`UserType`** `{NORMAL_USER, SYSTEM_ADMIN}` — loại tài khoản cấp hệ thống, nằm trên
+  `User.userType`. Mặc định khi register = **`NORMAL_USER`**. Tạo family **không** đổi
+  `userType` (vai trò quản lý gia đình thuộc lớp dưới). Trạng thái tài khoản dùng
+  `User.accountStatus` `{ACTIVE, INACTIVE, SUSPENDED}` (thay cho `isActive` cũ).
+- **`FamilyRole`** `{FAMILY_MANAGER, DEPUTY_MEMBER, FAMILY_MEMBER}` — quyền **trong từng
+  family**, nằm trên `FamilyMember.familyRole`. Người tạo family = `FAMILY_MANAGER`.
+- **`Relationship`** `{FATHER, MOTHER, SPOUSE, CHILD, SISTER, BROTHER, GRANDPARENT, OTHER}`
+  — chỉ hiển thị.
 
 Cách dùng guard/decorator:
 - Đăng nhập: `@UseGuards(JwtAuthGuard)`.
-- Quyền hệ thống: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(SystemRole.ADMIN, ...)`
-  (`modules/auth/`).
+- Quyền hệ thống (admin): `@UseGuards(JwtAuthGuard, RolesGuard)` +
+  `@Roles(UserType.SYSTEM_ADMIN)` (`modules/auth/`).
 - Quyền trong family: `@UseGuards(JwtAuthGuard, FamilyPermissionGuard)` +
-  `@FamilyRoles(FamilyRole.MANAGER)` (`modules/family-members/`). Guard đọc `:familyId` từ
-  params, kiểm tra membership + familyRole, gắn `request.familyMember`. **Route phải có
-  param `:familyId`**.
+  `@FamilyRoles(FamilyRole.FAMILY_MANAGER)` (`modules/family-members/`). Guard đọc
+  `:familyId` từ params, kiểm tra membership + familyRole, gắn `request.familyMember`.
+  **Route phải có param `:familyId`**.
 - Lấy user hiện tại: `@CurrentUser()` (cả object `SafeUser`) hoặc `@CurrentUser('id')`.
+- Lấy membership hiện tại (sau FamilyPermissionGuard): `@CurrentFamilyMember()` hoặc
+  `@CurrentFamilyMember('id')`.
 
 ## 6. Lệnh thường dùng (chạy trong `server/`)
 

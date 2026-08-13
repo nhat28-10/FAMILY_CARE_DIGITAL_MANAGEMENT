@@ -26,7 +26,7 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ffmpeg postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 
 # node_modules is copied as-is (it includes the Prisma CLI) so that
@@ -39,4 +39,4 @@ COPY --from=build /app/package.json ./package.json
 EXPOSE 3000
 
 # Apply pending migrations, then start the server.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

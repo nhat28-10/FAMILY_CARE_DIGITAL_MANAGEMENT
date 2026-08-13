@@ -5,6 +5,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+generator dbml {
+  provider            = "prisma-dbml-generator"
+  output              = "./dbml"
+  outputName          = "family-care.dbml"
+  projectName         = "Family Care Digital Management"
+  projectDatabaseType = "PostgreSQL"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -14,35 +22,269 @@ datasource db {
 // Enums — 3-layer role model
 // ===========================================================================
 
-/// System-wide role used for global authentication/authorization.
-enum SystemRole {
-  ADMIN
+/// Account-level user type (ERD: user_type). System-wide; family roles live on FamilyMember.familyRole, not here.
+enum UserType {
+  NORMAL_USER
+  SYSTEM_ADMIN
+}
+
+/// Account lifecycle status (ERD: account_status).
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Role of a user inside a specific family (ERD: family_role).
+enum FamilyRole {
   FAMILY_MANAGER
+  DEPUTY_MEMBER
   FAMILY_MEMBER
 }
 
-/// Role of a user inside a specific family.
-enum FamilyRole {
-  MANAGER
-  MEMBER
-}
-
-/// Family relationship — display only.
+/// Family relationship — display only (ERD: relationship_type).
 enum Relationship {
   FATHER
   MOTHER
+  SPOUSE
   CHILD
-  GRANDFATHER
-  GRANDMOTHER
+  SISTER
+  BROTHER
+  GRANDPARENT
   OTHER
 }
 
-/// Lifecycle status of a family invitation.
-enum InvitationStatus {
+/// Email/phone verification status of a user account (ERD: verification_status).
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+/// Operational lifecycle of a family workspace (ERD: workspace_status).
+enum WorkspaceStatus {
+  ACTIVE
   PENDING
-  ACCEPTED
-  REJECTED
+  SUSPENDED
   EXPIRED
+}
+
+/// Provisioning/activation result of a family workspace (ERD: activation_status).
+enum ActivationStatus {
+  ACTIVE
+  PENDING
+  FAILED
+}
+
+/// Membership lifecycle of a family member (ERD: member_status).
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+/// Controls whether a member's monthly finance summary is private or visible within their family workspace.
+enum FinanceVisibility {
+  PRIVATE
+  FAMILY
+}
+
+/// Lifecycle status of the single shared finance ledger owned by a family.
+enum FinanceLedgerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Whether a finance category records incoming or outgoing money.
+enum FinanceCategoryType {
+  INCOME
+  EXPENSE
+}
+
+/// Essential classification used for family expense analysis.
+enum EssentialType {
+  ESSENTIAL
+  NON_ESSENTIAL
+  NEUTRAL
+}
+
+/// Lifecycle status of a family-defined finance category.
+enum FinanceCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Business classification of a shared family ledger entry.
+enum LedgerEntryType {
+  INCOME
+  EXPENSE
+  CONTRIBUTION
+  ALLOWANCE
+  REWARD
+  SUPPORT
+  ADJUSTMENT
+}
+
+/// Ledger entries are retained for traceability and voided instead of deleted.
+enum LedgerEntryStatus {
+  ACTIVE
+  VOIDED
+}
+
+/// Allocation strategy used by a family for its internal finance planning.
+enum FinanceModelType {
+  FIVE_JARS
+  EIGHTY_TWENTY
+  CUSTOM
+}
+
+/// Lifecycle of a family's finance allocation configuration.
+enum FinanceModelStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum BudgetPeriodType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum BudgetPlanStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  CANCELED
+}
+
+enum FinancialGoalStatus {
+  ACTIVE
+  ACHIEVED
+  CANCELED
+  AT_RISK
+}
+
+enum GoalContributionPlanStatus {
+  PLANNED
+  PENDING_CONFIRMATION
+  PARTIAL
+  PAID
+  MISSED
+  REJECTED
+}
+
+enum BudgetAlertType {
+  OVER_BUDGET
+  GOAL_AT_RISK
+  NON_ESSENTIAL_TOO_HIGH
+}
+
+enum BudgetAlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum BudgetAlertStatus {
+  NEW
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum SpendingSupportRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum TaskCategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskType {
+  AD_HOC
+  RECURRING
+}
+
+enum TaskRepeatType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum TaskScheduleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+enum TaskAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum TaskSubmissionStatus {
+  WAITING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TaskUnavailabilityStatus {
+  REPORTED
+  HANDLED
+  CANCELED
+}
+
+enum RewardType {
+  MONEY_RECORD
+  POINT
+  OTHER
+}
+
+enum RewardSettlementStatus {
+  PENDING_SETTLEMENT
+  WAITING_CONFIRMATION
+  SETTLED
+  DISPUTED
+  CANCELED
+}
+
+enum RewardDisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+enum RewardExternalMethod {
+  CASH
+  BANK_TRANSFER
+  THIRD_PARTY_WALLET
+  OTHER
+}
+
+enum TaskProofType {
+  IMAGE
+  VIDEO
+  NOTE
+  FILE
 }
 
 // ===========================================================================
@@ -50,27 +292,100 @@ enum InvitationStatus {
 // ===========================================================================
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  fullName     String?
-  systemRole   SystemRole @default(FAMILY_MEMBER)
-  isActive     Boolean    @default(true)
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  passwordHash       String?
+  /// Firebase Auth UID — set khi user đăng nhập Google (social login). Null = chưa liên kết.
+  firebaseUid        String?            @unique
+  fullName           String?
+  /// ERD: phone_number — optional, unique when present.
+  phone              String?            @unique
+  /// ERD: avatar_url.
+  avatarUrl          String?
+  /// ERD: user_type — NORMAL_USER vs SYSTEM_ADMIN (not a family role).
+  userType           UserType           @default(NORMAL_USER)
+  /// ERD: account_status.
+  accountStatus      AccountStatus      @default(ACTIVE)
+  /// ERD: verification_status.
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  /// ERD: last_login_at — set on each successful login.
+  lastLoginAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  memberships     FamilyMember[]
-  refreshTokens   RefreshToken[]
-  sentInvitations Invitation[]   @relation("InvitedBy")
+  memberships             FamilyMember[]
+  refreshTokens           RefreshToken[]
+  deviceTokens            DeviceToken[]
+  ownedWearableDevices    WearableDevice[]            @relation("OwnedUserWearableDevices")
+  wearableActivations     WearableActivationSession[] @relation("WearableActivationOwnerUser")
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  joinRequests            JoinRequest[]
+  provisioningLogs        WorkspaceProvisioningLog[]  @relation("CreatedProvisioningLogs")
+  purchasedSubscriptions  FamilySubscription[]        @relation("PurchasedSubscriptions")
 
   @@map("users")
 }
 
-/// One row per active refresh token (per device/session). The raw token is
-/// never stored — only its bcrypt hash. Supports multi-device + per-session
-/// revocation and rotation.
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  adminUserId  String
+  adminEmail   String?
+  adminName    String?
+  action       String
+  targetType   String
+  targetId     String?
+  result       String
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([targetType])
+  @@index([targetId])
+  @@index([result])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+/// Mã OTP xác thực email (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng; `attempts` đếm số lần nhập sai để khóa tạm.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+/// Mã OTP đặt lại mật khẩu (6 số). Chỉ lưu sha256 của mã, không lưu mã thật. `usedAt` đánh dấu đã dùng/vô hiệu; `attempts` đếm số lần nhập sai để khóa tạm.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// One row per active refresh token (per device/session). The raw token is never stored — only its bcrypt hash. Supports multi-device + per-session revocation and rotation.
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String
@@ -79,58 +394,1926 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wearableActivationSessions WearableActivationSession[] @relation("WearableActivationClaimedRefreshToken")
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model Family {
-  id          String   @id @default(uuid())
-  name        String
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String           @id @default(uuid())
+  name             String
+  /// ERD: description.
+  description      String?
+  /// ERD: avatar_url.
+  avatarUrl        String?
+  /// ERD: workspace_status.
+  status           WorkspaceStatus  @default(ACTIVE)
+  /// ERD: activation_status.
+  activationStatus ActivationStatus @default(ACTIVE)
+  /// Mã mời ngắn của gia đình (kiểu Zalo). Null = manager chưa tạo mã.
+  inviteCode       String?          @unique @map("invite_code")
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // Relations
-  members     FamilyMember[]
-  invitations Invitation[]
+  members                    FamilyMember[]
+  joinRequests               JoinRequest[]
+  financeLedger              FinanceLedger?
+  financeCategories          FinanceCategory[]
+  financeModels              FinanceModel[]
+  financeCategoryJarMappings FinanceCategoryJarMapping[]
+  budgetPlans                BudgetPlan[]
+  financialGoals             FinancialGoal[]
+  goalContributionPlans      GoalContributionPlan[]
+  budgetAlerts               BudgetAlert[]
+  spendingSupportRequests    SpendingSupportRequest[]
+  taskCategories             TaskCategory[]
+  tasks                      Task[]
+  sosSetting                 SosSetting?
+  wearableDevices            WearableDevice[]
+  wearableActivations        WearableActivationSession[]
+  sosAlerts                  SosAlert[]
+  memberLocationPoints       MemberLocationPoint[]
+  notifications              Notification[]
+  subscription               FamilySubscription?
+  paymentTransactions        PaymentTransaction[]
+  provisioningLogs           WorkspaceProvisioningLog[]
+  conversations              Conversation[]
+  familyAnnouncements        FamilyAnnouncement[]
+  calendarEvents             CalendarEvent[]
+  albumMedia                 AlbumMedia[]
+  storageCleanupJobs         StorageCleanupJob[]
+  memberFaceProfiles         MemberFaceProfile[]
+  faceScanJobs               FaceScanJob[]
+  albumFaceDetections        AlbumFaceDetection[]
+  albumTagSuggestions        AlbumTagSuggestion[]
+  aiConversations            AIConversation[]
 
   @@map("families")
 }
 
 model FamilyMember {
-  id           String       @id @default(uuid())
-  familyId     String
-  userId       String
-  familyRole   FamilyRole   @default(MEMBER)
-  relationship Relationship @default(OTHER)
-  joinedAt     DateTime     @default(now())
+  id                     String       @id @default(uuid())
+  familyId               String
+  userId                 String
+  /// ERD: display_name — per-family display name override.
+  displayName            String?
+  familyRole             FamilyRole   @default(FAMILY_MEMBER)
+  relationship           Relationship @default(OTHER)
+  /// ERD: member_status.
+  status                 MemberStatus @default(ACTIVE)
+  /// Opt-in daily location sharing on the family map (separate from SOS tracking).
+  locationSharingEnabled Boolean      @default(false) @map("location_sharing_enabled")
+  joinedAt               DateTime     @default(now())
+  /// ERD: left_at — set when the member leaves/is removed.
+  leftAt                 DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @default(now()) @updatedAt
 
   family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  decidedJoinRequests              JoinRequest[]               @relation("DecidedJoinRequests")
+  monthlyFinances                  MemberMonthlyFinance[]
+  createdLedgerEntries             LedgerEntry[]               @relation("CreatedLedgerEntries")
+  createdBudgetPlans               BudgetPlan[]                @relation("CreatedBudgetPlans")
+  createdFinancialGoals            FinancialGoal[]             @relation("CreatedFinancialGoals")
+  goalAllocations                  GoalAllocation[]            @relation("GoalAllocations")
+  requestedSpendingSupportRequests SpendingSupportRequest[]    @relation("RequestedSpendingSupportRequests")
+  reviewedSpendingSupportRequests  SpendingSupportRequest[]    @relation("ReviewedSpendingSupportRequests")
+  createdTasks                     Task[]                      @relation("CreatedTasks")
+  assignedTasks                    TaskAssignment[]            @relation("TaskAssignedTo")
+  givenTaskAssignments             TaskAssignment[]            @relation("TaskAssignedBy")
+  submittedTaskSubmissions         TaskSubmission[]            @relation("TaskSubmissionSubmittedBy")
+  reviewedTaskSubmissions          TaskSubmission[]            @relation("TaskSubmissionReviewedBy")
+  reportedTaskUnavailabilities     TaskUnavailability[]        @relation("TaskUnavailabilityReportedBy")
+  handledTaskUnavailabilities      TaskUnavailability[]        @relation("TaskUnavailabilityHandledBy")
+  receivedRewardSettlements        RewardSettlement[]          @relation("RewardSettlementReceiver")
+  settledRewardSettlements         RewardSettlement[]          @relation("RewardSettlementSettledBy")
+  rewardAllocations                RewardAllocation[]          @relation("RewardAllocationAllocatedBy")
+  reportedRewardDisputes           RewardDispute[]             @relation("RewardDisputeReportedBy")
+  resolvedRewardDisputes           RewardDispute[]             @relation("RewardDisputeResolvedBy")
+  createdSosSettings               SosSetting[]                @relation("CreatedSosSettings")
+  ownedWearableDevices             WearableDevice[]            @relation("OwnedWearableDevices")
+  wearableActivations              WearableActivationSession[] @relation("WearableActivationOwnerMember")
+  triggeredSosAlerts               SosAlert[]                  @relation("TriggeredSosAlerts")
+  resolvedSosAlerts                SosAlert[]                  @relation("ResolvedSosAlerts")
+  sosResponses                     SosResponse[]               @relation("SosResponses")
+  memberLocationPoints             MemberLocationPoint[]       @relation("MemberLocationPoints")
+  notifications                    Notification[]              @relation("MemberNotifications")
+  createdConversations             Conversation[]              @relation("CreatedConversations")
+  conversationParticipations       ConversationParticipant[]   @relation("ConversationParticipations")
+  sentMessages                     Message[]                   @relation("SentMessages")
+  pinnedMessages                   Message[]                   @relation("PinnedMessages")
+  messageReactions                 MessageReaction[]           @relation("MessageReactions")
+  initiatedCalls                   Call[]                      @relation("InitiatedCalls")
+  callParticipations               CallParticipant[]           @relation("CallParticipations")
+  createdAnnouncements             FamilyAnnouncement[]        @relation("CreatedAnnouncements")
+  createdCalendarEvents            CalendarEvent[]             @relation("CreatedCalendarEvents")
+  calendarEventParticipations      CalendarEventParticipant[]  @relation("CalendarEventParticipations")
+  uploadedAlbumMedia               AlbumMedia[]                @relation("UploadedAlbumMedia")
+  deletedAlbumMedia                AlbumMedia[]                @relation("DeletedAlbumMedia")
+  reviewedModerationChecks         MediaModerationCheck[]      @relation("ReviewedModerationChecks")
+  taggedAlbumMediaTags             AlbumMediaTag[]             @relation("TaggedAlbumMediaTags")
+  createdAlbumMediaTags            AlbumMediaTag[]             @relation("CreatedAlbumMediaTags")
+  faceProfiles                     MemberFaceProfile[]         @relation("MemberFaceProfiles")
+  consentedFaceProfiles            MemberFaceProfile[]         @relation("ConsentedFaceProfiles")
+  requestedFaceScanJobs            FaceScanJob[]               @relation("RequestedFaceScanJobs")
+  suggestedAlbumTagSuggestions     AlbumTagSuggestion[]        @relation("SuggestedAlbumTagSuggestions")
+  confirmedAlbumTagSuggestions     AlbumTagSuggestion[]        @relation("ConfirmedAlbumTagSuggestions")
+  rejectedAlbumTagSuggestions      AlbumTagSuggestion[]        @relation("RejectedAlbumTagSuggestions")
+  aiConversations                  AIConversation[]            @relation("MemberAIConversations")
+  goalContributionPlans            GoalContributionPlan[]      @relation("GoalContributionPlans")
+  reviewedGoalContributionPlans    GoalContributionPlan[]      @relation("ReviewedGoalContributionPlans")
 
   @@unique([familyId, userId])
   @@index([userId])
   @@map("family_members")
 }
 
-model Invitation {
-  id           String           @id @default(uuid())
-  familyId     String
-  email        String
-  /// sha256 hash of the opaque invitation token (raw token returned once).
-  tokenHash    String           @unique
-  familyRole   FamilyRole       @default(MEMBER)
-  relationship Relationship     @default(OTHER)
-  status       InvitationStatus @default(PENDING)
-  invitedById  String
-  expiresAt    DateTime
-  createdAt    DateTime         @default(now())
+/// Trạng thái yêu cầu tham gia gia đình bằng mã mời.
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
 
-  family    Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  invitedBy User   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+/// Yêu cầu tham gia gia đình: user nhập mã mời của family và chờ manager duyệt.
+model JoinRequest {
+  id                String            @id @default(uuid())
+  familyId          String
+  userId            String
+  status            JoinRequestStatus @default(PENDING)
+  /// Lời nhắn của người xin vào (vd "Con là út của bố").
+  message           String?
+  /// Thành viên (manager) đã duyệt/từ chối yêu cầu.
+  decidedByMemberId String?
+  decidedAt         DateTime?
+  createdAt         DateTime          @default(now())
+
+  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decidedByMember FamilyMember? @relation("DecidedJoinRequests", fields: [decidedByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([familyId, status])
+  @@index([userId])
+  @@map("join_requests")
+}
+
+/// Monthly personal income and expense summary for a family member. This is a summary only; personal ledger entries are intentionally not modeled.
+model MemberMonthlyFinance {
+  id                         String            @id @default(uuid())
+  memberId                   String
+  periodMonth                Int
+  periodYear                 Int
+  expectedIncome             Decimal?          @db.Decimal(18, 2)
+  actualIncome               Decimal?          @db.Decimal(18, 2)
+  expectedPersonalExpense    Decimal?          @db.Decimal(18, 2)
+  actualPersonalExpense      Decimal?          @db.Decimal(18, 2)
+  expectedSharedContribution Decimal?          @db.Decimal(18, 2)
+  actualSharedContribution   Decimal?          @db.Decimal(18, 2)
+  incomeVisibility           FinanceVisibility @default(PRIVATE)
+  expenseVisibility          FinanceVisibility @default(PRIVATE)
+  note                       String?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  member FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, periodMonth, periodYear])
+  @@index([periodYear, periodMonth])
+  @@map("member_monthly_finances")
+}
+
+/// The single shared finance ledger for a family workspace. Family finance is an internal record system and does not represent a real-money wallet.
+model FinanceLedger {
+  id         String              @id @default(uuid())
+  familyId   String              @unique
+  ledgerName String
+  status     FinanceLedgerStatus @default(ACTIVE)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries      LedgerEntry[]
+  budgetLines  BudgetLine[]
+  budgetAlerts BudgetAlert[]
+
+  @@map("finance_ledgers")
+}
+
+/// Family-defined classification for shared ledger entries.
+model FinanceCategory {
+  id            String                @id @default(uuid())
+  familyId      String
+  name          String
+  categoryType  FinanceCategoryType
+  essentialType EssentialType         @default(NEUTRAL)
+  status        FinanceCategoryStatus @default(ACTIVE)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  family                  Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  entries                 LedgerEntry[]
+  budgetLines             BudgetLine[]
+  budgetAlerts            BudgetAlert[]
+  jarMappings             FinanceCategoryJarMapping[]
+  spendingSupportRequests SpendingSupportRequest[]
+
+  @@unique([familyId, name, categoryType])
+  @@index([familyId, categoryType, status])
+  @@map("finance_categories")
+}
+
+/// Historical finance allocation configuration for a family. Only one model may be active for a family at a time.
+model FinanceModel {
+  id        String             @id @default(uuid())
+  familyId  String
+  modelType FinanceModelType
+  name      String
+  status    FinanceModelStatus @default(DRAFT)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  family              Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  jars                FinanceJar[]
+  categoryJarMappings FinanceCategoryJarMapping[]
+
+  @@index([familyId, status])
+  @@map("finance_models")
+}
+
+/// Jar/fund allocation belonging to one finance model. Percentages are planning values only and never represent stored real money.
+model FinanceJar {
+  id                   String   @id @default(uuid())
+  financeModelId       String
+  name                 String
+  jarCode              String
+  allocationPercentage Decimal  @db.Decimal(5, 2)
+  description          String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  financeModel      FinanceModel                @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  budgetLines       BudgetLine[]
+  financialGoals    FinancialGoal[]
+  ledgerEntries     LedgerEntry[]
+  budgetAlerts      BudgetAlert[]
+  rewardAllocations RewardAllocation[]
+  categoryMappings  FinanceCategoryJarMapping[]
+
+  @@unique([financeModelId, jarCode])
+  @@index([financeModelId, isActive])
+  @@map("finance_jars")
+}
+
+/// Default jar assignment for a category inside one finance model.
+/// The same category can point to different jars in FIVE_JARS vs EIGHTY_TWENTY.
+model FinanceCategoryJarMapping {
+  id             String   @id @default(uuid())
+  familyId       String
+  financeModelId String
+  categoryId     String
+  jarId          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  family       Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  financeModel FinanceModel    @relation(fields: [financeModelId], references: [id], onDelete: Cascade)
+  category     FinanceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  jar          FinanceJar      @relation(fields: [jarId], references: [id], onDelete: Cascade)
+
+  @@unique([financeModelId, categoryId])
+  @@index([familyId])
+  @@index([financeModelId])
+  @@index([categoryId])
+  @@index([jarId])
+  @@map("finance_category_jar_mappings")
+}
+
+/// Immutable-style record in the shared family ledger. Corrections should be represented by voiding or adjustment entries rather than deleting history.
+model LedgerEntry {
+  id                String            @id @default(uuid())
+  ledgerId          String
+  categoryId        String?
+  jarId             String?
+  createdByMemberId String
+  entryType         LedgerEntryType
+  amount            Decimal           @db.Decimal(18, 2)
+  description       String
+  note              String?
+  entryDate         DateTime
+  status            LedgerEntryStatus @default(ACTIVE)
+  sourceType        String?
+  sourceId          String?
+  metadata          Json?             @db.JsonB
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  ledger            FinanceLedger      @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  category          FinanceCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  jar               FinanceJar?        @relation(fields: [jarId], references: [id], onDelete: SetNull)
+  createdByMember   FamilyMember       @relation("CreatedLedgerEntries", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  goalAllocations   GoalAllocation[]
+  rewardAllocations RewardAllocation[]
+
+  @@index([ledgerId, entryDate])
+  @@index([ledgerId, entryType, status])
+  @@index([categoryId])
+  @@index([jarId])
+  @@index([createdByMemberId])
+  @@index([sourceType, sourceId])
+  @@map("ledger_entries")
+}
+
+/// Subscription plan tier (ERD: SubscriptionPlan). Paid plans are annual-only; admins (SYSTEM_ADMIN) manage these, family workspaces subscribe to them.
+model SubscriptionPlan {
+  id            String        @id @default(uuid())
+  /// Unique plan code, e.g. FREE / PLUS / PREMIUM / GOLD. `FREE` is reserved as the default plan for new families.
+  planCode      String        @unique
+  name          String
+  /// ERD: annual_price — paid plans are billed yearly.
+  annualPrice   Decimal       @db.Decimal(18, 2)
+  /// Canonical billing cadence used by Admin and Stripe price creation.
+  billingPeriod BillingPeriod @default(YEARLY)
+  /// Monthly price for MONTHLY plans. Null for FREE/YEARLY unless configured for display.
+  monthlyPrice  Decimal?      @db.Decimal(18, 2)
+  /// Yearly price for YEARLY plans. Null for FREE/MONTHLY unless configured for display.
+  yearlyPrice   Decimal?      @db.Decimal(18, 2)
+  /// ERD: max_members — member cap enforced per workspace subscription.
+  maxMembers    Int
+  /// ERD: storage_limit — storage allowance in megabytes.
+  storageLimit  Int
+  /// ERD: feature_access — feature flags/limits map for the tier.
+  featureAccess Json?
+  /// Stripe recurring (annual) Price id — required for paid tiers (PLUS/PREMIUM).
+  stripePriceId String?       @unique
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  familySubscriptions FamilySubscription[]
+
+  @@map("subscription_plans")
+}
+
+/// Lifecycle state of a family's subscription (mirrors Stripe subscription status).
+enum FamilySubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum BillingPeriod {
+  FREE
+  MONTHLY
+  YEARLY
+}
+
+/// One row per family (always present). New families start on FREE with no expiry; buying a paid plan moves the row to PLUS/PREMIUM and fills the Stripe ids. Webhooks are the source of truth for status/period changes.
+model FamilySubscription {
+  id                   String                   @id @default(uuid())
+  familyId             String                   @unique
+  planId               String
+  status               FamilySubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?                  @unique
+  /// null for FREE (no expiry); set from Stripe current_period_start for paid plans.
+  currentPeriodStart   DateTime?
+  /// null for FREE (no expiry); set from Stripe current_period_end for paid plans.
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean                  @default(false)
+  /// User accountable for the current paid plan (who bought/renewed it). Null for FREE / auto-seeded rows. SetNull on user delete so billing history survives. Only a FAMILY_MANAGER can become the purchaser (enforced in the API).
+  purchasedByUserId    String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  family      Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+  purchasedBy User?            @relation("PurchasedSubscriptions", fields: [purchasedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("family_subscriptions")
+}
+
+/// Payment/webhook history. `stripeEventId` is unique so replayed Stripe webhook events are idempotent (duplicate inserts fail and are skipped).
+model PaymentTransaction {
+  id            String   @id @default(uuid())
+  familyId      String
+  stripeEventId String   @unique
+  type          String
+  amount        Decimal? @db.Decimal(18, 2)
+  currency      String?
+  status        String
+  rawPayload    Json
+  createdAt     DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([familyId])
-  @@map("invitations")
+  @@map("payment_transactions")
+}
+
+model SpendingSupportRequest {
+  id                 String                       @id @default(uuid())
+  familyId           String
+  requesterMemberId  String
+  amount             Decimal                      @db.Decimal(18, 2)
+  categoryId         String?
+  purpose            String
+  status             SpendingSupportRequestStatus @default(PENDING)
+  reviewedByMemberId String?
+  reviewedAt         DateTime?
+  decisionNote       String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  family           Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  requesterMember  FamilyMember     @relation("RequestedSpendingSupportRequests", fields: [requesterMemberId], references: [id], onDelete: Restrict)
+  reviewedByMember FamilyMember?    @relation("ReviewedSpendingSupportRequests", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
+  category         FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([familyId])
+  @@index([requesterMemberId])
+  @@index([reviewedByMemberId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("spending_support_requests")
+}
+
+/// Family-level budget plan for an internal planning period.
+model BudgetPlan {
+  id                    String           @id @default(uuid())
+  familyId              String
+  planName              String
+  periodType            BudgetPeriodType
+  periodStart           DateTime         @db.Date
+  periodEnd             DateTime         @db.Date
+  expectedSharedIncome  Decimal?         @db.Decimal(18, 2)
+  expectedSharedExpense Decimal?         @db.Decimal(18, 2)
+  status                BudgetPlanStatus @default(DRAFT)
+  createdByMemberId     String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  family          Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember  @relation("CreatedBudgetPlans", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  lines           BudgetLine[]
+  budgetAlerts    BudgetAlert[]
+
+  @@index([familyId])
+  @@index([periodStart, periodEnd])
+  @@index([status])
+  @@map("budget_plans")
+}
+
+/// Planned amount assigned to a family category, finance jar, or both.
+model BudgetLine {
+  id               String         @id @default(uuid())
+  budgetPlanId     String
+  categoryId       String?
+  jarId            String?
+  plannedAmount    Decimal        @db.Decimal(18, 2)
+  thresholdAmount  Decimal?       @db.Decimal(18, 2)
+  thresholdPercent Decimal?       @db.Decimal(5, 2)
+  essentialType    EssentialType?
+  note             String?
+
+  budgetPlan      BudgetPlan       @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
+  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  jar             FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
+  financeLedger   FinanceLedger?   @relation(fields: [financeLedgerId], references: [id])
+  financeLedgerId String?
+
+  @@index([budgetPlanId])
+  @@index([categoryId])
+  @@index([jarId])
+  @@map("budget_lines")
+}
+
+model FinancialGoal {
+  id                        String              @id @default(uuid())
+  familyId                  String
+  goalName                  String
+  targetAmount              Decimal             @db.Decimal(18, 2)
+  deadline                  DateTime?           @db.Date
+  monthlyContributionTarget Decimal?            @db.Decimal(18, 2)
+  relatedJarId              String?
+  status                    FinancialGoalStatus @default(ACTIVE)
+  createdByMemberId         String
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  family            Family                 @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  relatedJar        FinanceJar?            @relation(fields: [relatedJarId], references: [id], onDelete: SetNull)
+  createdByMember   FamilyMember           @relation("CreatedFinancialGoals", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  allocations       GoalAllocation[]
+  contributionPlans GoalContributionPlan[]
+  budgetAlerts      BudgetAlert[]
+  rewardAllocations RewardAllocation[]
+
+  @@index([familyId])
+  @@index([relatedJarId])
+  @@index([status])
+  @@index([deadline])
+  @@map("financial_goals")
+}
+
+model GoalAllocation {
+  id                  String   @id @default(uuid())
+  goalId              String
+  ledgerEntryId       String
+  amount              Decimal  @db.Decimal(18, 2)
+  allocatedByMemberId String
+  allocatedAt         DateTime @default(now())
+
+  goal              FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  ledgerEntry       LedgerEntry   @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+  allocatedByMember FamilyMember  @relation("GoalAllocations", fields: [allocatedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([goalId])
+  @@index([ledgerEntryId])
+  @@index([allocatedByMemberId])
+  @@map("goal_allocations")
+}
+
+model GoalContributionPlan {
+  id                 String                     @id @default(uuid())
+  familyId           String
+  goalId             String
+  memberId           String
+  periodMonth        Int
+  periodYear         Int
+  plannedAmount      Decimal                    @db.Decimal(18, 2)
+  pendingAmount      Decimal?                   @db.Decimal(18, 2)
+  dueDate            DateTime                   @db.Date
+  status             GoalContributionPlanStatus @default(PLANNED)
+  submittedAt        DateTime?
+  submittedNote      String?
+  reviewedByMemberId String?
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  family           Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  goal             FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  member           FamilyMember  @relation("GoalContributionPlans", fields: [memberId], references: [id], onDelete: Cascade)
+  reviewedByMember FamilyMember? @relation("ReviewedGoalContributionPlans", fields: [reviewedByMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([goalId, memberId, periodMonth, periodYear])
+  @@index([familyId, periodYear, periodMonth])
+  @@index([goalId, periodYear, periodMonth])
+  @@index([memberId])
+  @@index([reviewedByMemberId])
+  @@index([status])
+  @@map("goal_contribution_plans")
+}
+
+model BudgetAlert {
+  id             String              @id @default(uuid())
+  familyId       String
+  sourceKey      String
+  budgetPlanId   String?
+  goalId         String?
+  jarId          String?
+  categoryId     String?
+  alertType      BudgetAlertType
+  severity       BudgetAlertSeverity
+  thresholdValue Decimal?            @db.Decimal(18, 2)
+  actualValue    Decimal?            @db.Decimal(18, 2)
+  message        String?
+  resolutionNote String?
+  status         BudgetAlertStatus   @default(NEW)
+  createdAt      DateTime            @default(now())
+  resolvedAt     DateTime?
+
+  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  budgetPlan      BudgetPlan?      @relation(fields: [budgetPlanId], references: [id], onDelete: SetNull)
+  goal            FinancialGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  jar             FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
+  category        FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  financeLedger   FinanceLedger?   @relation(fields: [financeLedgerId], references: [id])
+  financeLedgerId String?
+
+  @@index([familyId])
+  @@index([sourceKey])
+  @@index([budgetPlanId])
+  @@index([goalId])
+  @@index([jarId])
+  @@index([categoryId])
+  @@index([alertType])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@map("budget_alerts")
+}
+
+model TaskCategory {
+  id          String             @id @default(uuid())
+  familyId    String
+  name        String
+  description String?
+  status      TaskCategoryStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@unique([familyId, name])
+  @@index([familyId, status])
+  @@map("task_categories")
+}
+
+model Task {
+  id                String       @id @default(uuid())
+  familyId          String
+  taskCategoryId    String?
+  title             String
+  description       String?
+  taskType          TaskType     @default(AD_HOC)
+  priority          TaskPriority @default(MEDIUM)
+  status            TaskStatus   @default(ACTIVE)
+  createdByMemberId String
+  dueAt             DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  family          Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category        TaskCategory?    @relation(fields: [taskCategoryId], references: [id], onDelete: SetNull)
+  createdByMember FamilyMember     @relation("CreatedTasks", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  assignments     TaskAssignment[]
+  schedule        TaskSchedule?
+  rewardSetting   RewardSetting?
+
+  @@index([familyId])
+  @@index([taskCategoryId])
+  @@index([createdByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("tasks")
+}
+
+model TaskSchedule {
+  id             String             @id @default(uuid())
+  taskId         String             @unique
+  repeatType     TaskRepeatType
+  repeatInterval Int
+  startDate      DateTime           @db.Date
+  endDate        DateTime?          @db.Date
+  dayOfWeek      Int?
+  status         TaskScheduleStatus @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([status])
+  @@index([startDate])
+  @@map("task_schedules")
+}
+
+model TaskAssignment {
+  id                 String               @id @default(uuid())
+  taskId             String
+  assignedToMemberId String
+  assignedByMemberId String
+  status             TaskAssignmentStatus @default(ASSIGNED)
+  assignedAt         DateTime             @default(now())
+  startAt            DateTime?
+  dueAt              DateTime?
+  reminderSentAt     DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  task             Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedToMember FamilyMember         @relation("TaskAssignedTo", fields: [assignedToMemberId], references: [id], onDelete: Restrict)
+  assignedByMember FamilyMember         @relation("TaskAssignedBy", fields: [assignedByMemberId], references: [id], onDelete: Restrict)
+  submissions      TaskSubmission[]
+  unavailabilities TaskUnavailability[]
+
+  @@index([taskId])
+  @@index([assignedToMemberId])
+  @@index([assignedByMemberId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("task_assignments")
+}
+
+model TaskSubmission {
+  id                  String               @id @default(uuid())
+  assignmentId        String
+  submittedByMemberId String
+  submissionNote      String?
+  status              TaskSubmissionStatus @default(WAITING_REVIEW)
+  reviewedByMemberId  String?
+  reviewNote          String?
+  submittedAt         DateTime             @default(now())
+  reviewedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  assignment        TaskAssignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submittedByMember FamilyMember      @relation("TaskSubmissionSubmittedBy", fields: [submittedByMemberId], references: [id], onDelete: Restrict)
+  reviewedByMember  FamilyMember?     @relation("TaskSubmissionReviewedBy", fields: [reviewedByMemberId], references: [id], onDelete: Restrict)
+  proofs            TaskProof[]
+  rewardSettlement  RewardSettlement?
+
+  @@index([assignmentId])
+  @@index([submittedByMemberId])
+  @@index([reviewedByMemberId])
+  @@index([status])
+  @@map("task_submissions")
+}
+
+model RewardSetting {
+  id                   String     @id @default(uuid())
+  taskId               String     @unique
+  rewardType           RewardType
+  rewardAmount         Decimal?   @db.Decimal(14, 2)
+  rewardDescription    String?
+  autoCreateSettlement Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  task        Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  settlements RewardSettlement[]
+
+  @@index([taskId])
+  @@map("reward_settings")
+}
+
+model RewardSettlement {
+  id                String                 @id @default(uuid())
+  taskSubmissionId  String                 @unique
+  rewardSettingId   String
+  receiverMemberId  String
+  settledByMemberId String?
+  amount            Decimal                @db.Decimal(14, 2)
+  status            RewardSettlementStatus @default(PENDING_SETTLEMENT)
+  externalMethod    RewardExternalMethod?
+  externalNote      String?
+  settledAt         DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  taskSubmission  TaskSubmission     @relation(fields: [taskSubmissionId], references: [id], onDelete: Cascade)
+  rewardSetting   RewardSetting      @relation(fields: [rewardSettingId], references: [id], onDelete: Restrict)
+  receiverMember  FamilyMember       @relation("RewardSettlementReceiver", fields: [receiverMemberId], references: [id], onDelete: Restrict)
+  settledByMember FamilyMember?      @relation("RewardSettlementSettledBy", fields: [settledByMemberId], references: [id], onDelete: Restrict)
+  allocations     RewardAllocation[]
+  disputes        RewardDispute[]
+
+  @@index([rewardSettingId])
+  @@index([receiverMemberId])
+  @@index([settledByMemberId])
+  @@index([status])
+  @@map("reward_settlements")
+}
+
+model RewardAllocation {
+  id                  String   @id @default(uuid())
+  rewardSettlementId  String
+  jarId               String?
+  goalId              String?
+  ledgerEntryId       String?
+  amount              Decimal  @db.Decimal(14, 2)
+  allocatedByMemberId String
+  allocatedAt         DateTime @default(now())
+
+  rewardSettlement  RewardSettlement @relation(fields: [rewardSettlementId], references: [id], onDelete: Cascade)
+  jar               FinanceJar?      @relation(fields: [jarId], references: [id], onDelete: SetNull)
+  goal              FinancialGoal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  ledgerEntry       LedgerEntry?     @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+  allocatedByMember FamilyMember     @relation("RewardAllocationAllocatedBy", fields: [allocatedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([rewardSettlementId])
+  @@index([jarId])
+  @@index([goalId])
+  @@index([ledgerEntryId])
+  @@index([allocatedByMemberId])
+  @@map("reward_allocations")
+}
+
+model RewardDispute {
+  id                 String              @id @default(uuid())
+  rewardSettlementId String
+  reportedByMemberId String
+  reason             String
+  status             RewardDisputeStatus @default(OPEN)
+  resolvedByMemberId String?
+  createdAt          DateTime            @default(now())
+  resolvedAt         DateTime?
+
+  rewardSettlement RewardSettlement @relation(fields: [rewardSettlementId], references: [id], onDelete: Cascade)
+  reportedByMember FamilyMember     @relation("RewardDisputeReportedBy", fields: [reportedByMemberId], references: [id], onDelete: Restrict)
+  resolvedByMember FamilyMember?    @relation("RewardDisputeResolvedBy", fields: [resolvedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([rewardSettlementId])
+  @@index([reportedByMemberId])
+  @@index([resolvedByMemberId])
+  @@index([status])
+  @@map("reward_disputes")
+}
+
+model TaskUnavailability {
+  id                 String                   @id @default(uuid())
+  assignmentId       String
+  reportedByMemberId String
+  reason             String
+  status             TaskUnavailabilityStatus @default(REPORTED)
+  reportedAt         DateTime                 @default(now())
+  handledByMemberId  String?
+  handledAt          DateTime?
+
+  assignment       TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  reportedByMember FamilyMember   @relation("TaskUnavailabilityReportedBy", fields: [reportedByMemberId], references: [id], onDelete: Restrict)
+  handledByMember  FamilyMember?  @relation("TaskUnavailabilityHandledBy", fields: [handledByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([reportedByMemberId])
+  @@index([handledByMemberId])
+  @@index([status])
+  @@index([reportedAt])
+  @@map("task_unavailabilities")
+}
+
+model TaskProof {
+  id           String        @id @default(uuid())
+  submissionId String
+  proofType    TaskProofType
+  fileUrl      String?
+  thumbnailUrl String?
+  note         String?
+  uploadedAt   DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  submission TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([proofType])
+  @@map("task_proofs")
+}
+
+// ===========================================================================
+// SOS / Safety Response + Notifications
+// ===========================================================================
+
+/// How a SOS alert was triggered (mobile app, wearable, simulated device demo).
+enum SosSourceType {
+  MOBILE_APP
+  WEARABLE
+  SIMULATED_DEVICE
+}
+
+/// Lifecycle of a SOS alert.
+enum SosAlertStatus {
+  ACTIVE
+  RESOLVED
+  CANCELED
+  FALSE_ALARM
+}
+
+/// Severity classification shared by alerts and sensor events.
+enum SosSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Type of member response to a SOS alert.
+enum SosResponseType {
+  VIEWED
+  ON_THE_WAY
+  CONFIRM_SAFE
+  NEED_HELP
+  RESOLVED
+  CANCELED
+}
+
+enum WearableDeviceType {
+  SMARTWATCH
+  GPS_TRACKER
+  BLE_DEVICE
+  SIMULATED_DEVICE
+}
+
+enum DevicePairingStatus {
+  PAIRED
+  UNPAIRED
+  LOST
+}
+
+enum WearableActivationStatus {
+  PENDING
+  PAIRED
+  CLAIMED
+  EXPIRED
+}
+
+/// Origin of a GPS location point (shared by SOS routes and daily tracking).
+enum GpsSourceType {
+  MOBILE_GPS
+  WEARABLE_GPS
+  SIMULATED_GPS
+}
+
+enum SensorEventType {
+  SOS_BUTTON_PRESSED
+  FALL_DETECTED
+  HEART_RATE_ABNORMAL
+  HARD_IMPACT
+  ABNORMAL_MOVEMENT
+}
+
+enum NotificationType {
+  SOS
+  GENERAL
+  ALBUM_TAG
+  JOIN_REQUEST
+  MEMBER
+  TASK
+  CALENDAR
+  FINANCE
+  CHAT
+  CALL
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+/// Per-workspace SOS configuration (1-1 with a family workspace).
+model SosSetting {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @map("sos_setting_id") @db.Uuid
+  workspaceId             String   @unique @map("workspace_id")
+  isEnabled               Boolean  @default(true) @map("is_enabled")
+  notifyAllMembers        Boolean  @default(true) @map("notify_all_members")
+  autoCreateAlertFromFall Boolean  @default(false) @map("auto_create_alert_from_fall")
+  locationRequired        Boolean  @default(true) @map("location_required")
+  createdByMemberId       String?  @map("created_by_member_id")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember   FamilyMember?      @relation("CreatedSosSettings", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  emergencyContacts EmergencyContact[]
+
+  @@index([createdByMemberId])
+  @@map("sos_settings")
+}
+
+/// Emergency contacts attached to a workspace's SOS settings.
+model EmergencyContact {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @map("contact_id") @db.Uuid
+  sosSettingId     String   @map("sos_setting_id") @db.Uuid
+  contactName      String   @map("contact_name")
+  phoneNumber      String   @map("phone_number")
+  relationshipNote String?  @map("relationship_note")
+  priorityOrder    Int      @map("priority_order")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  sosSetting SosSetting @relation(fields: [sosSettingId], references: [id], onDelete: Cascade)
+
+  @@index([sosSettingId])
+  @@map("emergency_contacts")
+}
+
+/// Wearable / tracking devices paired to a member within a workspace.
+model WearableDevice {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @map("device_id") @db.Uuid
+  workspaceId      String              @map("workspace_id")
+  ownerMemberId    String              @map("owner_member_id")
+  ownerUserId      String              @map("owner_user_id")
+  deviceName       String              @map("device_name")
+  deviceType       WearableDeviceType  @map("device_type")
+  deviceIdentifier String              @map("device_identifier")
+  pairingStatus    DevicePairingStatus @map("pairing_status")
+  gpsEnabled       Boolean             @map("gps_enabled")
+  sosEnabled       Boolean             @map("sos_enabled")
+  lastSeenAt       DateTime?           @map("last_seen_at") @db.Timestamptz
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace   Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerUser   User         @relation("OwnedUserWearableDevices", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  ownerMember FamilyMember @relation("OwnedWearableDevices", fields: [ownerMemberId], references: [id], onDelete: Cascade)
+
+  sosAlerts            SosAlert[]
+  sosLocationPoints    SosLocationPoint[]
+  sensorEvents         SensorEvent[]
+  memberLocationPoints MemberLocationPoint[]
+  activationSessions   WearableActivationSession[]
+
+  // Plus a partial unique index (one paired wearable per user account) added
+  // via raw SQL in the migration: UNIQUE(owner_user_id) WHERE pairing_status='PAIRED'.
+  @@unique([workspaceId, deviceIdentifier])
+  @@index([workspaceId])
+  @@index([ownerMemberId])
+  @@index([ownerUserId])
+  @@map("wearable_devices")
+}
+
+/// Short-lived activation session used by Wear OS before it has a user token.
+model WearableActivationSession {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @map("activation_session_id") @db.Uuid
+  code                  String                   @map("code")
+  status                WearableActivationStatus @default(PENDING) @map("status")
+  deviceName            String?                  @map("device_name")
+  deviceType            WearableDeviceType       @default(SMARTWATCH) @map("device_type")
+  workspaceId           String?                  @map("workspace_id")
+  ownerMemberId         String?                  @map("owner_member_id")
+  ownerUserId           String?                  @map("owner_user_id")
+  wearableDeviceId      String?                  @map("wearable_device_id") @db.Uuid
+  claimedRefreshTokenId String?                  @map("claimed_refresh_token_id")
+  expiresAt             DateTime                 @map("expires_at") @db.Timestamptz
+  claimedAt             DateTime?                @map("claimed_at") @db.Timestamptz
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace           Family?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerMember         FamilyMember?   @relation("WearableActivationOwnerMember", fields: [ownerMemberId], references: [id], onDelete: Cascade)
+  ownerUser           User?           @relation("WearableActivationOwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  wearableDevice      WearableDevice? @relation(fields: [wearableDeviceId], references: [id], onDelete: SetNull)
+  claimedRefreshToken RefreshToken?   @relation("WearableActivationClaimedRefreshToken", fields: [claimedRefreshTokenId], references: [id], onDelete: SetNull)
+
+  @@index([code, status])
+  @@index([expiresAt])
+  @@index([ownerUserId])
+  @@index([wearableDeviceId])
+  @@index([claimedRefreshTokenId])
+  @@map("wearable_activation_sessions")
+}
+
+/// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
+model SosAlert {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
+  workspaceId         String         @map("workspace_id")
+  triggeredByMemberId String         @map("triggered_by_member_id")
+  deviceId            String?        @map("device_id") @db.Uuid
+  sourceType          SosSourceType  @map("source_type")
+  status              SosAlertStatus @default(ACTIVE) @map("status")
+  severity            SosSeverity?   @map("severity")
+  initialLatitude     Decimal?       @map("initial_latitude") @db.Decimal(10, 7)
+  initialLongitude    Decimal?       @map("initial_longitude") @db.Decimal(10, 7)
+  message             String?        @map("message")
+  triggeredAt         DateTime       @default(now()) @map("triggered_at") @db.Timestamptz
+  resolvedByMemberId  String?        @map("resolved_by_member_id")
+  resolvedAt          DateTime?      @map("resolved_at") @db.Timestamptz
+  resolutionNote      String?        @map("resolution_note")
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggeredByMember FamilyMember    @relation("TriggeredSosAlerts", fields: [triggeredByMemberId], references: [id], onDelete: Cascade)
+  device            WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  resolvedByMember  FamilyMember?   @relation("ResolvedSosAlerts", fields: [resolvedByMemberId], references: [id], onDelete: SetNull)
+
+  locationPoints SosLocationPoint[]
+  responses      SosResponse[]
+  sensorEvents   SensorEvent[]      @relation("CreatedSosAlertSensorEvents")
+
+  @@index([workspaceId])
+  @@index([triggeredByMemberId])
+  @@index([deviceId])
+  @@index([status])
+  @@index([triggeredAt])
+  @@map("sos_alerts")
+}
+
+/// GPS route points captured during a single SOS event.
+model SosLocationPoint {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
+  sosAlertId String        @map("sos_alert_id") @db.Uuid
+  deviceId   String?       @map("device_id") @db.Uuid
+  latitude   Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude  Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy   Decimal?      @map("accuracy") @db.Decimal(10, 2)
+  sourceType GpsSourceType @map("source_type")
+  recordedAt DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  sosAlert SosAlert        @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  device   WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([sosAlertId])
+  @@index([deviceId])
+  @@index([recordedAt])
+  @@map("sos_location_points")
+}
+
+/// Member responses to a SOS alert (viewed / safe / need help / resolved / canceled).
+model SosResponse {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @map("response_id") @db.Uuid
+  sosAlertId        String          @map("sos_alert_id") @db.Uuid
+  responderMemberId String          @map("responder_member_id")
+  responseType      SosResponseType @map("response_type")
+  message           String?         @map("message")
+  respondedAt       DateTime        @default(now()) @map("responded_at") @db.Timestamptz
+
+  sosAlert        SosAlert     @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  responderMember FamilyMember @relation("SosResponses", fields: [responderMemberId], references: [id], onDelete: Cascade)
+
+  @@index([sosAlertId])
+  @@index([responderMemberId])
+  @@map("sos_responses")
+}
+
+/// Raw sensor events emitted by wearable / simulated devices.
+model SensorEvent {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @map("sensor_event_id") @db.Uuid
+  deviceId          String          @map("device_id") @db.Uuid
+  eventType         SensorEventType @map("event_type")
+  rawValue          Json?           @map("raw_value") @db.JsonB
+  severity          SosSeverity?    @map("severity")
+  detectedAt        DateTime        @map("detected_at") @db.Timestamptz
+  createdSosAlertId String?         @map("created_sos_alert_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  device          WearableDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdSosAlert SosAlert?      @relation("CreatedSosAlertSensorEvents", fields: [createdSosAlertId], references: [id], onDelete: SetNull)
+
+  @@index([deviceId])
+  @@index([createdSosAlertId])
+  @@index([detectedAt])
+  @@map("sensor_events")
+}
+
+/// Everyday member location tracking — separate from SOS-event route points.
+model MemberLocationPoint {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @map("location_point_id") @db.Uuid
+  workspaceId String        @map("workspace_id")
+  memberId    String        @map("member_id")
+  deviceId    String?       @map("device_id") @db.Uuid
+  latitude    Decimal       @map("latitude") @db.Decimal(10, 7)
+  longitude   Decimal       @map("longitude") @db.Decimal(10, 7)
+  accuracy    Decimal?      @map("accuracy") @db.Decimal(10, 2)
+  sourceType  GpsSourceType @map("source_type")
+  recordedAt  DateTime      @map("recorded_at") @db.Timestamptz
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member    FamilyMember    @relation("MemberLocationPoints", fields: [memberId], references: [id], onDelete: Cascade)
+  device    WearableDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  // Plus CHECK constraints added via raw SQL in the migration:
+  // latitude BETWEEN -90 AND 90, longitude BETWEEN -180 AND 180.
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([deviceId])
+  @@index([recordedAt])
+  @@map("member_location_points")
+}
+
+/// Shared in-app notifications (reused across modules; SOS uses type=SOS).
+model Notification {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @map("notification_id") @db.Uuid
+  familyId          String               @map("family_id")
+  recipientMemberId String               @map("recipient_member_id")
+  type              NotificationType     @map("type")
+  priority          NotificationPriority @default(NORMAL) @map("priority")
+  title             String               @map("title")
+  body              String               @map("body")
+  referenceType     String?              @map("reference_type")
+  referenceId       String?              @map("reference_id")
+  isRead            Boolean              @default(false) @map("is_read")
+  readAt            DateTime?            @map("read_at") @db.Timestamptz
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  family          Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  recipientMember FamilyMember @relation("MemberNotifications", fields: [recipientMemberId], references: [id], onDelete: Cascade)
+
+  @@index([recipientMemberId, isRead])
+  @@index([familyId])
+  @@map("notifications")
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+/// Thiết bị nhận FCM push — gắn theo USER (nhận noti của mọi family mình tham gia).
+model DeviceToken {
+  id         String         @id @default(uuid())
+  userId     String
+  token      String         @unique
+  platform   DevicePlatform
+  deviceName String?
+  lastSeenAt DateTime       @updatedAt
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// ===========================================================================
+// Workspace provisioning (admin) + Communication + Calendar + Album + AI
+// (bổ sung theo Physical ERD — style snake_case @map giống nhóm SOS)
+// ===========================================================================
+
+enum ProvisioningActionType {
+  CREATE
+  ACTIVATE
+  RETRY
+  SUSPEND
+}
+
+enum ProvisioningStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum ConversationType {
+  GROUP
+  PRIVATE
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  LEFT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  LOCATION
+  SOS_QUICK_MESSAGE
+  CALL
+}
+
+enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  CANCELED
+}
+
+enum CallParticipantStatus {
+  INVITED
+  JOINED
+  DECLINED
+  LEFT
+  NO_ANSWER
+}
+
+enum AnnouncementStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum CalendarEventStatus {
+  ACTIVE
+  CANCELED
+  COMPLETED
+}
+
+enum EventResponseStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  MAYBE
+}
+
+enum AlbumMediaType {
+  PHOTO
+  VIDEO
+}
+
+enum AlbumVisibilityScope {
+  FAMILY
+  PRIVATE
+  MANAGER_ONLY
+}
+
+enum MediaModerationStatus {
+  PENDING
+  PROCESSING
+  SAFE
+  NEED_REVIEW
+  FLAGGED
+}
+
+enum MediaCheckType {
+  SENSITIVE_CONTENT
+  FACE_GROUPING
+}
+
+enum MediaCheckResult {
+  SAFE
+  FLAGGED
+  NEED_REVIEW
+}
+
+enum StorageCleanupStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum StorageCleanupReason {
+  ORPHAN_UPLOAD
+  PERMANENT_DELETE_RETRY
+  PERMANENT_DELETE_DB_FAILED
+}
+
+enum FaceProfileStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+enum FaceScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AlbumFaceDetectionStatus {
+  MATCHED
+  UNMATCHED
+  SUPERSEDED
+}
+
+enum AlbumTagSuggestionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
+enum AiSenderType {
+  USER
+  AI
+}
+
+enum AiRelatedModule {
+  FINANCE
+  TASK
+  SOS
+  CALENDAR
+  GENERAL
+}
+
+/// Provisioning/activation audit log của một family workspace (admin).
+model WorkspaceProvisioningLog {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @map("provisioning_log_id") @db.Uuid
+  workspaceId     String                 @map("workspace_id")
+  actionType      ProvisioningActionType @map("action_type")
+  status          ProvisioningStatus     @default(PENDING) @map("status")
+  message         String?                @map("message")
+  startedAt       DateTime?              @map("started_at") @db.Timestamptz
+  finishedAt      DateTime?              @map("finished_at") @db.Timestamptz
+  createdByUserId String?                @map("created_by_user_id")
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace     Family @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser User?  @relation("CreatedProvisioningLogs", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([createdByUserId])
+  @@index([status])
+  @@map("workspace_provisioning_logs")
+}
+
+/// Hội thoại nhóm/riêng trong một family workspace (chat).
+model Conversation {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @map("conversation_id") @db.Uuid
+  workspaceId       String             @map("workspace_id")
+  conversationType  ConversationType   @default(GROUP) @map("conversation_type")
+  conversationName  String?            @map("conversation_name")
+  createdByMemberId String             @map("created_by_member_id")
+  status            ConversationStatus @default(ACTIVE) @map("status")
+  /// Nhóm chat chung mặc định của family (duy nhất 1/workspace — partial unique index trong migration).
+  isDefault         Boolean            @default(false) @map("is_default")
+  /// Dedupe chat 1-1: "<memberIdNhỏ>:<memberIdLớn>" (sort 2 memberId). GROUP = null.
+  directKey         String?            @unique @map("direct_key")
+  /// Thời điểm tin nhắn cuối — sort danh sách hội thoại.
+  lastMessageAt     DateTime?          @map("last_message_at") @db.Timestamptz
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace       Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedConversations", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  calls        Call[]
+
+  @@index([workspaceId])
+  @@index([createdByMemberId])
+  @@map("conversations")
+}
+
+/// Thành viên tham gia một hội thoại.
+model ConversationParticipant {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @map("participant_id") @db.Uuid
+  conversationId    String            @map("conversation_id") @db.Uuid
+  memberId          String            @map("member_id")
+  joinedAt          DateTime          @default(now()) @map("joined_at") @db.Timestamptz
+  leftAt            DateTime?         @map("left_at") @db.Timestamptz
+  participantStatus ParticipantStatus @default(ACTIVE) @map("participant_status")
+  /// Read receipt: đã đọc tới thời điểm này (đếm unread = message sentAt > lastReadAt).
+  lastReadAt        DateTime?         @map("last_read_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  member       FamilyMember @relation("ConversationParticipations", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, memberId])
+  @@index([conversationId])
+  @@index([memberId])
+  @@map("conversation_participants")
+}
+
+/// Tin nhắn trong một hội thoại.
+model Message {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
+  conversationId   String      @map("conversation_id") @db.Uuid
+  senderMemberId   String      @map("sender_member_id")
+  messageType      MessageType @default(TEXT) @map("message_type")
+  content          String?     @map("content")
+  /// Reply/quote: tin nhắn được trả lời (cùng hội thoại).
+  replyToMessageId String?     @map("reply_to_message_id") @db.Uuid
+  /// Ghim tin nhắn trong hội thoại.
+  pinnedAt         DateTime?   @map("pinned_at") @db.Timestamptz
+  pinnedByMemberId String?     @map("pinned_by_member_id")
+  /// Cuộc gọi liên quan (chỉ set khi messageType = CALL) — tin nhắn hệ thống ghi log cuộc gọi.
+  relatedCallId    String?     @map("related_call_id") @db.Uuid
+  sentAt           DateTime    @default(now()) @map("sent_at") @db.Timestamptz
+  editedAt         DateTime?   @map("edited_at") @db.Timestamptz
+  deletedAt        DateTime?   @map("deleted_at") @db.Timestamptz
+
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderMember   FamilyMember  @relation("SentMessages", fields: [senderMemberId], references: [id], onDelete: Cascade)
+  replyTo        Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies        Message[]     @relation("MessageReplies")
+  pinnedByMember FamilyMember? @relation("PinnedMessages", fields: [pinnedByMemberId], references: [id], onDelete: SetNull)
+  relatedCall    Call?         @relation(fields: [relatedCallId], references: [id], onDelete: SetNull)
+
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+
+  @@index([conversationId, sentAt])
+  @@index([senderMemberId])
+  @@index([conversationId, pinnedAt])
+  @@map("messages")
+}
+
+/// Cuộc gọi video/audio trong một hội thoại (LiveKit room 1-1 hoặc nhóm).
+model Call {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @map("call_id") @db.Uuid
+  conversationId      String     @map("conversation_id") @db.Uuid
+  initiatedByMemberId String     @map("initiated_by_member_id")
+  /// Tên phòng LiveKit, dạng `call-<uuid>`.
+  roomName            String     @unique @map("room_name")
+  status              CallStatus @default(RINGING) @map("status")
+  startedAt           DateTime   @default(now()) @map("started_at") @db.Timestamptz
+  /// Thời điểm người đầu tiên join phòng (khác startedAt = lúc bắt đầu đổ chuông).
+  connectedAt         DateTime?  @map("connected_at") @db.Timestamptz
+  endedAt             DateTime?  @map("ended_at") @db.Timestamptz
+  /// 'hangup' | 'timeout' | 'all_left'.
+  endedReason         String?    @map("ended_reason")
+
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiatedByMember  FamilyMember @relation("InitiatedCalls", fields: [initiatedByMemberId], references: [id], onDelete: Restrict)
+  participants       CallParticipant[]
+  relatedMessages    Message[]
+
+  @@index([conversationId, startedAt])
+  @@map("calls")
+}
+
+/// Thành viên tham gia (được mời/đã join/đã rời) một cuộc gọi.
+model CallParticipant {
+  id        String                @id @default(dbgenerated("gen_random_uuid()")) @map("call_participant_id") @db.Uuid
+  callId    String                @map("call_id") @db.Uuid
+  memberId  String                @map("member_id")
+  status    CallParticipantStatus @default(INVITED) @map("status")
+  invitedAt DateTime              @default(now()) @map("invited_at") @db.Timestamptz
+  joinedAt  DateTime?             @map("joined_at") @db.Timestamptz
+  leftAt    DateTime?             @map("left_at") @db.Timestamptz
+
+  call   Call         @relation(fields: [callId], references: [id], onDelete: Cascade)
+  member FamilyMember @relation("CallParticipations", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([callId, memberId])
+  @@index([callId])
+  @@index([memberId])
+  @@map("call_participants")
+}
+
+/// Reaction (thả cảm xúc) trên một tin nhắn.
+model MessageReaction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @map("reaction_id") @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  memberId  String   @map("member_id")
+  emoji     String   @map("emoji")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  message Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  member  FamilyMember @relation("MessageReactions", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, memberId, emoji])
+  @@index([messageId])
+  @@index([memberId])
+  @@map("message_reactions")
+}
+
+/// Tệp đính kèm của một tin nhắn.
+model MessageAttachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @map("attachment_id") @db.Uuid
+  messageId  String   @map("message_id") @db.Uuid
+  fileType   String   @map("file_type")
+  fileUrl    String   @map("file_url")
+  fileName   String?  @map("file_name")
+  fileSize   Int?     @map("file_size")
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+/// Thông báo/announcement do member tạo trong family workspace.
+model FamilyAnnouncement {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @map("announcement_id") @db.Uuid
+  workspaceId       String               @map("workspace_id")
+  createdByMemberId String               @map("created_by_member_id")
+  title             String               @map("title")
+  content           String               @map("content")
+  priority          NotificationPriority @default(NORMAL) @map("priority")
+  status            AnnouncementStatus   @default(ACTIVE) @map("status")
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace       Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedAnnouncements", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([createdByMemberId])
+  @@map("family_announcements")
+}
+
+/// Sự kiện lịch của family workspace.
+model CalendarEvent {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_id") @db.Uuid
+  workspaceId       String              @map("workspace_id")
+  title             String              @map("title")
+  description       String?             @map("description")
+  location          String?             @map("location")
+  startTime         DateTime            @map("start_time") @db.Timestamptz
+  endTime           DateTime?           @map("end_time") @db.Timestamptz
+  isRecurring       Boolean             @default(false) @map("is_recurring")
+  createdByMemberId String              @map("created_by_member_id")
+  status            CalendarEventStatus @default(ACTIVE) @map("status")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace       Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedCalendarEvents", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+
+  participants CalendarEventParticipant[]
+
+  @@index([workspaceId])
+  @@index([createdByMemberId])
+  @@index([startTime])
+  @@map("calendar_events")
+}
+
+/// Thành viên được mời tham gia một sự kiện lịch.
+model CalendarEventParticipant {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @map("event_participant_id") @db.Uuid
+  eventId         String              @map("event_id") @db.Uuid
+  memberId        String              @map("member_id")
+  responseStatus  EventResponseStatus @default(INVITED) @map("response_status")
+  reminderEnabled Boolean             @default(true) @map("reminder_enabled")
+  reminderSentAt  DateTime?           @map("reminder_sent_at") @db.Timestamptz
+
+  event  CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member FamilyMember  @relation("CalendarEventParticipations", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@index([eventId])
+  @@index([memberId])
+  @@map("calendar_event_participants")
+}
+
+/// Ảnh/video trong album gia đình.
+model AlbumMedia {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
+  workspaceId            String                @map("workspace_id")
+  uploadedByMemberId     String                @map("uploaded_by_member_id")
+  mediaType              AlbumMediaType        @map("media_type")
+  mediaUrl               String?               @map("media_url")
+  storageKey             String?               @map("storage_key")
+  originalFileName       String?               @map("original_file_name")
+  mimeType               String?               @map("mime_type")
+  fileSize               Int?                  @map("file_size")
+  thumbnailUrl           String?               @map("thumbnail_url")
+  caption                String?               @map("caption")
+  visibilityScope        AlbumVisibilityScope  @default(FAMILY) @map("visibility_scope")
+  moderationStatus       MediaModerationStatus @default(PENDING) @map("moderation_status")
+  uploadedAt             DateTime              @default(now()) @map("uploaded_at") @db.Timestamptz
+  updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?             @map("deleted_at") @db.Timestamptz
+  deletedByMemberId      String?               @map("deleted_by_member_id")
+  deleteReason           String?               @map("delete_reason")
+  moderationStartedAt    DateTime?             @map("moderation_started_at") @db.Timestamptz
+  moderationCompletedAt  DateTime?             @map("moderation_completed_at") @db.Timestamptz
+  moderationAttemptCount Int                   @default(0) @map("moderation_attempt_count")
+  lastModerationError    String?               @map("last_moderation_error")
+  latestModerationJobId  String?               @map("latest_moderation_job_id") @db.Uuid
+  moderationQueuedAt     DateTime?             @map("moderation_queued_at") @db.Timestamptz
+
+  workspace        Family        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedByMember FamilyMember  @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  deletedByMember  FamilyMember? @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
+
+  tags             AlbumMediaTag[]
+  moderationChecks MediaModerationCheck[]
+  cleanupJobs      StorageCleanupJob[]    @relation("MediaCleanupJobs")
+  faceScanJobs     FaceScanJob[]
+  faceDetections   AlbumFaceDetection[]
+  tagSuggestions   AlbumTagSuggestion[]
+
+  @@index([workspaceId])
+  @@index([uploadedByMemberId])
+  @@index([moderationStatus])
+  @@index([workspaceId, uploadedAt])
+  @@index([workspaceId, deletedAt, uploadedAt])
+  @@index([workspaceId, moderationStatus, uploadedAt])
+  @@index([moderationStatus, moderationStartedAt])
+  @@index([moderationStatus, moderationQueuedAt])
+  @@index([deletedByMemberId])
+  @@map("album_media")
+}
+
+/// Tag gắn thành viên vào một media (manual tagging cho MVP).
+model AlbumMediaTag {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @map("tag_id") @db.Uuid
+  mediaId          String   @map("media_id") @db.Uuid
+  taggedMemberId   String   @map("tagged_member_id")
+  taggedByMemberId String   @map("tagged_by_member_id")
+  tagNote          String?  @map("tag_note")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  media          AlbumMedia   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  taggedMember   FamilyMember @relation("TaggedAlbumMediaTags", fields: [taggedMemberId], references: [id], onDelete: Cascade)
+  taggedByMember FamilyMember @relation("CreatedAlbumMediaTags", fields: [taggedByMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, taggedMemberId])
+  @@index([mediaId])
+  @@index([taggedMemberId])
+  @@index([taggedByMemberId])
+  @@map("album_media_tags")
+}
+
+/// Async scan record for album face detection and workspace-scoped matching.
+model FaceScanJob {
+  scanJobId           String            @id @default(dbgenerated("gen_random_uuid()")) @map("scan_job_id") @db.Uuid
+  workspaceId         String            @map("workspace_id")
+  mediaId             String            @map("media_id") @db.Uuid
+  requestedByMemberId String            @map("requested_by_member_id")
+  status              FaceScanJobStatus @default(PENDING) @map("status")
+  attemptCount        Int               @default(0) @map("attempt_count")
+  lastError           String?           @map("last_error")
+  startedAt           DateTime?         @map("started_at") @db.Timestamptz
+  completedAt         DateTime?         @map("completed_at") @db.Timestamptz
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  media             AlbumMedia           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  requestedByMember FamilyMember         @relation("RequestedFaceScanJobs", fields: [requestedByMemberId], references: [id], onDelete: Restrict)
+  detections        AlbumFaceDetection[]
+
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId, createdAt])
+  @@index([status, startedAt])
+  @@map("face_scan_jobs")
+}
+
+/// Face detected in an album photo. No plaintext biometric embedding is stored.
+model AlbumFaceDetection {
+  detectionId    String                   @id @default(dbgenerated("gen_random_uuid()")) @map("detection_id") @db.Uuid
+  workspaceId    String                   @map("workspace_id")
+  scanJobId      String                   @map("scan_job_id") @db.Uuid
+  mediaId        String                   @map("media_id") @db.Uuid
+  faceIndex      Int                      @map("face_index")
+  boundingBox    Json                     @map("bounding_box")
+  detectionScore Decimal?                 @map("detection_score") @db.Decimal(5, 4)
+  qualityScore   Decimal?                 @map("quality_score") @db.Decimal(5, 4)
+  modelName      String                   @map("model_name")
+  modelVersion   String                   @map("model_version")
+  status         AlbumFaceDetectionStatus @default(UNMATCHED) @map("status")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace   Family               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scanJob     FaceScanJob          @relation(fields: [scanJobId], references: [scanJobId], onDelete: Cascade)
+  media       AlbumMedia           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  suggestions AlbumTagSuggestion[]
+
+  @@unique([scanJobId, faceIndex])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId])
+  @@map("album_face_detections")
+}
+
+/// Human-confirmed candidate tag proposed from a face detection.
+model AlbumTagSuggestion {
+  suggestionId        String                   @id @default(dbgenerated("gen_random_uuid()")) @map("suggestion_id") @db.Uuid
+  workspaceId         String                   @map("workspace_id")
+  detectionId         String                   @map("detection_id") @db.Uuid
+  mediaId             String                   @map("media_id") @db.Uuid
+  suggestedMemberId   String                   @map("suggested_member_id")
+  similarityScore     Decimal                  @map("similarity_score") @db.Decimal(5, 4)
+  secondBestScore     Decimal?                 @map("second_best_score") @db.Decimal(5, 4)
+  scoreMargin         Decimal?                 @map("score_margin") @db.Decimal(5, 4)
+  status              AlbumTagSuggestionStatus @default(PENDING) @map("status")
+  confirmedByMemberId String?                  @map("confirmed_by_member_id")
+  confirmedAt         DateTime?                @map("confirmed_at") @db.Timestamptz
+  rejectedByMemberId  String?                  @map("rejected_by_member_id")
+  rejectedAt          DateTime?                @map("rejected_at") @db.Timestamptz
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace         Family             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  detection         AlbumFaceDetection @relation(fields: [detectionId], references: [detectionId], onDelete: Cascade)
+  media             AlbumMedia         @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  suggestedMember   FamilyMember       @relation("SuggestedAlbumTagSuggestions", fields: [suggestedMemberId], references: [id], onDelete: Restrict)
+  confirmedByMember FamilyMember?      @relation("ConfirmedAlbumTagSuggestions", fields: [confirmedByMemberId], references: [id], onDelete: SetNull)
+  rejectedByMember  FamilyMember?      @relation("RejectedAlbumTagSuggestions", fields: [rejectedByMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([detectionId, suggestedMemberId])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@index([workspaceId, mediaId])
+  @@index([suggestedMemberId, status])
+  @@map("album_tag_suggestions")
+}
+
+/// Durable retry record for R2/database cleanup; never stores signed URLs or credentials.
+model StorageCleanupJob {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @map("cleanup_job_id") @db.Uuid
+  workspaceId  String?              @map("workspace_id")
+  mediaId      String?              @map("media_id") @db.Uuid
+  storageKey   String               @unique @map("storage_key")
+  reason       StorageCleanupReason @map("reason")
+  status       StorageCleanupStatus @default(PENDING) @map("status")
+  attemptCount Int                  @default(0) @map("attempt_count")
+  lastError    String?              @map("last_error")
+  nextRetryAt  DateTime?            @default(now()) @map("next_retry_at") @db.Timestamptz
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace Family?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  media     AlbumMedia? @relation("MediaCleanupJobs", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextRetryAt])
+  @@index([workspaceId])
+  @@index([mediaId])
+  @@map("storage_cleanup_jobs")
+}
+
+/// Kết quả kiểm duyệt nội dung media (future/demo: face grouping, sensitive content).
+model MediaModerationCheck {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @map("moderation_id") @db.Uuid
+  mediaId            String           @map("media_id") @db.Uuid
+  jobId              String?          @unique @map("job_id") @db.Uuid
+  checkType          MediaCheckType   @map("check_type")
+  provider           String?          @map("provider")
+  modelName          String?          @map("model_name")
+  resultStatus       MediaCheckResult @map("result_status")
+  confidenceScore    Decimal?         @map("confidence_score") @db.Decimal(5, 4)
+  categories         Json?            @map("categories")
+  reasonCode         String?          @map("reason_code")
+  summary            String?          @map("summary")
+  errorCode          String?          @map("error_code")
+  errorMessage       String?          @map("error_message")
+  reviewedByMemberId String?          @map("reviewed_by_member_id")
+  reviewNote         String?          @map("review_note")
+  reviewedAt         DateTime?        @map("reviewed_at") @db.Timestamptz
+  checkedAt          DateTime         @default(now()) @map("checked_at") @db.Timestamptz
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  media            AlbumMedia    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  reviewedByMember FamilyMember? @relation("ReviewedModerationChecks", fields: [reviewedByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([mediaId])
+  @@index([mediaId, checkedAt])
+  @@index([checkType])
+  @@index([reviewedByMemberId])
+  @@map("media_moderation_checks")
+}
+
+/// Consent-backed face profile for a family member. Stores metadata only; biometric vectors live encrypted in MemberFaceEmbedding.
+model MemberFaceProfile {
+  profileId           String            @id @default(dbgenerated("gen_random_uuid()")) @map("profile_id") @db.Uuid
+  workspaceId         String            @map("workspace_id")
+  memberId            String            @map("member_id")
+  status              FaceProfileStatus @default(ACTIVE) @map("status")
+  consentedAt         DateTime          @map("consented_at") @db.Timestamptz
+  consentedByMemberId String            @map("consented_by_member_id")
+  modelName           String            @map("model_name")
+  modelVersion        String            @map("model_version")
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime?         @map("deleted_at") @db.Timestamptz
+
+  workspace         Family                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member            FamilyMember          @relation("MemberFaceProfiles", fields: [memberId], references: [id], onDelete: Cascade)
+  consentedByMember FamilyMember          @relation("ConsentedFaceProfiles", fields: [consentedByMemberId], references: [id], onDelete: Restrict)
+  embeddings        MemberFaceEmbedding[]
+
+  @@unique([workspaceId, memberId])
+  @@index([workspaceId])
+  @@index([memberId])
+  @@index([consentedByMemberId])
+  @@index([status])
+  @@map("member_face_profiles")
+}
+
+/// Encrypted face embedding sample. Plaintext embedding values are never stored.
+model MemberFaceEmbedding {
+  embeddingId        String    @id @default(dbgenerated("gen_random_uuid()")) @map("embedding_id") @db.Uuid
+  profileId          String    @map("profile_id") @db.Uuid
+  encryptedEmbedding Bytes     @map("encrypted_embedding")
+  encryptionIv       Bytes     @map("encryption_iv")
+  encryptionAuthTag  Bytes     @map("encryption_auth_tag")
+  embeddingDimension Int       @map("embedding_dimension")
+  detectionScore     Decimal?  @map("detection_score") @db.Decimal(5, 4)
+  qualityScore       Decimal?  @map("quality_score") @db.Decimal(5, 4)
+  modelName          String    @map("model_name")
+  modelVersion       String    @map("model_version")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz
+
+  profile MemberFaceProfile @relation(fields: [profileId], references: [profileId], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([profileId, revokedAt])
+  @@map("member_face_embeddings")
+}
+
+/// Phiên hội thoại với AI assistant (theo từng member trong workspace).
+model AIConversation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @map("ai_conversation_id") @db.Uuid
+  workspaceId       String   @map("workspace_id")
+  memberId          String   @map("member_id")
+  conversationTitle String?  @map("conversation_title")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member    FamilyMember @relation("MemberAIConversations", fields: [memberId], references: [id], onDelete: Cascade)
+
+  messages AIMessage[]
+
+  @@index([workspaceId])
+  @@index([memberId])
+  @@map("ai_conversations")
+}
+
+/// Tin nhắn trong một phiên AIConversation.
+model AIMessage {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @map("ai_message_id") @db.Uuid
+  aiConversationId  String           @map("ai_conversation_id") @db.Uuid
+  senderType        AiSenderType     @map("sender_type")
+  messageContent    String           @map("message_content")
+  relatedModule     AiRelatedModule? @map("related_module")
+  permissionContext Json?            @map("permission_context")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  aiConversation AIConversation @relation(fields: [aiConversationId], references: [id], onDelete: Cascade)
+
+  @@index([aiConversationId])
+  @@map("ai_messages")
 }

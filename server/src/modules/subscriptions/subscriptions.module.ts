@@ -1,4 +1,22 @@
 import { Module } from '@nestjs/common';
 
-@Module({})
+import { BillingsModule } from '../billing/billings.module';
+import { FamilyMembersModule } from '../family-members/family-members.module';
+import { FamilySubscriptionController } from './controllers/family-subscription.controller';
+import { FeatureAccessService } from './feature-access.service';
+import { FeatureAccessGuard } from './guards/feature-access.guard';
+import { SubscriptionsService } from './subscriptions.service';
+
+/**
+ * Family-facing subscriptions: view current plan + start Stripe Checkout.
+ * Imports BillingsModule for StripeService and FamilyMembersModule for the
+ * per-family permission guard. Exports SubscriptionsService so FamiliesModule
+ * can seed the FREE plan on family creation.
+ */
+@Module({
+  imports: [BillingsModule, FamilyMembersModule],
+  controllers: [FamilySubscriptionController],
+  providers: [SubscriptionsService, FeatureAccessService, FeatureAccessGuard],
+  exports: [SubscriptionsService, FeatureAccessService, FeatureAccessGuard],
+})
 export class SubscriptionsModule {}

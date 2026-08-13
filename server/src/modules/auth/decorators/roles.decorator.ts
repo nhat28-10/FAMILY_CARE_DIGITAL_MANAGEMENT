@@ -1,13 +1,12 @@
 import { SetMetadata } from '@nestjs/common';
-import { SystemRole } from '@prisma/client';
+import { UserType } from '@prisma/client';
 
 export const ROLES_KEY = 'roles';
 
 /**
- * Restricts a route to the given system roles. Used together with RolesGuard.
+ * Restricts a route to the given account user types. Used with RolesGuard.
  *
  * @example
- * @Roles(SystemRole.ADMIN)
- * @Roles(SystemRole.ADMIN, SystemRole.FAMILY_MANAGER)
+ * @Roles(UserType.SYSTEM_ADMIN)
  */
-export const Roles = (...roles: SystemRole[]) => SetMetadata(ROLES_KEY, roles);
+export const Roles = (...roles: UserType[]) => SetMetadata(ROLES_KEY, roles);

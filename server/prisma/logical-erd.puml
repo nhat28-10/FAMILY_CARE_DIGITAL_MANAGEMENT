@@ -1,0 +1,1156 @@
+@startuml Family-Care-Logical-ERD
+' Logical Data Model - Family Care Digital Management
+' Auto-generated from Prisma schema (no physical data types).
+!pragma layout smetana
+hide circle
+hide methods
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #FDF6E3
+  BorderColor #586E75
+}
+skinparam shadowing false
+left to right direction
+
+entity "User" as User {
+  * Id <<PK>>
+  --
+  * Email
+    Password Hash
+    Firebase Uid
+    Full Name
+    Phone
+    Avatar URL
+  * User Type
+  * Account Status
+  * Verification Status
+    Last Login At
+  * Created At
+  * Updated At
+}
+
+entity "Admin Audit Log" as AdminAuditLog {
+  * Id <<PK>>
+  --
+  * Admin User ID
+    Admin Email
+    Admin Name
+  * Action
+  * Target Type
+    Target ID
+  * Result
+    Ip Address
+    User Agent
+    Metadata
+    Error Message
+  * Created At
+}
+
+entity "Email Verification Token" as EmailVerificationToken {
+  * Id <<PK>>
+  --
+  * User ID <<FK>>
+  * Code Hash
+  * Expires At
+    Used At
+  * Attempts
+  * Created At
+}
+
+entity "Password Reset Token" as PasswordResetToken {
+  * Id <<PK>>
+  --
+  * User ID <<FK>>
+  * Code Hash
+  * Expires At
+    Used At
+  * Attempts
+  * Created At
+}
+
+entity "Refresh Token" as RefreshToken {
+  * Id <<PK>>
+  --
+  * User ID <<FK>>
+  * Token Hash
+  * Expires At
+    Revoked At
+  * Created At
+}
+
+entity "Family" as Family {
+  * Id <<PK>>
+  --
+  * Name
+    Description
+    Avatar URL
+  * Status
+  * Activation Status
+    Invite Code
+  * Created By ID
+  * Created At
+  * Updated At
+}
+
+entity "Family Member" as FamilyMember {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * User ID <<FK>>
+    Display Name
+  * Family Role
+  * Relationship
+  * Status
+  * Location Sharing Enabled
+  * Joined At
+    Left At
+  * Created At
+  * Updated At
+}
+
+entity "Join Request" as JoinRequest {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * User ID <<FK>>
+  * Status
+    Message
+    Decided By Member ID <<FK>>
+    Decided At
+  * Created At
+}
+
+entity "Member Monthly Finance" as MemberMonthlyFinance {
+  * Id <<PK>>
+  --
+  * Member ID <<FK>>
+  * Period Month
+  * Period Year
+    Expected Income
+    Actual Income
+    Expected Personal Expense
+    Actual Personal Expense
+    Expected Shared Contribution
+    Actual Shared Contribution
+  * Income Visibility
+  * Expense Visibility
+    Note
+  * Created At
+  * Updated At
+}
+
+entity "Finance Ledger" as FinanceLedger {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Ledger Name
+  * Status
+  * Created At
+  * Updated At
+}
+
+entity "Finance Category" as FinanceCategory {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Name
+  * Category Type
+  * Essential Type
+  * Status
+  * Created At
+  * Updated At
+}
+
+entity "Finance Model" as FinanceModel {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Model Type
+  * Name
+  * Status
+  * Created At
+  * Updated At
+}
+
+entity "Finance Jar" as FinanceJar {
+  * Id <<PK>>
+  --
+  * Finance Model ID <<FK>>
+  * Name
+  * Jar Code
+  * Allocation Percentage
+    Description
+  * Is Active
+  * Created At
+  * Updated At
+}
+
+entity "Finance Category Jar Mapping" as FinanceCategoryJarMapping {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Finance Model ID <<FK>>
+  * Category ID <<FK>>
+  * Jar ID <<FK>>
+  * Created At
+  * Updated At
+}
+
+entity "Ledger Entry" as LedgerEntry {
+  * Id <<PK>>
+  --
+  * Ledger ID <<FK>>
+    Category ID <<FK>>
+    Jar ID <<FK>>
+  * Created By Member ID <<FK>>
+  * Entry Type
+  * Amount
+  * Description
+    Note
+  * Entry Date
+  * Status
+    Source Type
+    Source ID
+    Metadata
+  * Created At
+  * Updated At
+}
+
+entity "Subscription Plan" as SubscriptionPlan {
+  * Id <<PK>>
+  --
+  * Plan Code
+  * Name
+  * Annual Price
+  * Billing Period
+    Monthly Price
+    Yearly Price
+  * Max Members
+  * Storage Limit
+    Feature Access
+    Stripe Price ID
+  * Is Active
+  * Created At
+  * Updated At
+}
+
+entity "Family Subscription" as FamilySubscription {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Plan ID <<FK>>
+  * Status
+    Stripe Customer ID
+    Stripe Subscription ID
+    Current Period Start
+    Current Period End
+  * Cancel At Period End
+    Purchased By User ID <<FK>>
+  * Created At
+  * Updated At
+}
+
+entity "Payment Transaction" as PaymentTransaction {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Stripe Event ID
+  * Type
+    Amount
+    Currency
+  * Status
+  * Raw Payload
+  * Created At
+}
+
+entity "Spending Support Request" as SpendingSupportRequest {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Requester Member ID <<FK>>
+  * Amount
+    Category ID <<FK>>
+  * Purpose
+  * Status
+    Reviewed By Member ID <<FK>>
+    Reviewed At
+    Decision Note
+  * Created At
+  * Updated At
+}
+
+entity "Budget Plan" as BudgetPlan {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Plan Name
+  * Period Type
+  * Period Start
+  * Period End
+    Expected Shared Income
+    Expected Shared Expense
+  * Status
+  * Created By Member ID <<FK>>
+  * Created At
+  * Updated At
+}
+
+entity "Budget Line" as BudgetLine {
+  * Id <<PK>>
+  --
+  * Budget Plan ID <<FK>>
+    Category ID <<FK>>
+    Jar ID <<FK>>
+  * Planned Amount
+    Threshold Amount
+    Threshold Percent
+    Essential Type
+    Note
+    Finance Ledger ID <<FK>>
+}
+
+entity "Financial Goal" as FinancialGoal {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Goal Name
+  * Target Amount
+    Deadline
+    Monthly Contribution Target
+    Related Jar ID <<FK>>
+  * Status
+  * Created By Member ID <<FK>>
+  * Created At
+  * Updated At
+}
+
+entity "Goal Allocation" as GoalAllocation {
+  * Id <<PK>>
+  --
+  * Goal ID <<FK>>
+  * Ledger Entry ID <<FK>>
+  * Amount
+  * Allocated By Member ID <<FK>>
+  * Allocated At
+}
+
+entity "Goal Contribution Plan" as GoalContributionPlan {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Goal ID <<FK>>
+  * Member ID <<FK>>
+  * Period Month
+  * Period Year
+  * Planned Amount
+    Pending Amount
+  * Due Date
+  * Status
+    Submitted At
+    Submitted Note
+    Reviewed By Member ID <<FK>>
+    Reviewed At
+    Review Note
+  * Created At
+  * Updated At
+}
+
+entity "Budget Alert" as BudgetAlert {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Source Key
+    Budget Plan ID <<FK>>
+    Goal ID <<FK>>
+    Jar ID <<FK>>
+    Category ID <<FK>>
+  * Alert Type
+  * Severity
+    Threshold Value
+    Actual Value
+    Message
+    Resolution Note
+  * Status
+  * Created At
+    Resolved At
+    Finance Ledger ID <<FK>>
+}
+
+entity "Task Category" as TaskCategory {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Name
+    Description
+  * Status
+  * Created At
+  * Updated At
+}
+
+entity "Task" as Task {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+    Task Category ID <<FK>>
+  * Title
+    Description
+  * Task Type
+  * Priority
+  * Status
+  * Created By Member ID <<FK>>
+    Due At
+  * Created At
+  * Updated At
+}
+
+entity "Task Schedule" as TaskSchedule {
+  * Id <<PK>>
+  --
+  * Task ID <<FK>>
+  * Repeat Type
+  * Repeat Interval
+  * Start Date
+    End Date
+    Day Of Week
+  * Status
+  * Created At
+  * Updated At
+}
+
+entity "Task Assignment" as TaskAssignment {
+  * Id <<PK>>
+  --
+  * Task ID <<FK>>
+  * Assigned To Member ID <<FK>>
+  * Assigned By Member ID <<FK>>
+  * Status
+  * Assigned At
+    Start At
+    Due At
+    Reminder Sent At
+  * Created At
+  * Updated At
+}
+
+entity "Task Submission" as TaskSubmission {
+  * Id <<PK>>
+  --
+  * Assignment ID <<FK>>
+  * Submitted By Member ID <<FK>>
+    Submission Note
+  * Status
+    Reviewed By Member ID <<FK>>
+    Review Note
+  * Submitted At
+    Reviewed At
+  * Created At
+  * Updated At
+}
+
+entity "Reward Setting" as RewardSetting {
+  * Id <<PK>>
+  --
+  * Task ID <<FK>>
+  * Reward Type
+    Reward Amount
+    Reward Description
+  * Auto Create Settlement
+  * Created At
+  * Updated At
+}
+
+entity "Reward Settlement" as RewardSettlement {
+  * Id <<PK>>
+  --
+  * Task Submission ID <<FK>>
+  * Reward Setting ID <<FK>>
+  * Receiver Member ID <<FK>>
+    Settled By Member ID <<FK>>
+  * Amount
+  * Status
+    External Method
+    External Note
+    Settled At
+    Confirmed At
+  * Created At
+  * Updated At
+}
+
+entity "Reward Allocation" as RewardAllocation {
+  * Id <<PK>>
+  --
+  * Reward Settlement ID <<FK>>
+    Jar ID <<FK>>
+    Goal ID <<FK>>
+    Ledger Entry ID <<FK>>
+  * Amount
+  * Allocated By Member ID <<FK>>
+  * Allocated At
+}
+
+entity "Reward Dispute" as RewardDispute {
+  * Id <<PK>>
+  --
+  * Reward Settlement ID <<FK>>
+  * Reported By Member ID <<FK>>
+  * Reason
+  * Status
+    Resolved By Member ID <<FK>>
+  * Created At
+    Resolved At
+}
+
+entity "Task Unavailability" as TaskUnavailability {
+  * Id <<PK>>
+  --
+  * Assignment ID <<FK>>
+  * Reported By Member ID <<FK>>
+  * Reason
+  * Status
+  * Reported At
+    Handled By Member ID <<FK>>
+    Handled At
+}
+
+entity "Task Proof" as TaskProof {
+  * Id <<PK>>
+  --
+  * Submission ID <<FK>>
+  * Proof Type
+    File URL
+    Thumbnail URL
+    Note
+  * Uploaded At
+  * Created At
+  * Updated At
+}
+
+entity "Sos Setting" as SosSetting {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Is Enabled
+  * Notify All Members
+  * Auto Create Alert From Fall
+  * Location Required
+    Created By Member ID <<FK>>
+  * Created At
+  * Updated At
+}
+
+entity "Emergency Contact" as EmergencyContact {
+  * Id <<PK>>
+  --
+  * Sos Setting ID <<FK>>
+  * Contact Name
+  * Phone Number
+    Relationship Note
+  * Priority Order
+  * Is Active
+  * Created At
+  * Updated At
+}
+
+entity "Wearable Device" as WearableDevice {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Owner Member ID <<FK>>
+  * Owner User ID <<FK>>
+  * Device Name
+  * Device Type
+  * Device Identifier
+  * Pairing Status
+  * Gps Enabled
+  * Sos Enabled
+    Last Seen At
+  * Created At
+  * Updated At
+}
+
+entity "Wearable Activation Session" as WearableActivationSession {
+  * Id <<PK>>
+  --
+  * Code
+  * Status
+    Device Name
+  * Device Type
+    Workspace ID <<FK>>
+    Owner Member ID <<FK>>
+    Owner User ID <<FK>>
+    Wearable Device ID <<FK>>
+    Claimed Refresh Token ID <<FK>>
+  * Expires At
+    Claimed At
+  * Created At
+  * Updated At
+}
+
+entity "Sos Alert" as SosAlert {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Triggered By Member ID <<FK>>
+    Device ID <<FK>>
+  * Source Type
+  * Status
+    Severity
+    Initial Latitude
+    Initial Longitude
+    Message
+  * Triggered At
+    Resolved By Member ID <<FK>>
+    Resolved At
+    Resolution Note
+  * Created At
+  * Updated At
+}
+
+entity "Sos Location Point" as SosLocationPoint {
+  * Id <<PK>>
+  --
+  * Sos Alert ID <<FK>>
+    Device ID <<FK>>
+  * Latitude
+  * Longitude
+    Accuracy
+  * Source Type
+  * Recorded At
+  * Created At
+}
+
+entity "Sos Response" as SosResponse {
+  * Id <<PK>>
+  --
+  * Sos Alert ID <<FK>>
+  * Responder Member ID <<FK>>
+  * Response Type
+    Message
+  * Responded At
+}
+
+entity "Sensor Event" as SensorEvent {
+  * Id <<PK>>
+  --
+  * Device ID <<FK>>
+  * Event Type
+    Raw Value
+    Severity
+  * Detected At
+    Created Sos Alert ID <<FK>>
+  * Created At
+}
+
+entity "Member Location Point" as MemberLocationPoint {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Member ID <<FK>>
+    Device ID <<FK>>
+  * Latitude
+  * Longitude
+    Accuracy
+  * Source Type
+  * Recorded At
+  * Created At
+}
+
+entity "Notification" as Notification {
+  * Id <<PK>>
+  --
+  * Family ID <<FK>>
+  * Recipient Member ID <<FK>>
+  * Type
+  * Priority
+  * Title
+  * Body
+    Reference Type
+    Reference ID
+  * Is Read
+    Read At
+  * Created At
+}
+
+entity "Device Token" as DeviceToken {
+  * Id <<PK>>
+  --
+  * User ID <<FK>>
+  * Token
+  * Platform
+    Device Name
+  * Last Seen At
+  * Created At
+}
+
+entity "Workspace Provisioning Log" as WorkspaceProvisioningLog {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Action Type
+  * Status
+    Message
+    Started At
+    Finished At
+    Created By User ID <<FK>>
+  * Created At
+}
+
+entity "Conversation" as Conversation {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Conversation Type
+    Conversation Name
+  * Created By Member ID <<FK>>
+  * Status
+  * Is Default
+    Direct Key
+    Last Message At
+  * Created At
+}
+
+entity "Conversation Participant" as ConversationParticipant {
+  * Id <<PK>>
+  --
+  * Conversation ID <<FK>>
+  * Member ID <<FK>>
+  * Joined At
+    Left At
+  * Participant Status
+    Last Read At
+}
+
+entity "Message" as Message {
+  * Id <<PK>>
+  --
+  * Conversation ID <<FK>>
+  * Sender Member ID <<FK>>
+  * Message Type
+    Content
+    Reply To Message ID <<FK>>
+    Pinned At
+    Pinned By Member ID <<FK>>
+    Related Call ID <<FK>>
+  * Sent At
+    Edited At
+    Deleted At
+}
+
+entity "Call" as Call {
+  * Id <<PK>>
+  --
+  * Conversation ID <<FK>>
+  * Initiated By Member ID <<FK>>
+  * Room Name
+  * Status
+  * Started At
+    Connected At
+    Ended At
+    Ended Reason
+}
+
+entity "Call Participant" as CallParticipant {
+  * Id <<PK>>
+  --
+  * Call ID <<FK>>
+  * Member ID <<FK>>
+  * Status
+  * Invited At
+    Joined At
+    Left At
+}
+
+entity "Message Reaction" as MessageReaction {
+  * Id <<PK>>
+  --
+  * Message ID <<FK>>
+  * Member ID <<FK>>
+  * Emoji
+  * Created At
+}
+
+entity "Message Attachment" as MessageAttachment {
+  * Id <<PK>>
+  --
+  * Message ID <<FK>>
+  * File Type
+  * File URL
+    File Name
+    File Size
+  * Uploaded At
+}
+
+entity "Family Announcement" as FamilyAnnouncement {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Created By Member ID <<FK>>
+  * Title
+  * Content
+  * Priority
+  * Status
+  * Created At
+}
+
+entity "Calendar Event" as CalendarEvent {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Title
+    Description
+    Location
+  * Start Time
+    End Time
+  * Is Recurring
+  * Created By Member ID <<FK>>
+  * Status
+  * Created At
+}
+
+entity "Calendar Event Participant" as CalendarEventParticipant {
+  * Id <<PK>>
+  --
+  * Event ID <<FK>>
+  * Member ID <<FK>>
+  * Response Status
+  * Reminder Enabled
+    Reminder Sent At
+}
+
+entity "Album Media" as AlbumMedia {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Uploaded By Member ID <<FK>>
+  * Media Type
+    Media URL
+    Storage Key
+    Original File Name
+    Mime Type
+    File Size
+    Thumbnail URL
+    Caption
+  * Visibility Scope
+  * Moderation Status
+  * Uploaded At
+  * Updated At
+    Deleted At
+    Deleted By Member ID <<FK>>
+    Delete Reason
+    Moderation Started At
+    Moderation Completed At
+  * Moderation Attempt Count
+    Last Moderation Error
+    Latest Moderation Job ID
+    Moderation Queued At
+}
+
+entity "Album Media Tag" as AlbumMediaTag {
+  * Id <<PK>>
+  --
+  * Media ID <<FK>>
+  * Tagged Member ID <<FK>>
+  * Tagged By Member ID <<FK>>
+    Tag Note
+  * Created At
+}
+
+entity "Face Scan Job" as FaceScanJob {
+  * Scan Job ID <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Media ID <<FK>>
+  * Requested By Member ID <<FK>>
+  * Status
+  * Attempt Count
+    Last Error
+    Started At
+    Completed At
+  * Created At
+  * Updated At
+}
+
+entity "Album Face Detection" as AlbumFaceDetection {
+  * Detection ID <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Scan Job ID <<FK>>
+  * Media ID <<FK>>
+  * Face Index
+  * Bounding Box
+    Detection Score
+    Quality Score
+  * Model Name
+  * Model Version
+  * Status
+  * Created At
+}
+
+entity "Album Tag Suggestion" as AlbumTagSuggestion {
+  * Suggestion ID <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Detection ID <<FK>>
+  * Media ID <<FK>>
+  * Suggested Member ID <<FK>>
+  * Similarity Score
+    Second Best Score
+    Score Margin
+  * Status
+    Confirmed By Member ID <<FK>>
+    Confirmed At
+    Rejected By Member ID <<FK>>
+    Rejected At
+  * Created At
+  * Updated At
+}
+
+entity "Storage Cleanup Job" as StorageCleanupJob {
+  * Id <<PK>>
+  --
+    Workspace ID <<FK>>
+    Media ID <<FK>>
+  * Storage Key
+  * Reason
+  * Status
+  * Attempt Count
+    Last Error
+    Next Retry At
+  * Created At
+  * Updated At
+}
+
+entity "Media Moderation Check" as MediaModerationCheck {
+  * Id <<PK>>
+  --
+  * Media ID <<FK>>
+    Job ID
+  * Check Type
+    Provider
+    Model Name
+  * Result Status
+    Confidence Score
+    Categories
+    Reason Code
+    Summary
+    Error Code
+    Error Message
+    Reviewed By Member ID <<FK>>
+    Review Note
+    Reviewed At
+  * Checked At
+  * Created At
+}
+
+entity "Member Face Profile" as MemberFaceProfile {
+  * Profile ID <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Member ID <<FK>>
+  * Status
+  * Consented At
+  * Consented By Member ID <<FK>>
+  * Model Name
+  * Model Version
+  * Created At
+  * Updated At
+    Deleted At
+}
+
+entity "Member Face Embedding" as MemberFaceEmbedding {
+  * Embedding ID <<PK>>
+  --
+  * Profile ID <<FK>>
+  * Encrypted Embedding
+  * Encryption Iv
+  * Encryption Auth Tag
+  * Embedding Dimension
+    Detection Score
+    Quality Score
+  * Model Name
+  * Model Version
+  * Created At
+    Revoked At
+}
+
+entity "AI Conversation" as AIConversation {
+  * Id <<PK>>
+  --
+  * Workspace ID <<FK>>
+  * Member ID <<FK>>
+    Conversation Title
+  * Created At
+}
+
+entity "AI Message" as AIMessage {
+  * Id <<PK>>
+  --
+  * Ai Conversation ID <<FK>>
+  * Sender Type
+  * Message Content
+    Related Module
+    Permission Context
+  * Created At
+}
+
+' ===== Relationships =====
+User ||--o{ FamilyMember
+User ||--o{ RefreshToken
+User ||--o{ DeviceToken
+User ||--o{ WearableDevice
+User ||--o{ WearableActivationSession
+User ||--o{ PasswordResetToken
+User ||--o{ EmailVerificationToken
+User ||--o{ JoinRequest
+User ||--o{ WorkspaceProvisioningLog
+User ||--o{ FamilySubscription
+RefreshToken ||--o{ WearableActivationSession
+Family ||--o{ FamilyMember
+Family ||--o{ JoinRequest
+Family ||--|| FinanceLedger
+Family ||--o{ FinanceCategory
+Family ||--o{ FinanceModel
+Family ||--o{ FinanceCategoryJarMapping
+Family ||--o{ BudgetPlan
+Family ||--o{ FinancialGoal
+Family ||--o{ GoalContributionPlan
+Family ||--o{ BudgetAlert
+Family ||--o{ SpendingSupportRequest
+Family ||--o{ TaskCategory
+Family ||--o{ Task
+Family ||--|| SosSetting
+Family ||--o{ WearableDevice
+Family ||--o{ WearableActivationSession
+Family ||--o{ SosAlert
+Family ||--o{ MemberLocationPoint
+Family ||--o{ Notification
+Family ||--|| FamilySubscription
+Family ||--o{ PaymentTransaction
+Family ||--o{ WorkspaceProvisioningLog
+Family ||--o{ Conversation
+Family ||--o{ FamilyAnnouncement
+Family ||--o{ CalendarEvent
+Family ||--o{ AlbumMedia
+Family ||--o{ StorageCleanupJob
+Family ||--o{ MemberFaceProfile
+Family ||--o{ FaceScanJob
+Family ||--o{ AlbumFaceDetection
+Family ||--o{ AlbumTagSuggestion
+Family ||--o{ AIConversation
+FamilyMember ||--o{ JoinRequest
+FamilyMember ||--o{ MemberMonthlyFinance
+FamilyMember ||--o{ LedgerEntry
+FamilyMember ||--o{ BudgetPlan
+FamilyMember ||--o{ FinancialGoal
+FamilyMember ||--o{ GoalAllocation
+FamilyMember ||--o{ SpendingSupportRequest
+FamilyMember ||--o{ SpendingSupportRequest
+FamilyMember ||--o{ Task
+FamilyMember ||--o{ TaskAssignment
+FamilyMember ||--o{ TaskAssignment
+FamilyMember ||--o{ TaskSubmission
+FamilyMember ||--o{ TaskSubmission
+FamilyMember ||--o{ TaskUnavailability
+FamilyMember ||--o{ TaskUnavailability
+FamilyMember ||--o{ RewardSettlement
+FamilyMember ||--o{ RewardSettlement
+FamilyMember ||--o{ RewardAllocation
+FamilyMember ||--o{ RewardDispute
+FamilyMember ||--o{ RewardDispute
+FamilyMember ||--o{ SosSetting
+FamilyMember ||--o{ WearableDevice
+FamilyMember ||--o{ WearableActivationSession
+FamilyMember ||--o{ SosAlert
+FamilyMember ||--o{ SosAlert
+FamilyMember ||--o{ SosResponse
+FamilyMember ||--o{ MemberLocationPoint
+FamilyMember ||--o{ Notification
+FamilyMember ||--o{ Conversation
+FamilyMember ||--o{ ConversationParticipant
+FamilyMember ||--o{ Message
+FamilyMember ||--o{ Message
+FamilyMember ||--o{ MessageReaction
+FamilyMember ||--o{ Call
+FamilyMember ||--o{ CallParticipant
+FamilyMember ||--o{ FamilyAnnouncement
+FamilyMember ||--o{ CalendarEvent
+FamilyMember ||--o{ CalendarEventParticipant
+FamilyMember ||--o{ AlbumMedia
+FamilyMember ||--o{ AlbumMedia
+FamilyMember ||--o{ MediaModerationCheck
+FamilyMember ||--o{ AlbumMediaTag
+FamilyMember ||--o{ AlbumMediaTag
+FamilyMember ||--o{ MemberFaceProfile
+FamilyMember ||--o{ MemberFaceProfile
+FamilyMember ||--o{ FaceScanJob
+FamilyMember ||--o{ AlbumTagSuggestion
+FamilyMember ||--o{ AlbumTagSuggestion
+FamilyMember ||--o{ AlbumTagSuggestion
+FamilyMember ||--o{ AIConversation
+FamilyMember ||--o{ GoalContributionPlan
+FamilyMember ||--o{ GoalContributionPlan
+FinanceLedger ||--o{ LedgerEntry
+FinanceLedger ||--o{ BudgetLine
+FinanceLedger ||--o{ BudgetAlert
+FinanceCategory ||--o{ LedgerEntry
+FinanceCategory ||--o{ BudgetLine
+FinanceCategory ||--o{ BudgetAlert
+FinanceCategory ||--o{ FinanceCategoryJarMapping
+FinanceCategory ||--o{ SpendingSupportRequest
+FinanceModel ||--o{ FinanceJar
+FinanceModel ||--o{ FinanceCategoryJarMapping
+FinanceJar ||--o{ BudgetLine
+FinanceJar ||--o{ FinancialGoal
+FinanceJar ||--o{ LedgerEntry
+FinanceJar ||--o{ BudgetAlert
+FinanceJar ||--o{ RewardAllocation
+FinanceJar ||--o{ FinanceCategoryJarMapping
+LedgerEntry ||--o{ GoalAllocation
+LedgerEntry ||--o{ RewardAllocation
+SubscriptionPlan ||--o{ FamilySubscription
+BudgetPlan ||--o{ BudgetLine
+BudgetPlan ||--o{ BudgetAlert
+FinancialGoal ||--o{ GoalAllocation
+FinancialGoal ||--o{ GoalContributionPlan
+FinancialGoal ||--o{ BudgetAlert
+FinancialGoal ||--o{ RewardAllocation
+TaskCategory ||--o{ Task
+Task ||--o{ TaskAssignment
+Task ||--|| TaskSchedule
+Task ||--|| RewardSetting
+TaskAssignment ||--o{ TaskSubmission
+TaskAssignment ||--o{ TaskUnavailability
+TaskSubmission ||--o{ TaskProof
+TaskSubmission ||--|| RewardSettlement
+RewardSetting ||--o{ RewardSettlement
+RewardSettlement ||--o{ RewardAllocation
+RewardSettlement ||--o{ RewardDispute
+SosSetting ||--o{ EmergencyContact
+WearableDevice ||--o{ SosAlert
+WearableDevice ||--o{ SosLocationPoint
+WearableDevice ||--o{ SensorEvent
+WearableDevice ||--o{ MemberLocationPoint
+WearableDevice ||--o{ WearableActivationSession
+SosAlert ||--o{ SosLocationPoint
+SosAlert ||--o{ SosResponse
+SosAlert ||--o{ SensorEvent
+Conversation ||--o{ ConversationParticipant
+Conversation ||--o{ Message
+Conversation ||--o{ Call
+Message ||--o{ Message
+Call ||--o{ Message
+Message ||--o{ MessageAttachment
+Message ||--o{ MessageReaction
+Call ||--o{ CallParticipant
+CalendarEvent ||--o{ CalendarEventParticipant
+AlbumMedia ||--o{ AlbumMediaTag
+AlbumMedia ||--o{ MediaModerationCheck
+AlbumMedia ||--o{ StorageCleanupJob
+AlbumMedia ||--o{ FaceScanJob
+AlbumMedia ||--o{ AlbumFaceDetection
+AlbumMedia ||--o{ AlbumTagSuggestion
+FaceScanJob ||--o{ AlbumFaceDetection
+AlbumFaceDetection ||--o{ AlbumTagSuggestion
+MemberFaceProfile ||--o{ MemberFaceEmbedding
+AIConversation ||--o{ AIMessage
+@enduml

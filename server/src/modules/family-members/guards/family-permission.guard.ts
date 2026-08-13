@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { FamilyMember, FamilyRole } from '@prisma/client';
+import { FamilyMember, FamilyRole, MemberStatus } from '@prisma/client';
 
 import { SafeUser } from '../../users/users.types';
 import { FAMILY_ROLES_KEY } from '../decorators/family-roles.decorator';
@@ -39,12 +39,12 @@ export class FamilyPermissionGuard implements CanActivate {
 
     const user = request.user;
     if (!user) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Bạn cần đăng nhập');
     }
 
     const familyId = request.params?.familyId;
     if (!familyId) {
-      throw new BadRequestException('familyId route parameter is required');
+      throw new BadRequestException('Thiếu tham số familyId trên đường dẫn');
     }
 
     const membership = await this.familyMembersService.findByFamilyAndUser(
@@ -52,7 +52,14 @@ export class FamilyPermissionGuard implements CanActivate {
       user.id,
     );
     if (!membership) {
-      throw new ForbiddenException('You are not a member of this family');
+      throw new ForbiddenException(
+        'Bạn không phải thành viên của gia đình này',
+      );
+    }
+    if (membership.status !== MemberStatus.ACTIVE) {
+      throw new ForbiddenException(
+        'Tư cách thành viên gia đình không còn hoạt động',
+      );
     }
 
     const requiredRoles = this.reflector.getAllAndOverride<FamilyRole[]>(
@@ -65,7 +72,7 @@ export class FamilyPermissionGuard implements CanActivate {
       !requiredRoles.includes(membership.familyRole)
     ) {
       throw new ForbiddenException(
-        `Requires family role: ${requiredRoles.join(' or ')}`,
+        `Yêu cầu vai trò gia đình: ${requiredRoles.join(' hoặc ')}`,
       );
     }
 

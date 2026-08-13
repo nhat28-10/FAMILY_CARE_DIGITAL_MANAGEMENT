@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, SystemRole, User } from '@prisma/client';
+import { Prisma, User, VerificationStatus } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -20,15 +20,45 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  findByPhone(phone: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { phone } });
+  }
+
   findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  updateProfile(
+    id: string,
+    data: Pick<Prisma.UserUpdateInput, 'fullName' | 'phone' | 'avatarUrl'>,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+    });
+  }
+
+  /** Records a successful login by stamping `lastLoginAt`. */
+  updateLastLogin(id: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
+
+  findByFirebaseUid(firebaseUid: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { firebaseUid } });
+  }
+
   /**
-   * Promotes a user to a new system role (e.g. FAMILY_MEMBER → FAMILY_MANAGER
-   * when they create their first family).
+   * Gắn Firebase UID vào tài khoản sẵn có (auto-link đăng nhập Google).
+   * Google đã xác minh email (email_verified=true là điều kiện link) — cùng
+   * bằng chứng sở hữu hộp thư như OTP, nên nâng luôn verificationStatus.
    */
-  updateSystemRole(id: string, systemRole: SystemRole): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data: { systemRole } });
+  linkFirebaseUid(id: string, firebaseUid: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { firebaseUid, verificationStatus: VerificationStatus.VERIFIED },
+    });
   }
 }

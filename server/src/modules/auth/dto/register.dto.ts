@@ -3,16 +3,13 @@ import {
   IsEmail,
   IsOptional,
   IsString,
+  IsUrl,
   Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 
-const PASSWORD_REGEX =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-
-const PASSWORD_RULE =
-  'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number and one special character';
+import { PASSWORD_REGEX, PASSWORD_RULE } from './password.constants';
 
 export class RegisterDto {
   @ApiProperty({ example: 'john.doe@example.com' })
@@ -34,4 +31,16 @@ export class RegisterDto {
   @IsString()
   @MaxLength(100)
   fullName?: string;
+
+  @ApiPropertyOptional({ example: '+84901234567' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phone?: string;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatar.png' })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(2048)
+  avatarUrl?: string;
 }

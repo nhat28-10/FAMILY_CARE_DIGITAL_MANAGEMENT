@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { SystemRole } from '@prisma/client';
+import { UserType } from '@prisma/client';
 
 import { SafeUser } from '../../users/users.types';
 import { ROLES_KEY } from '../decorators/roles.decorator';
@@ -19,7 +19,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<SystemRole[]>(
+    const requiredRoles = this.reflector.getAllAndOverride<UserType[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
@@ -32,9 +32,9 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{ user?: SafeUser }>();
     const user = request.user;
 
-    if (!user || !requiredRoles.includes(user.systemRole)) {
+    if (!user || !requiredRoles.includes(user.userType)) {
       throw new ForbiddenException(
-        'You do not have permission to access this resource',
+        'Bạn không có quyền truy cập tài nguyên này',
       );
     }
 

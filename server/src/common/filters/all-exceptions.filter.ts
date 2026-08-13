@@ -6,12 +6,23 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ThrottlerException } from '@nestjs/throttler';
 import { Response } from 'express';
 
 export interface ApiErrorResponse {
   success: false;
   message: string;
   statusCode: number;
+  code?: string;
+  errorCode?: string;
+  feature?: string;
+  errors?: unknown;
+  retryAfterSeconds?: number;
+  cooldownSeconds?: number;
+  requestedAmount?: number;
+  availableAmount?: number;
+  periodMonth?: number;
+  periodYear?: number;
 }
 
 /**
@@ -30,7 +41,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message = 'Lỗi hệ thống';
+    let code: string | undefined;
+    let errorCode: string | undefined;
+    let feature: string | undefined;
+    let errors: unknown;
+    let retryAfterSeconds: number | undefined;
+    let cooldownSeconds: number | undefined;
+    let requestedAmount: number | undefined;
+    let availableAmount: number | undefined;
+    let periodMonth: number | undefined;
+    let periodYear: number | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -39,7 +60,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof res === 'string') {
         message = res;
       } else if (res && typeof res === 'object') {
-        const raw = (res as Record<string, unknown>).message;
+        const body = res as Record<string, unknown>;
+        const raw = body.message;
         if (Array.isArray(raw)) {
           message = String(raw[0]);
         } else if (typeof raw === 'string') {
@@ -47,13 +69,64 @@ export class AllExceptionsFilter implements ExceptionFilter {
         } else {
           message = exception.message;
         }
+
+        if (typeof body.code === 'string') code = body.code;
+        if (typeof body.errorCode === 'string') errorCode = body.errorCode;
+        if (typeof body.feature === 'string') feature = body.feature;
+        if ('errors' in body) errors = body.errors;
+        if (typeof body.retryAfterSeconds === 'number') {
+          retryAfterSeconds = body.retryAfterSeconds;
+        }
+        if (typeof body.cooldownSeconds === 'number') {
+          cooldownSeconds = body.cooldownSeconds;
+        }
+        if (typeof body.requestedAmount === 'number') {
+          requestedAmount = body.requestedAmount;
+        }
+        if (typeof body.availableAmount === 'number') {
+          availableAmount = body.availableAmount;
+        }
+        if (typeof body.periodMonth === 'number') {
+          periodMonth = body.periodMonth;
+        }
+        if (typeof body.periodYear === 'number') {
+          periodYear = body.periodYear;
+        }
       }
     } else if (exception instanceof Error) {
-      // Unexpected error — log the stack but never leak internals to clients.
+      // Unexpected error: log the stack but never leak internals to clients.
       this.logger.error(exception.message, exception.stack);
     }
 
-    const body: ApiErrorResponse = { success: false, message, statusCode };
+    if (exception instanceof ThrottlerException) {
+      message = 'Bạn thao tác quá nhanh, vui lòng thử lại sau';
+    }
+
+    if (exception instanceof ThrottlerException) {
+      code = code ?? 'RATE_LIMITED';
+      errorCode = errorCode ?? code;
+    }
+    if (!code && errorCode) code = errorCode;
+    if (!errorCode && code) errorCode = code;
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(retryAfterSeconds));
+    }
+
+    const body: ApiErrorResponse = {
+      success: false,
+      message,
+      statusCode,
+      ...(code ? { code } : {}),
+      ...(errorCode ? { errorCode } : {}),
+      ...(feature ? { feature } : {}),
+      ...(errors !== undefined ? { errors } : {}),
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      ...(cooldownSeconds !== undefined ? { cooldownSeconds } : {}),
+      ...(requestedAmount !== undefined ? { requestedAmount } : {}),
+      ...(availableAmount !== undefined ? { availableAmount } : {}),
+      ...(periodMonth !== undefined ? { periodMonth } : {}),
+      ...(periodYear !== undefined ? { periodYear } : {}),
+    };
     response.status(statusCode).json(body);
   }
 }

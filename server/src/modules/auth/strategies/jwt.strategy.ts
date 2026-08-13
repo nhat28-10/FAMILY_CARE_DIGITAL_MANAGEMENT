@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import { AccountStatus } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { SafeUser, sanitizeUser } from '../../users/users.types';
@@ -28,10 +29,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const user = await this.usersService.findById(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException('Token không hợp lệ');
     }
-    if (!user.isActive) {
-      throw new UnauthorizedException('Account is locked');
+    if (user.accountStatus !== AccountStatus.ACTIVE) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
     }
 
     return sanitizeUser(user);

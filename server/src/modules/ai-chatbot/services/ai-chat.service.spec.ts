@@ -1,0 +1,496 @@
+import { BadGatewayException } from '@nestjs/common';
+import { AiRelatedModule, AiSenderType, FamilyRole } from '@prisma/client';
+import type { FamilyMember } from '@prisma/client';
+
+import { PrismaService } from '../../../prisma/prisma.service';
+import { ToolRegistryService } from '../tools/tool-registry.service';
+import { AiActionStatus, AiActionType } from '../types/ai-chatbot.types';
+import { AiChatService } from './ai-chat.service';
+import { AiConversationsService } from './ai-conversations.service';
+import { OpenAiClientService } from './openai-client.service';
+
+const familyId = 'family-1';
+const conversationId = 'conv-1';
+const member = {
+  id: 'member-1',
+  displayName: 'Bố',
+  familyRole: FamilyRole.FAMILY_MANAGER,
+} as FamilyMember;
+
+/** Dựng completion tối giản như OpenAI trả về. */
+const textCompletion = (content: string) => ({
+  choices: [{ message: { role: 'assistant', content, tool_calls: null } }],
+});
+const toolCallCompletion = (name: string, args: object) => ({
+  choices: [
+    {
+      message: {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name, arguments: JSON.stringify(args) },
+          },
+        ],
+      },
+    },
+  ],
+});
+
+describe('AiChatService', () => {
+  let prisma: {
+    aIMessage: { create: jest.Mock; findMany: jest.Mock };
+    family: { findUnique: jest.Mock };
+  };
+  let conversations: {
+    getOwnedConversationOrThrow: jest.Mock;
+    ensureTitle: jest.Mock;
+    toMessageView: jest.Mock;
+    toPendingActionView: jest.Mock;
+  };
+  let openAiClient: { chat: jest.Mock; config: Record<string, unknown> };
+  let toolRegistry: {
+    getOpenAiTools: jest.Mock;
+    getTool: jest.Mock;
+    executeReadTool: jest.Mock;
+  };
+  let service: AiChatService;
+
+  beforeEach(() => {
+    let messageSeq = 0;
+    prisma = {
+      aIMessage: {
+        create: jest.fn().mockImplementation(({ data }: { data: object }) =>
+          Promise.resolve({
+            id: `msg-${++messageSeq}`,
+            createdAt: new Date(),
+            relatedModule: null,
+            permissionContext: null,
+            ...data,
+          }),
+        ),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      family: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Gia đình Bin' }),
+      },
+    };
+    conversations = {
+      getOwnedConversationOrThrow: jest
+        .fn()
+        .mockResolvedValue({ id: conversationId, conversationTitle: 'x' }),
+      ensureTitle: jest.fn().mockResolvedValue(undefined),
+      toMessageView: jest.fn((message: { id: string }) => message),
+      toPendingActionView: jest.fn(
+        (messageId: string, action: object, actionIndex = 0) => ({
+          messageId,
+          actionIndex,
+          ...action,
+        }),
+      ),
+    };
+    openAiClient = {
+      chat: jest.fn(),
+      config: {
+        maxToolRounds: 5,
+        maxHistoryMessages: 20,
+        actionExpiresMinutes: 15,
+      },
+    };
+    toolRegistry = {
+      getOpenAiTools: jest.fn().mockReturnValue([]),
+      getTool: jest.fn(),
+      executeReadTool: jest.fn(),
+    };
+    service = new AiChatService(
+      prisma as unknown as PrismaService,
+      conversations as unknown as AiConversationsService,
+      openAiClient as unknown as OpenAiClientService,
+      toolRegistry as unknown as ToolRegistryService,
+    );
+  });
+
+  const send = (
+    currentMember: FamilyMember = member,
+    content = 'câu hỏi',
+  ) =>
+    service.sendMessage(familyId, currentMember, conversationId, {
+      content,
+    });
+
+  it('trả lời thường: lưu đúng 2 message USER + AI, relatedModule GENERAL', async () => {
+    openAiClient.chat.mockResolvedValue(textCompletion('Chào bạn!'));
+
+    const result = await send();
+
+    expect(prisma.aIMessage.create).toHaveBeenCalledTimes(2);
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.senderType).toBe(AiSenderType.AI);
+    expect(aiRow.messageContent).toBe('Chào bạn!');
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.GENERAL);
+    expect(result.pendingAction).toBeNull();
+  });
+
+  it('một vòng read tool rồi trả lời: relatedModule theo module tool', async () => {
+    toolRegistry.getTool.mockReturnValue({
+      name: 'get_finance_overview',
+      kind: 'read',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER],
+    });
+    toolRegistry.executeReadTool.mockResolvedValue({
+      ok: true,
+      content: '{"total":100}',
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(toolCallCompletion('get_finance_overview', {}))
+      .mockResolvedValueOnce(textCompletion('Tháng này chi 100đ.'));
+
+    await send();
+
+    expect(toolRegistry.executeReadTool).toHaveBeenCalledWith(
+      'get_finance_overview',
+      '{}',
+      expect.objectContaining({
+        familyId,
+        memberId: member.id,
+        familyRole: member.familyRole,
+        userContent: 'câu hỏi',
+        now: expect.any(Date),
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.toolTrace).toHaveLength(1);
+  });
+
+  it('write tool: tạo pendingAction PENDING, KHÔNG thực thi, ép text round sau', async () => {
+    const buildActionPayload = jest
+      .fn()
+      .mockResolvedValue({ amount: 50000, description: 'ăn sáng' });
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_ledger_entry',
+      kind: 'write',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER],
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_ledger_entry', {
+          amount: 50000,
+          description: 'ăn sáng',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion('Mình đã tạo đề xuất, bạn xác nhận nhé.'),
+      );
+
+    const result = await send();
+
+    expect(buildActionPayload).toHaveBeenCalled();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.permissionContext.pendingAction.status).toBe(
+      AiActionStatus.PENDING,
+    );
+    expect(aiRow.permissionContext.pendingAction.proposedByMemberId).toBe(
+      member.id,
+    );
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(1);
+    expect(result.pendingAction).not.toBeNull();
+    expect(result.pendingActions).toHaveLength(1);
+    // Round 2 phải bị ép tool_choice 'none' vì đã có đề xuất.
+    expect(openAiClient.chat.mock.calls[1][2]).toBe('none');
+  });
+
+  it('calendar pendingAction không dùng nhầm fallback thu/chi làm content', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({
+      title: 'Đi dã ngoại',
+      startTime: '2026-08-15T15:00:00+07:00',
+      endTime: '2026-08-15T18:00:00+07:00',
+      location: 'Công viên Ánh Sáng',
+    });
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_calendar_event',
+      kind: 'write',
+      module: AiRelatedModule.CALENDAR,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_calendar_event', {
+          title: 'Đi dã ngoại',
+          startTime: '2026-08-15T15:00:00+07:00',
+          endTime: '2026-08-15T18:00:00+07:00',
+          location: 'Công viên Ánh Sáng',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion(
+          'Mình chưa tạo được thẻ xác nhận cho yêu cầu này. Bạn vui lòng nói rõ loại giao dịch, số tiền và ngày ghi nhận để mình tạo đề xuất nhé.',
+        ),
+      );
+
+    const result = await send(
+      member,
+      'Tạo lịch đi dã ngoại 15h đến 18h ngày 15/08/2026 tại Công viên Ánh Sáng cho cả nhà.',
+    );
+
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toBe(
+      'Mình đã tạo đề xuất lịch. Vui lòng kiểm tra thông tin và xác nhận trên ứng dụng để hoàn tất nhé.',
+    );
+    expect(aiRow.messageContent).not.toContain('loại giao dịch');
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_CALENDAR_EVENT,
+      status: AiActionStatus.PENDING,
+      payload: {
+        title: 'Đi dã ngoại',
+        location: 'Công viên Ánh Sáng',
+      },
+    });
+    expect(result.pendingAction?.actionType).toBe(
+      AiActionType.CREATE_CALENDAR_EVENT,
+    );
+  });
+
+  it('recovers ALLOCATE_FUND_BY_MODEL when model wrongly answers no permission for manager', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({
+      amount: 100000,
+      periodMonth: 12,
+      periodYear: 2026,
+    });
+    toolRegistry.getTool.mockImplementation((name: string) => {
+      if (name === 'propose_allocate_fund_by_model') {
+        return {
+          name,
+          kind: 'write',
+          module: AiRelatedModule.FINANCE,
+          allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+          buildActionPayload,
+        };
+      }
+      return undefined;
+    });
+    openAiClient.chat.mockResolvedValue(
+      textCompletion(
+        'Hiện tại bạn không có quyền để thực hiện phân bổ quỹ cho tháng 12 năm 2026.',
+      ),
+    );
+
+    const result = await send(
+      member,
+      'Chia quỹ tháng 12 năm 2026 theo mô hình tài chính đang áp dụng với tổng tiền 100.000đ',
+    );
+
+    expect(buildActionPayload).toHaveBeenCalledWith(
+      { amount: 100000, periodMonth: 12, periodYear: 2026 },
+      expect.objectContaining({
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.ALLOCATE_FUND_BY_MODEL,
+      status: AiActionStatus.PENDING,
+      payload: {
+        amount: 100000,
+        periodMonth: 12,
+        periodYear: 2026,
+      },
+    });
+    expect(result.pendingAction?.actionType).toBe(
+      AiActionType.ALLOCATE_FUND_BY_MODEL,
+    );
+  });
+
+  it('recovers CREATE_LEDGER_ENTRY expense when model asks to confirm without tool call', async () => {
+    const buildActionPayload = jest.fn().mockImplementation((args) =>
+      Promise.resolve({
+        ...args,
+        entryDate: '2026-08-10T10:00:00+07:00',
+      }),
+    );
+    toolRegistry.getTool.mockImplementation((name: string) => {
+      if (name === 'propose_create_ledger_entry') {
+        return {
+          name,
+          kind: 'write',
+          module: AiRelatedModule.FINANCE,
+          allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+          actionType: AiActionType.CREATE_LEDGER_ENTRY,
+          buildActionPayload,
+        };
+      }
+      return undefined;
+    });
+    openAiClient.chat.mockResolvedValue(
+      textCompletion(
+        'Mình đã chuẩn bị đề xuất ghi khoản chi 50.000đ, bạn xác nhận trên ứng dụng nhé.',
+      ),
+    );
+
+    const result = await send(member, 'ghi nhận khoản chi 50000');
+
+    expect(buildActionPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entryType: 'EXPENSE',
+        amount: 50000,
+        description: 'Khoản chi 50.000đ',
+        entryDate: expect.any(Date),
+      }),
+      expect.objectContaining({
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      }),
+    );
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.relatedModule).toBe(AiRelatedModule.FINANCE);
+    expect(aiRow.permissionContext.pendingAction).toMatchObject({
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+      payload: {
+        entryType: 'EXPENSE',
+        amount: 50000,
+      },
+    });
+    expect(result.pendingAction).toMatchObject({
+      messageId: 'msg-2',
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      status: AiActionStatus.PENDING,
+    });
+    expect(result.pendingActions).toHaveLength(1);
+  });
+
+  it('does not ask app confirmation when no pending action can be created', async () => {
+    toolRegistry.getTool.mockReturnValue(undefined);
+    openAiClient.chat.mockResolvedValue(
+      textCompletion('Bạn hãy xác nhận trên ứng dụng để mình ghi sổ nhé.'),
+    );
+
+    const result = await send(member, 'ghi nhận khoản chi');
+
+    expect(result.pendingAction).toBeNull();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toContain('chưa tạo được thẻ xác nhận');
+    expect(aiRow.messageContent).not.toContain('xác nhận trên ứng dụng');
+  });
+
+  it('nhiều write tool trong cùng lượt được gom thành pendingActions', async () => {
+    const buildActionPayload = jest.fn().mockResolvedValue({ a: 1 });
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_ledger_entry',
+      kind: 'write',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER],
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: null,
+              tool_calls: [1, 2].map((n) => ({
+                id: `call-${n}`,
+                type: 'function',
+                function: {
+                  name: 'propose_create_ledger_entry',
+                  arguments: '{}',
+                },
+              })),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce(textCompletion('Đã tạo kế hoạch gồm 2 đề xuất.'));
+
+    const result = await send();
+
+    expect(buildActionPayload).toHaveBeenCalledTimes(2);
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.permissionContext.pendingActions).toHaveLength(2);
+    expect(aiRow.permissionContext.pendingAction).toEqual(
+      aiRow.permissionContext.pendingActions[0],
+    );
+    expect(result.pendingAction?.actionIndex).toBe(0);
+    expect(result.pendingActions).toHaveLength(2);
+    expect(result.pendingActions[1].actionIndex).toBe(1);
+  });
+
+  it('member write tool bị từ chối quyền thì không trả pendingAction', async () => {
+    const normalMember = {
+      ...member,
+      id: 'member-normal',
+      familyRole: FamilyRole.FAMILY_MEMBER,
+    } as FamilyMember;
+    const buildActionPayload = jest.fn();
+    toolRegistry.getTool.mockReturnValue({
+      name: 'propose_create_ledger_entry',
+      kind: 'write',
+      module: AiRelatedModule.FINANCE,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER, FamilyRole.DEPUTY_MEMBER],
+      actionType: AiActionType.CREATE_LEDGER_ENTRY,
+      buildActionPayload,
+    });
+    openAiClient.chat
+      .mockResolvedValueOnce(
+        toolCallCompletion('propose_create_ledger_entry', {
+          amount: 200000,
+          description: 'an toi',
+        }),
+      )
+      .mockResolvedValueOnce(
+        textCompletion(
+          'Toi da ghi nhan khoan chi 200.000 VND, vui long xac nhan tren ung dung nhe.',
+        ),
+      );
+
+    const result = await send(normalMember);
+
+    expect(result.pendingAction).toBeNull();
+    expect(buildActionPayload).not.toHaveBeenCalled();
+    const aiRow = prisma.aIMessage.create.mock.calls[1][0].data;
+    expect(aiRow.messageContent).toContain('không có quyền ghi khoản thu/chi');
+    expect(aiRow.permissionContext.pendingAction).toBeUndefined();
+  });
+
+  it('hết round budget vẫn trả text (gọi cuối tool_choice none)', async () => {
+    toolRegistry.getTool.mockReturnValue({
+      name: 'loop_tool',
+      kind: 'read',
+      module: AiRelatedModule.GENERAL,
+      allowedRoles: [FamilyRole.FAMILY_MANAGER],
+    });
+    toolRegistry.executeReadTool.mockResolvedValue({ ok: true, content: '{}' });
+    openAiClient.chat.mockResolvedValue(toolCallCompletion('loop_tool', {}));
+
+    const result = await send();
+
+    // 5 round tool + 1 round chốt; round chốt bị ép 'none'.
+    expect(openAiClient.chat).toHaveBeenCalledTimes(6);
+    expect(openAiClient.chat.mock.calls[5][2]).toBe('none');
+    expect(result.aiMessage).toBeDefined();
+  });
+
+  it('OpenAI lỗi → throw 502 nhưng message USER đã được lưu', async () => {
+    openAiClient.chat.mockRejectedValue(
+      new BadGatewayException('Trợ lý AI hiện không phản hồi'),
+    );
+
+    await expect(send()).rejects.toThrow(BadGatewayException);
+
+    expect(prisma.aIMessage.create).toHaveBeenCalledTimes(1);
+    expect(prisma.aIMessage.create.mock.calls[0][0].data.senderType).toBe(
+      AiSenderType.USER,
+    );
+  });
+});

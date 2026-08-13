@@ -5,9 +5,13 @@ import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
+import { FirebaseAuthService } from './firebase-auth.service';
+import { PasswordResetService } from './password-reset.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { VerifiedGuard } from './guards/verified.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 /**
@@ -27,10 +31,14 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   providers: [
     AuthService,
     RefreshTokenService,
+    EmailVerificationService,
+    FirebaseAuthService,
+    PasswordResetService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
+    VerifiedGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, VerifiedGuard],
 })
 export class AuthModule {}
