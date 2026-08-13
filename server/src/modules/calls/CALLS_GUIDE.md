@@ -212,25 +212,58 @@ máy — qua `end` hoặc `leave`, xem mục 2).
 
 ## 6. Push notification khi app ở nền
 
-Khi có cuộc gọi đến, các thành viên khác nhận FCM data payload chuẩn (giống mọi loại
-notification khác — xem `server/src/modules/notifications/NOTIFICATIONS_REALTIME.md`):
+**Push "cuộc gọi đến" là data-only message** (khác với mọi loại notification khác trong hệ thống —
+xem `server/src/modules/notifications/NOTIFICATIONS_REALTIME.md` cho hành vi mặc định). Nghĩa là
+FCM payload **không có khối `notification`** — Android **không tự vẽ** thông báo, toàn quyền hiển
+thị (kể cả full-screen-intent khi máy khoá) thuộc về app, qua background message handler
+(`firebaseBackgroundHandler` phía Flutter). Khối `data` nhận được:
 
 ```json
 {
   "referenceType": "CALL",
   "referenceId": "<callId>",
+  "callId": "<callId>",
+  "conversationId": "<conversationId>",
+  "callerName": "<tên người gọi, tiếng Việt>",
+  "conversationType": "PRIVATE hoặc GROUP",
+  "conversationName": "<tên hội thoại — rỗng nếu PRIVATE>",
+  "callEventType": "incoming",
   "title": "<tên người gọi>",
-  "body": "Cuộc gọi video đến"
+  "body": "Cuộc gọi video đến",
+  "notificationId": "",
+  "type": "CALL",
+  "familyId": "<familyId>"
 }
 ```
 
-FE bấm vào push → điều hướng thẳng tới màn hình cuộc gọi với `callId` đó, gọi
-`POST /calls/:callId/join` nếu người dùng chọn "Nghe máy".
+FE tự dựng nội dung hiển thị (không dùng `title`/`body` của hệ thống notification tray), điều
+hướng thẳng tới `IncomingCallScreen` với `callId`, gọi `POST /calls/:callId/join` nếu người dùng
+chọn "Nghe máy" hoặc `POST /calls/:callId/decline` nếu "Từ chối".
 
-**Push "Cuộc gọi nhỡ"**: nếu không ai bắt máy trong 30 giây, ngoài các event WS ở mục 3, những
-người **chưa từng bắt máy** (participant còn `status: "INVITED"` lúc timeout) còn nhận thêm 1 push
-riêng: `{ referenceType: "CALL", referenceId: "<callId>", title: "<tên người gọi>", body: "Cuộc
-gọi nhỡ" }` — cùng shape, chỉ khác `body`.
+**Push "Cuộc gọi nhỡ"** — **vẫn là notification message bình thường** (Android tự vẽ, không cần
+full-screen-intent). Gửi khi không ai bắt máy trong 30 giây, riêng cho những người **chưa từng bắt
+máy** (participant còn `status: "INVITED"` lúc timeout). Khối `data` cũng có cấu trúc tương tự,
+phân biệt bằng `callEventType: "missed"` (thay vì `"incoming"`) — không có `callerName` (không cần
+thiết cho cuộc gọi nhỡ):
+
+```json
+{
+  "referenceType": "CALL",
+  "referenceId": "<callId>",
+  "callId": "<callId>",
+  "conversationId": "<conversationId>",
+  "conversationType": "PRIVATE hoặc GROUP",
+  "conversationName": "<tên hội thoại>",
+  "callEventType": "missed",
+  "title": "<tên người gọi>",
+  "body": "Cuộc gọi nhỡ"
+}
+```
+
+**Giới hạn**: thiết kế data-only này chỉ có hiệu lực thật sự trên **Android**. iOS không có cơ chế
+tương đương qua FCM thường — muốn full-screen CallKit khi máy khoá trên iOS cần **VoIP Push
+(PushKit)**, một luồng kỹ thuật khác hẳn (APNs riêng, entitlement `voip`, code iOS-native), chưa
+nằm trong phạm vi hiện tại.
 
 ## 7. Mã lỗi ổn định
 

@@ -1,0 +1,1083 @@
+//// ------------------------------------------------------
+//// LOGICAL ERD — auto-generated từ Prisma schema. Chỉ hiện tên thuộc tính +
+//// đánh dấu PK/FK, KHÔNG hiện kiểu dữ liệu vật lý.
+//// Cách xem: mở https://dbdiagram.io -> Import -> DBML (hoặc paste nội dung file này).
+//// Chạy lại: node scripts/gen-logical-erd-dbml.js
+//// ------------------------------------------------------
+
+Project "Family Care - Logical ERD" {
+  Note: 'Mo hinh du lieu muc nghiep vu - chi hien thuoc tinh + PK/FK, khong hien kieu du lieu vat ly.'
+}
+
+Table "User" as User {
+  "Id" PK [pk]
+  "Email" ""
+  "Password Hash" ""
+  "Firebase Uid" ""
+  "Full Name" ""
+  "Phone" ""
+  "Avatar URL" ""
+  "User Type" ""
+  "Account Status" ""
+  "Verification Status" ""
+  "Last Login At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Admin Audit Log" as AdminAuditLog {
+  "Id" PK [pk]
+  "Admin User ID" ""
+  "Admin Email" ""
+  "Admin Name" ""
+  "Action" ""
+  "Target Type" ""
+  "Target ID" ""
+  "Result" ""
+  "Ip Address" ""
+  "User Agent" ""
+  "Metadata" ""
+  "Error Message" ""
+  "Created At" ""
+}
+
+Table "Email Verification Token" as EmailVerificationToken {
+  "Id" PK [pk]
+  "User ID" FK
+  "Code Hash" ""
+  "Expires At" ""
+  "Used At" ""
+  "Attempts" ""
+  "Created At" ""
+}
+
+Table "Password Reset Token" as PasswordResetToken {
+  "Id" PK [pk]
+  "User ID" FK
+  "Code Hash" ""
+  "Expires At" ""
+  "Used At" ""
+  "Attempts" ""
+  "Created At" ""
+}
+
+Table "Refresh Token" as RefreshToken {
+  "Id" PK [pk]
+  "User ID" FK
+  "Token Hash" ""
+  "Expires At" ""
+  "Revoked At" ""
+  "Created At" ""
+}
+
+Table "Family" as Family {
+  "Id" PK [pk]
+  "Name" ""
+  "Description" ""
+  "Avatar URL" ""
+  "Status" ""
+  "Activation Status" ""
+  "Invite Code" ""
+  "Created By ID" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Family Member" as FamilyMember {
+  "Id" PK [pk]
+  "Family ID" FK
+  "User ID" FK
+  "Display Name" ""
+  "Family Role" ""
+  "Relationship" ""
+  "Status" ""
+  "Location Sharing Enabled" ""
+  "Joined At" ""
+  "Left At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Join Request" as JoinRequest {
+  "Id" PK [pk]
+  "Family ID" FK
+  "User ID" FK
+  "Status" ""
+  "Message" ""
+  "Decided By Member ID" FK
+  "Decided At" ""
+  "Created At" ""
+}
+
+Table "Member Monthly Finance" as MemberMonthlyFinance {
+  "Id" PK [pk]
+  "Member ID" FK
+  "Period Month" ""
+  "Period Year" ""
+  "Expected Income" ""
+  "Actual Income" ""
+  "Expected Personal Expense" ""
+  "Actual Personal Expense" ""
+  "Expected Shared Contribution" ""
+  "Actual Shared Contribution" ""
+  "Income Visibility" ""
+  "Expense Visibility" ""
+  "Note" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Finance Ledger" as FinanceLedger {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Ledger Name" ""
+  "Status" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Finance Category" as FinanceCategory {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Name" ""
+  "Category Type" ""
+  "Essential Type" ""
+  "Status" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Finance Model" as FinanceModel {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Model Type" ""
+  "Name" ""
+  "Status" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Finance Jar" as FinanceJar {
+  "Id" PK [pk]
+  "Finance Model ID" FK
+  "Name" ""
+  "Jar Code" ""
+  "Allocation Percentage" ""
+  "Description" ""
+  "Is Active" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Finance Category Jar Mapping" as FinanceCategoryJarMapping {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Finance Model ID" FK
+  "Category ID" FK
+  "Jar ID" FK
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Ledger Entry" as LedgerEntry {
+  "Id" PK [pk]
+  "Ledger ID" FK
+  "Category ID" FK
+  "Jar ID" FK
+  "Created By Member ID" FK
+  "Entry Type" ""
+  "Amount" ""
+  "Description" ""
+  "Note" ""
+  "Entry Date" ""
+  "Status" ""
+  "Source Type" ""
+  "Source ID" ""
+  "Metadata" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Subscription Plan" as SubscriptionPlan {
+  "Id" PK [pk]
+  "Plan Code" ""
+  "Name" ""
+  "Annual Price" ""
+  "Billing Period" ""
+  "Monthly Price" ""
+  "Yearly Price" ""
+  "Max Members" ""
+  "Storage Limit" ""
+  "Feature Access" ""
+  "Stripe Price ID" ""
+  "Is Active" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Family Subscription" as FamilySubscription {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Plan ID" FK
+  "Status" ""
+  "Stripe Customer ID" ""
+  "Stripe Subscription ID" ""
+  "Current Period Start" ""
+  "Current Period End" ""
+  "Cancel At Period End" ""
+  "Purchased By User ID" FK
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Payment Transaction" as PaymentTransaction {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Stripe Event ID" ""
+  "Type" ""
+  "Amount" ""
+  "Currency" ""
+  "Status" ""
+  "Raw Payload" ""
+  "Created At" ""
+}
+
+Table "Spending Support Request" as SpendingSupportRequest {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Requester Member ID" FK
+  "Amount" ""
+  "Category ID" FK
+  "Purpose" ""
+  "Status" ""
+  "Reviewed By Member ID" FK
+  "Reviewed At" ""
+  "Decision Note" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Budget Plan" as BudgetPlan {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Plan Name" ""
+  "Period Type" ""
+  "Period Start" ""
+  "Period End" ""
+  "Expected Shared Income" ""
+  "Expected Shared Expense" ""
+  "Status" ""
+  "Created By Member ID" FK
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Budget Line" as BudgetLine {
+  "Id" PK [pk]
+  "Budget Plan ID" FK
+  "Category ID" FK
+  "Jar ID" FK
+  "Planned Amount" ""
+  "Threshold Amount" ""
+  "Threshold Percent" ""
+  "Essential Type" ""
+  "Note" ""
+  "Finance Ledger ID" FK
+}
+
+Table "Financial Goal" as FinancialGoal {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Goal Name" ""
+  "Target Amount" ""
+  "Deadline" ""
+  "Monthly Contribution Target" ""
+  "Related Jar ID" FK
+  "Status" ""
+  "Created By Member ID" FK
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Goal Allocation" as GoalAllocation {
+  "Id" PK [pk]
+  "Goal ID" FK
+  "Ledger Entry ID" FK
+  "Amount" ""
+  "Allocated By Member ID" FK
+  "Allocated At" ""
+}
+
+Table "Goal Contribution Plan" as GoalContributionPlan {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Goal ID" FK
+  "Member ID" FK
+  "Period Month" ""
+  "Period Year" ""
+  "Planned Amount" ""
+  "Pending Amount" ""
+  "Due Date" ""
+  "Status" ""
+  "Submitted At" ""
+  "Submitted Note" ""
+  "Reviewed By Member ID" FK
+  "Reviewed At" ""
+  "Review Note" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Budget Alert" as BudgetAlert {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Source Key" ""
+  "Budget Plan ID" FK
+  "Goal ID" FK
+  "Jar ID" FK
+  "Category ID" FK
+  "Alert Type" ""
+  "Severity" ""
+  "Threshold Value" ""
+  "Actual Value" ""
+  "Message" ""
+  "Resolution Note" ""
+  "Status" ""
+  "Created At" ""
+  "Resolved At" ""
+  "Finance Ledger ID" FK
+}
+
+Table "Task Category" as TaskCategory {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Name" ""
+  "Description" ""
+  "Status" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Task" as Task {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Task Category ID" FK
+  "Title" ""
+  "Description" ""
+  "Task Type" ""
+  "Priority" ""
+  "Status" ""
+  "Created By Member ID" FK
+  "Due At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Task Schedule" as TaskSchedule {
+  "Id" PK [pk]
+  "Task ID" FK
+  "Repeat Type" ""
+  "Repeat Interval" ""
+  "Start Date" ""
+  "End Date" ""
+  "Day Of Week" ""
+  "Status" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Task Assignment" as TaskAssignment {
+  "Id" PK [pk]
+  "Task ID" FK
+  "Assigned To Member ID" FK
+  "Assigned By Member ID" FK
+  "Status" ""
+  "Assigned At" ""
+  "Start At" ""
+  "Due At" ""
+  "Reminder Sent At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Task Submission" as TaskSubmission {
+  "Id" PK [pk]
+  "Assignment ID" FK
+  "Submitted By Member ID" FK
+  "Submission Note" ""
+  "Status" ""
+  "Reviewed By Member ID" FK
+  "Review Note" ""
+  "Submitted At" ""
+  "Reviewed At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Reward Setting" as RewardSetting {
+  "Id" PK [pk]
+  "Task ID" FK
+  "Reward Type" ""
+  "Reward Amount" ""
+  "Reward Description" ""
+  "Auto Create Settlement" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Reward Settlement" as RewardSettlement {
+  "Id" PK [pk]
+  "Task Submission ID" FK
+  "Reward Setting ID" FK
+  "Receiver Member ID" FK
+  "Settled By Member ID" FK
+  "Amount" ""
+  "Status" ""
+  "External Method" ""
+  "External Note" ""
+  "Settled At" ""
+  "Confirmed At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Reward Allocation" as RewardAllocation {
+  "Id" PK [pk]
+  "Reward Settlement ID" FK
+  "Jar ID" FK
+  "Goal ID" FK
+  "Ledger Entry ID" FK
+  "Amount" ""
+  "Allocated By Member ID" FK
+  "Allocated At" ""
+}
+
+Table "Reward Dispute" as RewardDispute {
+  "Id" PK [pk]
+  "Reward Settlement ID" FK
+  "Reported By Member ID" FK
+  "Reason" ""
+  "Status" ""
+  "Resolved By Member ID" FK
+  "Created At" ""
+  "Resolved At" ""
+}
+
+Table "Task Unavailability" as TaskUnavailability {
+  "Id" PK [pk]
+  "Assignment ID" FK
+  "Reported By Member ID" FK
+  "Reason" ""
+  "Status" ""
+  "Reported At" ""
+  "Handled By Member ID" FK
+  "Handled At" ""
+}
+
+Table "Task Proof" as TaskProof {
+  "Id" PK [pk]
+  "Submission ID" FK
+  "Proof Type" ""
+  "File URL" ""
+  "Thumbnail URL" ""
+  "Note" ""
+  "Uploaded At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Sos Setting" as SosSetting {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Is Enabled" ""
+  "Notify All Members" ""
+  "Auto Create Alert From Fall" ""
+  "Location Required" ""
+  "Created By Member ID" FK
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Emergency Contact" as EmergencyContact {
+  "Id" PK [pk]
+  "Sos Setting ID" FK
+  "Contact Name" ""
+  "Phone Number" ""
+  "Relationship Note" ""
+  "Priority Order" ""
+  "Is Active" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Wearable Device" as WearableDevice {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Owner Member ID" FK
+  "Owner User ID" FK
+  "Device Name" ""
+  "Device Type" ""
+  "Device Identifier" ""
+  "Pairing Status" ""
+  "Gps Enabled" ""
+  "Sos Enabled" ""
+  "Last Seen At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Wearable Activation Session" as WearableActivationSession {
+  "Id" PK [pk]
+  "Code" ""
+  "Status" ""
+  "Device Name" ""
+  "Device Type" ""
+  "Workspace ID" FK
+  "Owner Member ID" FK
+  "Owner User ID" FK
+  "Wearable Device ID" FK
+  "Claimed Refresh Token ID" FK
+  "Expires At" ""
+  "Claimed At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Sos Alert" as SosAlert {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Triggered By Member ID" FK
+  "Device ID" FK
+  "Source Type" ""
+  "Status" ""
+  "Severity" ""
+  "Initial Latitude" ""
+  "Initial Longitude" ""
+  "Message" ""
+  "Triggered At" ""
+  "Resolved By Member ID" FK
+  "Resolved At" ""
+  "Resolution Note" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Sos Location Point" as SosLocationPoint {
+  "Id" PK [pk]
+  "Sos Alert ID" FK
+  "Device ID" FK
+  "Latitude" ""
+  "Longitude" ""
+  "Accuracy" ""
+  "Source Type" ""
+  "Recorded At" ""
+  "Created At" ""
+}
+
+Table "Sos Response" as SosResponse {
+  "Id" PK [pk]
+  "Sos Alert ID" FK
+  "Responder Member ID" FK
+  "Response Type" ""
+  "Message" ""
+  "Responded At" ""
+}
+
+Table "Sensor Event" as SensorEvent {
+  "Id" PK [pk]
+  "Device ID" FK
+  "Event Type" ""
+  "Raw Value" ""
+  "Severity" ""
+  "Detected At" ""
+  "Created Sos Alert ID" FK
+  "Created At" ""
+}
+
+Table "Member Location Point" as MemberLocationPoint {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Member ID" FK
+  "Device ID" FK
+  "Latitude" ""
+  "Longitude" ""
+  "Accuracy" ""
+  "Source Type" ""
+  "Recorded At" ""
+  "Created At" ""
+}
+
+Table "Notification" as Notification {
+  "Id" PK [pk]
+  "Family ID" FK
+  "Recipient Member ID" FK
+  "Type" ""
+  "Priority" ""
+  "Title" ""
+  "Body" ""
+  "Reference Type" ""
+  "Reference ID" ""
+  "Is Read" ""
+  "Read At" ""
+  "Created At" ""
+}
+
+Table "Device Token" as DeviceToken {
+  "Id" PK [pk]
+  "User ID" FK
+  "Token" ""
+  "Platform" ""
+  "Device Name" ""
+  "Last Seen At" ""
+  "Created At" ""
+}
+
+Table "Workspace Provisioning Log" as WorkspaceProvisioningLog {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Action Type" ""
+  "Status" ""
+  "Message" ""
+  "Started At" ""
+  "Finished At" ""
+  "Created By User ID" FK
+  "Created At" ""
+}
+
+Table "Conversation" as Conversation {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Conversation Type" ""
+  "Conversation Name" ""
+  "Created By Member ID" FK
+  "Status" ""
+  "Is Default" ""
+  "Direct Key" ""
+  "Last Message At" ""
+  "Created At" ""
+}
+
+Table "Conversation Participant" as ConversationParticipant {
+  "Id" PK [pk]
+  "Conversation ID" FK
+  "Member ID" FK
+  "Joined At" ""
+  "Left At" ""
+  "Participant Status" ""
+  "Last Read At" ""
+}
+
+Table "Message" as Message {
+  "Id" PK [pk]
+  "Conversation ID" FK
+  "Sender Member ID" FK
+  "Message Type" ""
+  "Content" ""
+  "Reply To Message ID" FK
+  "Pinned At" ""
+  "Pinned By Member ID" FK
+  "Related Call ID" FK
+  "Sent At" ""
+  "Edited At" ""
+  "Deleted At" ""
+}
+
+Table "Call" as Call {
+  "Id" PK [pk]
+  "Conversation ID" FK
+  "Initiated By Member ID" FK
+  "Room Name" ""
+  "Status" ""
+  "Started At" ""
+  "Connected At" ""
+  "Ended At" ""
+  "Ended Reason" ""
+}
+
+Table "Call Participant" as CallParticipant {
+  "Id" PK [pk]
+  "Call ID" FK
+  "Member ID" FK
+  "Status" ""
+  "Invited At" ""
+  "Joined At" ""
+  "Left At" ""
+}
+
+Table "Message Reaction" as MessageReaction {
+  "Id" PK [pk]
+  "Message ID" FK
+  "Member ID" FK
+  "Emoji" ""
+  "Created At" ""
+}
+
+Table "Message Attachment" as MessageAttachment {
+  "Id" PK [pk]
+  "Message ID" FK
+  "File Type" ""
+  "File URL" ""
+  "File Name" ""
+  "File Size" ""
+  "Uploaded At" ""
+}
+
+Table "Family Announcement" as FamilyAnnouncement {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Created By Member ID" FK
+  "Title" ""
+  "Content" ""
+  "Priority" ""
+  "Status" ""
+  "Created At" ""
+}
+
+Table "Calendar Event" as CalendarEvent {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Title" ""
+  "Description" ""
+  "Location" ""
+  "Start Time" ""
+  "End Time" ""
+  "Is Recurring" ""
+  "Created By Member ID" FK
+  "Status" ""
+  "Created At" ""
+}
+
+Table "Calendar Event Participant" as CalendarEventParticipant {
+  "Id" PK [pk]
+  "Event ID" FK
+  "Member ID" FK
+  "Response Status" ""
+  "Reminder Enabled" ""
+  "Reminder Sent At" ""
+}
+
+Table "Album Media" as AlbumMedia {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Uploaded By Member ID" FK
+  "Media Type" ""
+  "Media URL" ""
+  "Storage Key" ""
+  "Original File Name" ""
+  "Mime Type" ""
+  "File Size" ""
+  "Thumbnail URL" ""
+  "Caption" ""
+  "Visibility Scope" ""
+  "Moderation Status" ""
+  "Uploaded At" ""
+  "Updated At" ""
+  "Deleted At" ""
+  "Deleted By Member ID" FK
+  "Delete Reason" ""
+  "Moderation Started At" ""
+  "Moderation Completed At" ""
+  "Moderation Attempt Count" ""
+  "Last Moderation Error" ""
+  "Latest Moderation Job ID" ""
+  "Moderation Queued At" ""
+}
+
+Table "Album Media Tag" as AlbumMediaTag {
+  "Id" PK [pk]
+  "Media ID" FK
+  "Tagged Member ID" FK
+  "Tagged By Member ID" FK
+  "Tag Note" ""
+  "Created At" ""
+}
+
+Table "Face Scan Job" as FaceScanJob {
+  "Scan Job ID" PK [pk]
+  "Workspace ID" FK
+  "Media ID" FK
+  "Requested By Member ID" FK
+  "Status" ""
+  "Attempt Count" ""
+  "Last Error" ""
+  "Started At" ""
+  "Completed At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Album Face Detection" as AlbumFaceDetection {
+  "Detection ID" PK [pk]
+  "Workspace ID" FK
+  "Scan Job ID" FK
+  "Media ID" FK
+  "Face Index" ""
+  "Bounding Box" ""
+  "Detection Score" ""
+  "Quality Score" ""
+  "Model Name" ""
+  "Model Version" ""
+  "Status" ""
+  "Created At" ""
+}
+
+Table "Album Tag Suggestion" as AlbumTagSuggestion {
+  "Suggestion ID" PK [pk]
+  "Workspace ID" FK
+  "Detection ID" FK
+  "Media ID" FK
+  "Suggested Member ID" FK
+  "Similarity Score" ""
+  "Second Best Score" ""
+  "Score Margin" ""
+  "Status" ""
+  "Confirmed By Member ID" FK
+  "Confirmed At" ""
+  "Rejected By Member ID" FK
+  "Rejected At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Storage Cleanup Job" as StorageCleanupJob {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Media ID" FK
+  "Storage Key" ""
+  "Reason" ""
+  "Status" ""
+  "Attempt Count" ""
+  "Last Error" ""
+  "Next Retry At" ""
+  "Created At" ""
+  "Updated At" ""
+}
+
+Table "Media Moderation Check" as MediaModerationCheck {
+  "Id" PK [pk]
+  "Media ID" FK
+  "Job ID" ""
+  "Check Type" ""
+  "Provider" ""
+  "Model Name" ""
+  "Result Status" ""
+  "Confidence Score" ""
+  "Categories" ""
+  "Reason Code" ""
+  "Summary" ""
+  "Error Code" ""
+  "Error Message" ""
+  "Reviewed By Member ID" FK
+  "Review Note" ""
+  "Reviewed At" ""
+  "Checked At" ""
+  "Created At" ""
+}
+
+Table "Member Face Profile" as MemberFaceProfile {
+  "Profile ID" PK [pk]
+  "Workspace ID" FK
+  "Member ID" FK
+  "Status" ""
+  "Consented At" ""
+  "Consented By Member ID" FK
+  "Model Name" ""
+  "Model Version" ""
+  "Created At" ""
+  "Updated At" ""
+  "Deleted At" ""
+}
+
+Table "Member Face Embedding" as MemberFaceEmbedding {
+  "Embedding ID" PK [pk]
+  "Profile ID" FK
+  "Encrypted Embedding" ""
+  "Encryption Iv" ""
+  "Encryption Auth Tag" ""
+  "Embedding Dimension" ""
+  "Detection Score" ""
+  "Quality Score" ""
+  "Model Name" ""
+  "Model Version" ""
+  "Created At" ""
+  "Revoked At" ""
+}
+
+Table "AI Conversation" as AIConversation {
+  "Id" PK [pk]
+  "Workspace ID" FK
+  "Member ID" FK
+  "Conversation Title" ""
+  "Created At" ""
+}
+
+Table "AI Message" as AIMessage {
+  "Id" PK [pk]
+  "Ai Conversation ID" FK
+  "Sender Type" ""
+  "Message Content" ""
+  "Related Module" ""
+  "Permission Context" ""
+  "Created At" ""
+}
+
+// ===== Relationships =====
+Ref: FamilyMember."User ID" > User."Id"
+Ref: RefreshToken."User ID" > User."Id"
+Ref: DeviceToken."User ID" > User."Id"
+Ref: WearableDevice."Owner User ID" > User."Id"
+Ref: WearableActivationSession."Owner User ID" > User."Id"
+Ref: PasswordResetToken."User ID" > User."Id"
+Ref: EmailVerificationToken."User ID" > User."Id"
+Ref: JoinRequest."User ID" > User."Id"
+Ref: WorkspaceProvisioningLog."Created By User ID" > User."Id"
+Ref: FamilySubscription."Purchased By User ID" > User."Id"
+Ref: WearableActivationSession."Claimed Refresh Token ID" > RefreshToken."Id"
+Ref: FamilyMember."Family ID" > Family."Id"
+Ref: JoinRequest."Family ID" > Family."Id"
+Ref: FinanceLedger."Family ID" > Family."Id"
+Ref: FinanceCategory."Family ID" > Family."Id"
+Ref: FinanceModel."Family ID" > Family."Id"
+Ref: FinanceCategoryJarMapping."Family ID" > Family."Id"
+Ref: BudgetPlan."Family ID" > Family."Id"
+Ref: FinancialGoal."Family ID" > Family."Id"
+Ref: GoalContributionPlan."Family ID" > Family."Id"
+Ref: BudgetAlert."Family ID" > Family."Id"
+Ref: SpendingSupportRequest."Family ID" > Family."Id"
+Ref: TaskCategory."Family ID" > Family."Id"
+Ref: Task."Family ID" > Family."Id"
+Ref: SosSetting."Workspace ID" > Family."Id"
+Ref: WearableDevice."Workspace ID" > Family."Id"
+Ref: WearableActivationSession."Workspace ID" > Family."Id"
+Ref: SosAlert."Workspace ID" > Family."Id"
+Ref: MemberLocationPoint."Workspace ID" > Family."Id"
+Ref: Notification."Family ID" > Family."Id"
+Ref: FamilySubscription."Family ID" > Family."Id"
+Ref: PaymentTransaction."Family ID" > Family."Id"
+Ref: WorkspaceProvisioningLog."Workspace ID" > Family."Id"
+Ref: Conversation."Workspace ID" > Family."Id"
+Ref: FamilyAnnouncement."Workspace ID" > Family."Id"
+Ref: CalendarEvent."Workspace ID" > Family."Id"
+Ref: AlbumMedia."Workspace ID" > Family."Id"
+Ref: StorageCleanupJob."Workspace ID" > Family."Id"
+Ref: MemberFaceProfile."Workspace ID" > Family."Id"
+Ref: FaceScanJob."Workspace ID" > Family."Id"
+Ref: AlbumFaceDetection."Workspace ID" > Family."Id"
+Ref: AlbumTagSuggestion."Workspace ID" > Family."Id"
+Ref: AIConversation."Workspace ID" > Family."Id"
+Ref: JoinRequest."Decided By Member ID" > FamilyMember."Id"
+Ref: MemberMonthlyFinance."Member ID" > FamilyMember."Id"
+Ref: LedgerEntry."Created By Member ID" > FamilyMember."Id"
+Ref: BudgetPlan."Created By Member ID" > FamilyMember."Id"
+Ref: FinancialGoal."Created By Member ID" > FamilyMember."Id"
+Ref: GoalAllocation."Allocated By Member ID" > FamilyMember."Id"
+Ref: SpendingSupportRequest."Requester Member ID" > FamilyMember."Id"
+Ref: SpendingSupportRequest."Reviewed By Member ID" > FamilyMember."Id"
+Ref: Task."Created By Member ID" > FamilyMember."Id"
+Ref: TaskAssignment."Assigned To Member ID" > FamilyMember."Id"
+Ref: TaskAssignment."Assigned By Member ID" > FamilyMember."Id"
+Ref: TaskSubmission."Submitted By Member ID" > FamilyMember."Id"
+Ref: TaskSubmission."Reviewed By Member ID" > FamilyMember."Id"
+Ref: TaskUnavailability."Reported By Member ID" > FamilyMember."Id"
+Ref: TaskUnavailability."Handled By Member ID" > FamilyMember."Id"
+Ref: RewardSettlement."Receiver Member ID" > FamilyMember."Id"
+Ref: RewardSettlement."Settled By Member ID" > FamilyMember."Id"
+Ref: RewardAllocation."Allocated By Member ID" > FamilyMember."Id"
+Ref: RewardDispute."Reported By Member ID" > FamilyMember."Id"
+Ref: RewardDispute."Resolved By Member ID" > FamilyMember."Id"
+Ref: SosSetting."Created By Member ID" > FamilyMember."Id"
+Ref: WearableDevice."Owner Member ID" > FamilyMember."Id"
+Ref: WearableActivationSession."Owner Member ID" > FamilyMember."Id"
+Ref: SosAlert."Triggered By Member ID" > FamilyMember."Id"
+Ref: SosAlert."Resolved By Member ID" > FamilyMember."Id"
+Ref: SosResponse."Responder Member ID" > FamilyMember."Id"
+Ref: MemberLocationPoint."Member ID" > FamilyMember."Id"
+Ref: Notification."Recipient Member ID" > FamilyMember."Id"
+Ref: Conversation."Created By Member ID" > FamilyMember."Id"
+Ref: ConversationParticipant."Member ID" > FamilyMember."Id"
+Ref: Message."Sender Member ID" > FamilyMember."Id"
+Ref: Message."Pinned By Member ID" > FamilyMember."Id"
+Ref: MessageReaction."Member ID" > FamilyMember."Id"
+Ref: Call."Initiated By Member ID" > FamilyMember."Id"
+Ref: CallParticipant."Member ID" > FamilyMember."Id"
+Ref: FamilyAnnouncement."Created By Member ID" > FamilyMember."Id"
+Ref: CalendarEvent."Created By Member ID" > FamilyMember."Id"
+Ref: CalendarEventParticipant."Member ID" > FamilyMember."Id"
+Ref: AlbumMedia."Uploaded By Member ID" > FamilyMember."Id"
+Ref: AlbumMedia."Deleted By Member ID" > FamilyMember."Id"
+Ref: MediaModerationCheck."Reviewed By Member ID" > FamilyMember."Id"
+Ref: AlbumMediaTag."Tagged Member ID" > FamilyMember."Id"
+Ref: AlbumMediaTag."Tagged By Member ID" > FamilyMember."Id"
+Ref: MemberFaceProfile."Member ID" > FamilyMember."Id"
+Ref: MemberFaceProfile."Consented By Member ID" > FamilyMember."Id"
+Ref: FaceScanJob."Requested By Member ID" > FamilyMember."Id"
+Ref: AlbumTagSuggestion."Suggested Member ID" > FamilyMember."Id"
+Ref: AlbumTagSuggestion."Confirmed By Member ID" > FamilyMember."Id"
+Ref: AlbumTagSuggestion."Rejected By Member ID" > FamilyMember."Id"
+Ref: AIConversation."Member ID" > FamilyMember."Id"
+Ref: GoalContributionPlan."Member ID" > FamilyMember."Id"
+Ref: GoalContributionPlan."Reviewed By Member ID" > FamilyMember."Id"
+Ref: LedgerEntry."Ledger ID" > FinanceLedger."Id"
+Ref: BudgetLine."Finance Ledger ID" > FinanceLedger."Id"
+Ref: BudgetAlert."Finance Ledger ID" > FinanceLedger."Id"
+Ref: LedgerEntry."Category ID" > FinanceCategory."Id"
+Ref: BudgetLine."Category ID" > FinanceCategory."Id"
+Ref: BudgetAlert."Category ID" > FinanceCategory."Id"
+Ref: FinanceCategoryJarMapping."Category ID" > FinanceCategory."Id"
+Ref: SpendingSupportRequest."Category ID" > FinanceCategory."Id"
+Ref: FinanceJar."Finance Model ID" > FinanceModel."Id"
+Ref: FinanceCategoryJarMapping."Finance Model ID" > FinanceModel."Id"
+Ref: BudgetLine."Jar ID" > FinanceJar."Id"
+Ref: FinancialGoal."Related Jar ID" > FinanceJar."Id"
+Ref: LedgerEntry."Jar ID" > FinanceJar."Id"
+Ref: BudgetAlert."Jar ID" > FinanceJar."Id"
+Ref: RewardAllocation."Jar ID" > FinanceJar."Id"
+Ref: FinanceCategoryJarMapping."Jar ID" > FinanceJar."Id"
+Ref: GoalAllocation."Ledger Entry ID" > LedgerEntry."Id"
+Ref: RewardAllocation."Ledger Entry ID" > LedgerEntry."Id"
+Ref: FamilySubscription."Plan ID" > SubscriptionPlan."Id"
+Ref: BudgetLine."Budget Plan ID" > BudgetPlan."Id"
+Ref: BudgetAlert."Budget Plan ID" > BudgetPlan."Id"
+Ref: GoalAllocation."Goal ID" > FinancialGoal."Id"
+Ref: GoalContributionPlan."Goal ID" > FinancialGoal."Id"
+Ref: BudgetAlert."Goal ID" > FinancialGoal."Id"
+Ref: RewardAllocation."Goal ID" > FinancialGoal."Id"
+Ref: Task."Task Category ID" > TaskCategory."Id"
+Ref: TaskAssignment."Task ID" > Task."Id"
+Ref: TaskSchedule."Task ID" > Task."Id"
+Ref: RewardSetting."Task ID" > Task."Id"
+Ref: TaskSubmission."Assignment ID" > TaskAssignment."Id"
+Ref: TaskUnavailability."Assignment ID" > TaskAssignment."Id"
+Ref: TaskProof."Submission ID" > TaskSubmission."Id"
+Ref: RewardSettlement."Task Submission ID" > TaskSubmission."Id"
+Ref: RewardSettlement."Reward Setting ID" > RewardSetting."Id"
+Ref: RewardAllocation."Reward Settlement ID" > RewardSettlement."Id"
+Ref: RewardDispute."Reward Settlement ID" > RewardSettlement."Id"
+Ref: EmergencyContact."Sos Setting ID" > SosSetting."Id"
+Ref: SosAlert."Device ID" > WearableDevice."Id"
+Ref: SosLocationPoint."Device ID" > WearableDevice."Id"
+Ref: SensorEvent."Device ID" > WearableDevice."Id"
+Ref: MemberLocationPoint."Device ID" > WearableDevice."Id"
+Ref: WearableActivationSession."Wearable Device ID" > WearableDevice."Id"
+Ref: SosLocationPoint."Sos Alert ID" > SosAlert."Id"
+Ref: SosResponse."Sos Alert ID" > SosAlert."Id"
+Ref: SensorEvent."Created Sos Alert ID" > SosAlert."Id"
+Ref: ConversationParticipant."Conversation ID" > Conversation."Id"
+Ref: Message."Conversation ID" > Conversation."Id"
+Ref: Call."Conversation ID" > Conversation."Id"
+Ref: Message."Reply To Message ID" > Message."Id"
+Ref: Message."Related Call ID" > Call."Id"
+Ref: MessageAttachment."Message ID" > Message."Id"
+Ref: MessageReaction."Message ID" > Message."Id"
+Ref: CallParticipant."Call ID" > Call."Id"
+Ref: CalendarEventParticipant."Event ID" > CalendarEvent."Id"
+Ref: AlbumMediaTag."Media ID" > AlbumMedia."Id"
+Ref: MediaModerationCheck."Media ID" > AlbumMedia."Id"
+Ref: StorageCleanupJob."Media ID" > AlbumMedia."Id"
+Ref: FaceScanJob."Media ID" > AlbumMedia."Id"
+Ref: AlbumFaceDetection."Media ID" > AlbumMedia."Id"
+Ref: AlbumTagSuggestion."Media ID" > AlbumMedia."Id"
+Ref: AlbumFaceDetection."Scan Job ID" > FaceScanJob."Scan Job ID"
+Ref: AlbumTagSuggestion."Detection ID" > AlbumFaceDetection."Detection ID"
+Ref: MemberFaceEmbedding."Profile ID" > MemberFaceProfile."Profile ID"
+Ref: AIMessage."Ai Conversation ID" > AIConversation."Id"

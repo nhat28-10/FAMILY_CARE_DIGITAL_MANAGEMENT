@@ -79,30 +79,47 @@ export class FcmNotificationChannel
     }
 
     const messages: admin.messaging.Message[] = deliveries.flatMap((delivery) =>
-      (tokensByUser.get(delivery.userId) ?? []).map((token) => ({
-        token,
-        notification: {
-          title: delivery.notification.title,
-          body: delivery.notification.body,
-        },
-        android: {
-          priority: this.isHighPriority(delivery.notification.priority)
-            ? ('high' as const)
-            : ('normal' as const),
-          notification: {
-            channelId: this.resolveChannelId(delivery.notification),
+      (tokensByUser.get(delivery.userId) ?? []).map((token) => {
+        const dataOnly = delivery.notification.dataOnly === true;
+        const priority = this.isHighPriority(delivery.notification.priority)
+          ? ('high' as const)
+          : ('normal' as const);
+        return {
+          token,
+          // Data-only (không có khối `notification`): Android không tự vẽ
+          // gì, app tự xử lý toàn bộ qua background handler (vd màn cuộc
+          // gọi đến full-screen). Mọi notification khác giữ nguyên hành vi
+          // cũ — Android tự vẽ từ khối `notification`.
+          ...(dataOnly
+            ? {}
+            : {
+                notification: {
+                  title: delivery.notification.title,
+                  body: delivery.notification.body,
+                },
+              }),
+          android: {
+            priority,
+            ...(dataOnly
+              ? {}
+              : {
+                  notification: {
+                    channelId: this.resolveChannelId(delivery.notification),
+                  },
+                }),
           },
-        },
-        data: {
-          title: delivery.notification.title,
-          body: delivery.notification.body,
-          notificationId: delivery.notification.id ?? '',
-          type: delivery.notification.type,
-          familyId: delivery.notification.familyId ?? '',
-          referenceType: delivery.notification.referenceType ?? '',
-          referenceId: delivery.notification.referenceId ?? '',
-        },
-      })),
+          data: {
+            title: delivery.notification.title,
+            body: delivery.notification.body,
+            notificationId: delivery.notification.id ?? '',
+            type: delivery.notification.type,
+            familyId: delivery.notification.familyId ?? '',
+            referenceType: delivery.notification.referenceType ?? '',
+            referenceId: delivery.notification.referenceId ?? '',
+            ...delivery.notification.data,
+          },
+        };
+      }),
     );
 
     const deadTokens: string[] = [];
