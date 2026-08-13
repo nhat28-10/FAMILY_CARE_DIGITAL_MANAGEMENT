@@ -77,13 +77,17 @@ export class FamilyMembersService {
   /** Families the user belongs to, with their membership info. */
   findMyFamilies(userId: string) {
     return this.prisma.family.findMany({
-      where: { members: { some: { userId } } },
+      where: {
+        members: { some: { userId, status: MemberStatus.ACTIVE } },
+      },
       include: {
         members: {
-          where: { userId },
+          where: { userId, status: MemberStatus.ACTIVE },
           select: { familyRole: true, relationship: true, joinedAt: true },
         },
-        _count: { select: { members: true } },
+        _count: {
+          select: { members: { where: { status: MemberStatus.ACTIVE } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
