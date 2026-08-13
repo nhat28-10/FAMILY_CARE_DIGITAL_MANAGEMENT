@@ -199,6 +199,17 @@ export class CallsService {
         body: 'Cuộc gọi video đến',
         referenceType: 'CALL',
         referenceId: call.id,
+        // Data-only: FE tự vẽ IncomingCallScreen full-screen (kể cả khi app
+        // nền/khoá máy) thay vì để Android tự hiện thông báo trơn.
+        dataOnly: true,
+        data: {
+          callId: call.id,
+          conversationId: conversation.id,
+          callerName,
+          conversationType: conversation.conversationType,
+          conversationName: conversation.conversationName ?? '',
+          callEventType: 'incoming',
+        },
       });
     } catch (err) {
       this.logger.error(
@@ -599,7 +610,11 @@ export class CallsService {
         }),
         this.prisma.conversation.findUnique({
           where: { id: call.conversationId },
-          select: { workspaceId: true },
+          select: {
+            workspaceId: true,
+            conversationType: true,
+            conversationName: true,
+          },
         }),
       ]);
       const userIds = pendingParticipants.map((p) => p.member.userId);
@@ -614,6 +629,15 @@ export class CallsService {
         body: 'Cuộc gọi nhỡ',
         referenceType: 'CALL',
         referenceId: call.id,
+        // Không set dataOnly — cuộc gọi nhỡ chỉ mang tính thông tin, giữ
+        // notification message để Android tự hiện thông báo như bình thường.
+        data: {
+          callId: call.id,
+          conversationId: call.conversationId,
+          conversationType: conversation.conversationType,
+          conversationName: conversation.conversationName ?? '',
+          callEventType: 'missed',
+        },
       });
     } catch (err) {
       this.logger.error(

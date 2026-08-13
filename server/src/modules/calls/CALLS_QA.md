@@ -129,3 +129,37 @@ dùng, FE không nên gợi ý thử lại.
   `GET /calls/conversations/:id?limit=1`.
 - **Swagger đầy đủ** cho cả 7 endpoint `/calls/*` (trước đó hoàn toàn trống — 0 schema, 0 mã lỗi
   khai báo). Có thể đối chiếu trực tiếp trên `/api/docs`.
+
+## Đợt 3 (12/08) — Gọi nhóm thực tế + push cuộc gọi đến
+
+FE đã code xong UI gọi nhóm và test thật 2 máy Android, phát hiện thêm 1 nhóm câu hỏi.
+
+**A.1** — Đúng, `NO_ANSWER` chưa có kế hoạch cụ thể set cho từng participant; MVP dừng ở timeout
+cả cuộc gọi (mục 3.2 ở trên).
+
+**A.2** — BE không set giới hạn cứng trong code (`initiate()` chỉ check `>= 2` người, không có
+upper bound). Giới hạn thực tế (nếu có) tới từ gói LiveKit Cloud đang dùng, không phải từ code BE.
+
+**A.3** — Đúng, `GET /calls/:callId` dùng chung `callInclude` với `POST /calls`, `participants[]`
+đầy đủ y hệt (không rút gọn).
+
+**A.4** — Đúng, `call:incoming` luôn gửi `call.participants` từ cùng include bất kể số người trong
+hội thoại, không có logic rút gọn theo kích thước nhóm.
+
+**B.3 ⟳ đã làm** — Đề xuất đổi push "cuộc gọi đến" (`referenceType=CALL`, lúc `initiate()`) sang
+FCM data-only message (bỏ khối `notification`) **đã triển khai**. Xem `CALLS_GUIDE.md` mục 6 cho
+cấu trúc `data` đầy đủ. Cơ chế mới (`dataOnly`/`data` trong `EphemeralNotificationInput`) là
+opt-in — chỉ `CallsService.initiate()` bật, mọi `referenceType` khác (SOS, TASK, CALENDAR...)
+không đổi hành vi.
+
+**B.5** — Đúng, `FcmNotificationChannel.deliver()` là hàm dùng chung. Thiết kế triển khai là nhánh
+điều kiện dựa trên field `dataOnly` mới (mặc định `false`/`undefined`) — không cần tách nhánh code
+riêng, không ảnh hưởng các `referenceType` khác vì chúng không set field này.
+
+**B.6 ⟳ đã làm** — Xác nhận đúng: 2 lần gửi riêng biệt. Đã thêm field `callEventType: "incoming" |
+"missed"` vào khối `data` của cả 2 loại push để FE phân biệt tường minh thay vì đoán qua `body`.
+Push "cuộc gọi nhỡ" **giữ nguyên** dạng notification message (không đổi sang data-only) — đúng đề
+xuất của FE ở B.6.
+
+**Giới hạn đã nói rõ với FE**: thiết kế data-only chỉ có hiệu lực trên Android. iOS cần VoIP Push
+(PushKit) — cơ chế khác hẳn, ngoài phạm vi đợt này.

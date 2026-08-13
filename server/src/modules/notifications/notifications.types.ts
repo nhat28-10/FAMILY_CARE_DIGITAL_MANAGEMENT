@@ -15,6 +15,14 @@ export interface NotificationPayload {
   referenceType: string | null;
   referenceId: string | null;
   createdAt: string;
+  /** Field tuỳ ý gộp thêm vào khối `data` FCM (vd callId/conversationId cho CALL). */
+  data?: Record<string, string> | null;
+  /**
+   * true = gửi FCM data-only (không có khối `notification`) — app tự vẽ UI
+   * (vd màn cuộc gọi đến full-screen) thay vì để Android tự hiện thông báo.
+   * Mặc định false/undefined giữ nguyên hành vi cũ cho mọi notification khác.
+   */
+  dataOnly?: boolean;
 }
 
 /** Một lượt giao tới 1 user (memberId = null với push-only). */
@@ -33,6 +41,10 @@ export interface EphemeralNotificationInput {
   body: string;
   referenceType?: string | null;
   referenceId?: string | null;
+  /** Field tuỳ ý gộp thêm vào khối `data` FCM (vd callId/conversationId cho CALL). */
+  data?: Record<string, string>;
+  /** true = gửi FCM data-only — xem `NotificationPayload.dataOnly`. */
+  dataOnly?: boolean;
 }
 
 export type DispatchJobData =
