@@ -215,6 +215,7 @@ export class CloudflareWorkersAiService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const imageDataUrl = `data:${mimeType};base64,${image.toString('base64')}`;
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.accountId)}/ai/run/${this.modelName}`,
         {
@@ -232,20 +233,11 @@ export class CloudflareWorkersAiService {
               },
               {
                 role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: 'Return exactly this JSON shape: {"decision":"SAFE|NEED_REVIEW|FLAGGED","riskScore":0.0,"categories":[{"code":"SEXUAL_EXPLICIT|NUDITY|GRAPHIC_VIOLENCE|WEAPON|DRUGS|SELF_HARM|HATE_EXTREMISM|OTHER_SENSITIVE","score":0.0}],"reasonCode":"UPPER_SNAKE_CASE","summary":"brief non-graphic summary"}. Scores must be numbers from 0 to 1.',
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:${mimeType};base64,${image.toString('base64')}`,
-                    },
-                  },
-                ],
+                content:
+                  'Return exactly this JSON shape: {"decision":"SAFE|NEED_REVIEW|FLAGGED","riskScore":0.0,"categories":[{"code":"SEXUAL_EXPLICIT|NUDITY|GRAPHIC_VIOLENCE|WEAPON|DRUGS|SELF_HARM|HATE_EXTREMISM|OTHER_SENSITIVE","score":0.0}],"reasonCode":"UPPER_SNAKE_CASE","summary":"brief non-graphic summary"}. Scores must be numbers from 0 to 1.',
               },
             ],
+            image: imageDataUrl,
             response_format: {
               type: 'json_schema',
               json_schema: RESPONSE_SCHEMA,
@@ -315,6 +307,7 @@ export class CloudflareWorkersAiService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const imageDataUrl = `data:${mimeType};base64,${image.toString('base64')}`;
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.accountId)}/ai/run/${this.modelName}`,
         {
@@ -332,23 +325,13 @@ export class CloudflareWorkersAiService {
               },
               {
                 role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text:
-                      'Return exactly this JSON shape: {"hasPerson":true,"labels":["beach","sea"],"sceneSummary":"brief neutral scene description","topicMatch":"MATCH|MISMATCH|UNCERTAIN","topicConfidence":0.0,"mismatchReason":"short reason or empty string"}. ' +
-                      `Topic to compare: ${normalizedTopic ? JSON.stringify(normalizedTopic) : 'none'}. ` +
-                      'If no topic is provided, set topicMatch to UNCERTAIN and topicConfidence to 0. Labels must be broad visual objects/scenes only.',
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:${mimeType};base64,${image.toString('base64')}`,
-                    },
-                  },
-                ],
+                content:
+                  'Return exactly this JSON shape: {"hasPerson":true,"labels":["beach","sea"],"sceneSummary":"brief neutral scene description","topicMatch":"MATCH|MISMATCH|UNCERTAIN","topicConfidence":0.0,"mismatchReason":"short reason or empty string"}. ' +
+                  `Topic to compare: ${normalizedTopic ? JSON.stringify(normalizedTopic) : 'none'}. ` +
+                  'If no topic is provided, set topicMatch to UNCERTAIN and topicConfidence to 0. Labels must be broad visual objects/scenes only.',
               },
             ],
+            image: imageDataUrl,
             response_format: {
               type: 'json_schema',
               json_schema: CONTEXT_RESPONSE_SCHEMA,
@@ -406,11 +389,10 @@ export class CloudflareWorkersAiService {
     if (!this.isRecord(envelope) || envelope.success !== true) {
       throw this.invalidResponse();
     }
-    const result = envelope.result;
-    if (!this.isRecord(result) || !('response' in result)) {
-      throw this.invalidResponse();
+    let value: unknown = envelope.result;
+    if (this.isRecord(value) && 'response' in value) {
+      value = value.response;
     }
-    let value: unknown = result.response;
     if (typeof value === 'string') {
       value = this.parseModelText(value);
     }
@@ -421,11 +403,10 @@ export class CloudflareWorkersAiService {
     if (!this.isRecord(envelope) || envelope.success !== true) {
       throw this.invalidResponse();
     }
-    const result = envelope.result;
-    if (!this.isRecord(result) || !('response' in result)) {
-      throw this.invalidResponse();
+    let value: unknown = envelope.result;
+    if (this.isRecord(value) && 'response' in value) {
+      value = value.response;
     }
-    let value: unknown = result.response;
     if (typeof value === 'string') {
       value = this.parseContextModelText(value);
     }
