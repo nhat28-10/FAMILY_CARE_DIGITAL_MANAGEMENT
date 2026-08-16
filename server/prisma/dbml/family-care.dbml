@@ -124,6 +124,7 @@ Table families {
   conversations conversations [not null]
   familyAnnouncements family_announcements [not null]
   calendarEvents calendar_events [not null]
+  albumCollections album_collections [not null]
   albumMedia album_media [not null]
   storageCleanupJobs storage_cleanup_jobs [not null]
   memberFaceProfiles member_face_profiles [not null]
@@ -186,6 +187,7 @@ Table family_members {
   createdAnnouncements family_announcements [not null]
   createdCalendarEvents calendar_events [not null]
   calendarEventParticipations calendar_event_participants [not null]
+  createdAlbumCollections album_collections [not null]
   uploadedAlbumMedia album_media [not null]
   deletedAlbumMedia album_media [not null]
   reviewedModerationChecks media_moderation_checks [not null]
@@ -1158,9 +1160,32 @@ Table calendar_event_participants {
   Note: 'Thành viên được mời tham gia một sự kiện lịch.'
 }
 
+Table album_collections {
+  id String [pk]
+  workspaceId String [not null]
+  name String [not null]
+  description String
+  coverMediaId String
+  createdByMemberId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  workspace families [not null]
+  createdByMember family_members [not null]
+  coverMedia album_media
+  media album_media [not null]
+
+  indexes {
+    (workspaceId, name) [unique]
+  }
+
+  Note: 'Ảnh/video trong album gia đình.'
+}
+
 Table album_media {
   id String [pk]
   workspaceId String [not null]
+  collectionId String
   uploadedByMemberId String [not null]
   mediaType AlbumMediaType [not null]
   mediaUrl String
@@ -1184,6 +1209,8 @@ Table album_media {
   latestModerationJobId String
   moderationQueuedAt DateTime
   workspace families [not null]
+  collection album_collections
+  coveredCollections album_collections [not null]
   uploadedByMember family_members [not null]
   deletedByMember family_members
   tags album_media_tags [not null]
@@ -1192,8 +1219,6 @@ Table album_media {
   faceScanJobs face_scan_jobs [not null]
   faceDetections album_face_detections [not null]
   tagSuggestions album_tag_suggestions [not null]
-
-  Note: 'Ảnh/video trong album gia đình.'
 }
 
 Table album_media_tags {
@@ -2170,7 +2195,15 @@ Ref: calendar_event_participants.eventId > calendar_events.id [delete: Cascade]
 
 Ref: calendar_event_participants.memberId > family_members.id [delete: Cascade]
 
+Ref: album_collections.workspaceId > families.id [delete: Cascade]
+
+Ref: album_collections.createdByMemberId > family_members.id [delete: Restrict]
+
+Ref: album_collections.coverMediaId - album_media.id [delete: Set Null]
+
 Ref: album_media.workspaceId > families.id [delete: Cascade]
+
+Ref: album_media.collectionId - album_collections.id [delete: Set Null]
 
 Ref: album_media.uploadedByMemberId > family_members.id [delete: Cascade]
 

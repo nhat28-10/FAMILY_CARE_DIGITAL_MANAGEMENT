@@ -16,8 +16,13 @@ import { StorageService } from '../storage/storage.service';
 import { AlbumMediaPolicy } from './album-media.policy';
 import { AlbumStorageCleanupService } from './album-storage-cleanup.service';
 import { AlbumsService } from './albums.service';
-import { PermanentDeleteAlbumMediaDto } from './dto/album-media.dto';
+import {
+  AlbumDraftContentIntent,
+  PermanentDeleteAlbumMediaDto,
+} from './dto/album-media.dto';
+import { CloudflareWorkersAiService } from './moderation/cloudflare-workers-ai.service';
 import { AlbumModerationService } from './moderation/album-moderation.service';
+import { ModerationProviderError } from './moderation/moderation.types';
 
 const now = new Date('2026-07-11T00:00:00.000Z');
 
@@ -72,6 +77,7 @@ function media(overrides: Record<string, unknown> = {}) {
 describe('AlbumsService permissions and deletion flow', () => {
   let service: AlbumsService;
   let prisma: {
+    albumCollection: { findFirst: jest.Mock };
     albumMedia: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
@@ -89,9 +95,11 @@ describe('AlbumsService permissions and deletion flow', () => {
     createSignedReadUrl: jest.Mock;
   };
   let cleanup: { record: jest.Mock };
+  let workersAi: { analyzeAlbumContext: jest.Mock };
 
   beforeEach(() => {
     prisma = {
+      albumCollection: { findFirst: jest.fn() },
       albumMedia: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -114,6 +122,7 @@ describe('AlbumsService permissions and deletion flow', () => {
     };
     storage.deleteFileByKey.mockResolvedValue(true);
     cleanup = { record: jest.fn().mockResolvedValue(undefined) };
+    workersAi = { analyzeAlbumContext: jest.fn() };
     service = new AlbumsService(
       prisma as unknown as PrismaService,
       storage as unknown as StorageService,
@@ -122,6 +131,7 @@ describe('AlbumsService permissions and deletion flow', () => {
       {
         enqueueAfterUpload: jest.fn(),
       } as unknown as AlbumModerationService,
+      workersAi as unknown as CloudflareWorkersAiService,
       { get: jest.fn().mockReturnValue(600) } as unknown as ConfigService,
     );
   });
@@ -368,5 +378,95 @@ describe('AlbumsService permissions and deletion flow', () => {
       prisma.albumMedia.findMany.mock.calls[0][0].where.AND,
     ).toContainEqual({ tags: { some: { taggedMemberId } } });
     expect(result.items[0].tagCount).toBe(2);
+  });
+
+  it('allows a draft image when context matches the collection topic', async () => {
+    prisma.albumCollection.findFirst.mockResolvedValue({ name: 'Đi biển' });
+    workersAi.analyzeAlbumContext.mockResolvedValue({
+      hasPerson: true,
+      labels: ['beach', 'sea', 'family'],
+      sceneSummary: 'Gia đình ở bãi biển.',
+      topicMatch: 'MATCH',
+      topicConfidence: 0.88,
+      mismatchReason: '',
+    });
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      {
+        collectionId: '11111111-1111-4111-8111-111111111111',
+        declaredContentIntent: AlbumDraftContentIntent.PEOPLE,
+      },
+      {
+        originalname: 'beach.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(workersAi.analyzeAlbumContext).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      'image/jpeg',
+      'Đi biển',
+    );
+    expect(result.recommendation).toBe('ALLOW');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('warns when a people draft has no person and mismatches the topic', async () => {
+    workersAi.analyzeAlbumContext.mockResolvedValue({
+      hasPerson: false,
+      labels: ['snow', 'skiing', 'mountain'],
+      sceneSummary: 'Cảnh trượt tuyết trên núi.',
+      topicMatch: 'MISMATCH',
+      topicConfidence: 0.91,
+      mismatchReason:
+        'Ảnh có bối cảnh tuyết/trượt tuyết, không giống chủ đề đi biển.',
+    });
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      {
+        topic: 'Đi biển',
+        declaredContentIntent: AlbumDraftContentIntent.PEOPLE,
+      },
+      {
+        originalname: 'ski.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(result.recommendation).toBe('WARN');
+    expect(result.topicMatch).toBe('MISMATCH');
+    expect(result.hasPerson).toBe(false);
+    expect(result.warnings).toHaveLength(2);
+    expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
+  });
+
+  it('returns a soft warning when draft analysis is unavailable', async () => {
+    workersAi.analyzeAlbumContext.mockRejectedValue(
+      new ModerationProviderError('AI unavailable', 'AI_NOT_CONFIGURED', false),
+    );
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      { topic: 'Đi biển' },
+      {
+        originalname: 'draft.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(result.recommendation).toBe('WARN');
+    expect(result.analysisStatus).toBe('UNAVAILABLE');
+    expect(result.errorCode).toBe('AI_NOT_CONFIGURED');
   });
 });

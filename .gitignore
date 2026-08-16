@@ -16,6 +16,7 @@ dist/
 build/
 .next/
 out/
+outputs/
 
 # Logs
 logs/
@@ -51,3 +52,17 @@ public/uploads/
 *.zip
 *.rar
 *.7z
+
+# Local spreadsheet layout/repair artifacts
+outputs/unit-test-match/GSU26SE042_Unit_Test_layout_final*.xlsx
+outputs/unit-test-match/layout-preview.html
+outputs/unit-test-match/previews/
+outputs/unit-test-match/openxml-validator/
+
+# One-off spreadsheet helper scripts
+scripts/fix-unit-test-layout.ps1
+scripts/verify-unit-test-layout.ps1
+scripts/render-unit-test-preview.ps1
+scripts/render-unit-test-preview-png.ps1
+scripts/rebuild_backend_unit_test_like_sample.ps1
+scripts/rebuild_backend_unit_test_workbook.ps1

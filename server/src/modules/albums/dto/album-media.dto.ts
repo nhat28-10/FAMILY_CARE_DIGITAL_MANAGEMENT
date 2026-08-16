@@ -26,7 +26,40 @@ export enum AlbumDeletedView {
   TRASH = 'TRASH',
 }
 
+export enum AlbumDraftContentIntent {
+  PEOPLE = 'PEOPLE',
+  SCENE_OR_OBJECT = 'SCENE_OR_OBJECT',
+}
+
+export class AnalyzeAlbumDraftDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 120,
+    example: 'Đi biển',
+    description:
+      'Chủ đề tạm thời nếu FE chưa chọn collection hoặc muốn override tên collection',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  topic?: string;
+
+  @ApiPropertyOptional({ enum: AlbumDraftContentIntent })
+  @IsOptional()
+  @IsEnum(AlbumDraftContentIntent)
+  declaredContentIntent?: AlbumDraftContentIntent;
+}
+
 export class UploadAlbumMediaDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
+
   @ApiPropertyOptional({ maxLength: 1000, example: 'Kỷ niệm gia đình' })
   @IsOptional()
   @IsString()
@@ -43,6 +76,11 @@ export class UploadAlbumMediaDto {
 }
 
 export class ListAlbumMediaQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
+
   @ApiPropertyOptional({ enum: AlbumMediaType })
   @IsOptional()
   @IsEnum(AlbumMediaType)
@@ -93,6 +131,15 @@ export class ListAlbumMediaQueryDto extends PaginationQueryDto {
 }
 
 export class UpdateAlbumMediaDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Gửi null để bỏ media khỏi album/collection',
+  })
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string | null;
+
   @ApiPropertyOptional({
     maxLength: 1000,
     nullable: true,
