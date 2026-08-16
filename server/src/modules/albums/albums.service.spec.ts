@@ -374,9 +374,11 @@ describe('AlbumsService permissions and deletion flow', () => {
       where: { id: taggedMemberId, familyId: 'family-1' },
       select: { id: true },
     });
-    expect(
-      prisma.albumMedia.findMany.mock.calls[0][0].where.AND,
-    ).toContainEqual({ tags: { some: { taggedMemberId } } });
+    const findManyCalls = prisma.albumMedia.findMany.mock.calls as unknown[][];
+    const findManyArg = findManyCalls[0][0] as { where: { AND: unknown[] } };
+    expect(findManyArg.where.AND).toContainEqual({
+      tags: { some: { taggedMemberId } },
+    });
     expect(result.items[0].tagCount).toBe(2);
   });
 
@@ -472,9 +474,39 @@ describe('AlbumsService permissions and deletion flow', () => {
 
     expect(result.recommendation).toBe('WARN');
     expect(result.topicMatch).toBe('MISMATCH');
-    expect(result.warnings).toEqual([
+    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings).toContain(
       'Ảnh có vẻ không khớp với chủ đề album "anh LMH".',
-    ]);
+    );
+    expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
+  });
+
+  it('warns when a person-like topic has no person even if topic match is unknown', async () => {
+    workersAi.analyzeAlbumContext.mockResolvedValue({
+      hasPerson: false,
+      labels: ['beach', 'sea'],
+      sceneSummary: 'A quiet beach scene.',
+      topicMatch: 'UNCERTAIN',
+      topicConfidence: 0,
+      mismatchReason: '',
+    });
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      { topic: 'anh LMH' },
+      {
+        originalname: 'beach.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(result.recommendation).toBe('WARN');
+    expect(result.topicMatch).toBe('UNKNOWN');
+    expect(result.hasPerson).toBe(false);
+    expect(result.warnings).toHaveLength(1);
     expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
   });
 
@@ -498,5 +530,34 @@ describe('AlbumsService permissions and deletion flow', () => {
     expect(result.recommendation).toBe('WARN');
     expect(result.analysisStatus).toBe('UNAVAILABLE');
     expect(result.errorCode).toBe('AI_NOT_CONFIGURED');
+  });
+
+  it('returns a soft warning when draft analysis exceeds the BE timeout', async () => {
+    jest.useFakeTimers();
+    workersAi.analyzeAlbumContext.mockReturnValue(new Promise(() => undefined));
+
+    try {
+      const pending = service.analyzeDraft(
+        'family-1',
+        familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+        { topic: 'Beach' },
+        {
+          originalname: 'slow.jpg',
+          mimetype: 'image/jpeg',
+          size: 4,
+          buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+        },
+      );
+
+      await jest.advanceTimersByTimeAsync(600);
+      const result = await pending;
+
+      expect(result.recommendation).toBe('WARN');
+      expect(result.analysisStatus).toBe('UNAVAILABLE');
+      expect(result.errorCode).toBe('AI_DRAFT_TIMEOUT');
+      expect(result.suggestedActions).toContain('TRY_AGAIN');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
