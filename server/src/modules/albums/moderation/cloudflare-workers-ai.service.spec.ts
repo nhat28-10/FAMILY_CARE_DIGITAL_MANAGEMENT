@@ -274,4 +274,21 @@ describe('CloudflareWorkersAiService', () => {
       mismatchReason: '',
     });
   });
+
+  it('cleans reasoning-heavy plain text before using it as context summary', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse(
+        'The image depicts a serene beach scene. To determine the topic match, we can analyze the visual elements: * Beach: visible. * Sea: visible.',
+      ),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'anh LMH'),
+    ).resolves.toMatchObject({
+      hasPerson: false,
+      labels: ['beach'],
+      sceneSummary: 'The image depicts a serene beach scene.',
+      topicMatch: 'UNCERTAIN',
+    });
+  });
 });

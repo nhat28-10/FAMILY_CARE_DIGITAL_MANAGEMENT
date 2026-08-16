@@ -65,6 +65,7 @@ type AlbumMediaWithUploader = Prisma.AlbumMediaGetPayload<{
 @Injectable()
 export class AlbumsService {
   private readonly signedUrlTtlSeconds: number;
+  private readonly draftAnalysisTimeoutMs: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -79,6 +80,10 @@ export class AlbumsService {
       'storage.signedUrlTtlSeconds',
       600,
     );
+    this.draftAnalysisTimeoutMs = config.get<number>(
+      'albumModeration.draftAnalysisTimeoutMs',
+      12000,
+    );
   }
 
   async analyzeDraft(
@@ -91,6 +96,9 @@ export class AlbumsService {
     const validated = validateAlbumFile(file);
     const topic = await this.resolveDraftTopic(workspaceId, dto);
     const declaredContentIntent = dto.declaredContentIntent ?? null;
+    const expectsPeople =
+      declaredContentIntent === AlbumDraftContentIntent.PEOPLE ||
+      this.topicSuggestsPeople(topic);
     const base = {
       collectionId: dto.collectionId ?? null,
       topic,
@@ -116,20 +124,22 @@ export class AlbumsService {
     }
 
     try {
-      const result = await this.workersAi.analyzeAlbumContext(
-        file!.buffer,
-        validated.mimeType,
-        topic,
+      const result = await this.withDraftTimeout(
+        this.workersAi.analyzeAlbumContext(
+          file!.buffer,
+          validated.mimeType,
+          topic,
+        ),
       );
       const warnings: string[] = [];
       const suggestedActions = new Set<string>(['CONFIRM_UPLOAD']);
-      if (
-        declaredContentIntent === AlbumDraftContentIntent.PEOPLE &&
-        !result.hasPerson
-      ) {
+      if (expectsPeople && !result.hasPerson) {
         warnings.push(
           'Không phát hiện người trong ảnh. Ảnh vẫn có thể là kỷ niệm gia đình, nhưng sẽ không có gợi ý khuôn mặt nếu hệ thống không tìm thấy khuôn mặt.',
         );
+      }
+      if (expectsPeople && !result.hasPerson && topic) {
+        suggestedActions.add('CHOOSE_ANOTHER_COLLECTION');
       }
       if (topic && result.topicMatch === 'MISMATCH') {
         warnings.push(
@@ -630,5 +640,32 @@ export class AlbumsService {
   private normalizeOptionalText(value: string | null | undefined) {
     const normalized = value?.trim();
     return normalized ? normalized : null;
+  }
+
+  private topicSuggestsPeople(topic: string | null | undefined) {
+    const normalized = topic?.trim().replace(/\s+/g, ' ');
+    if (!normalized) return false;
+    return /\b(anh|chi|em|ong|ba|bo|me|bac|co|chu|di|cau|mo|thay|ban)\b/i.test(
+      normalized,
+    );
+  }
+
+  private withDraftTimeout<T>(promise: Promise<T>): Promise<T> {
+    let timeout: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeout = setTimeout(() => {
+        reject(
+          new ModerationProviderError(
+            'PhÃ¢n tÃ­ch nhÃ¡p album vÆ°á»£t quÃ¡ thá»i gian chá»',
+            'AI_DRAFT_TIMEOUT',
+            true,
+          ),
+        );
+      }, this.draftAnalysisTimeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
   }
 }

@@ -172,6 +172,10 @@ export default () => ({
     flagThreshold: parseFloat(
       process.env.ALBUM_MODERATION_FLAG_THRESHOLD || '0.80',
     ),
+    draftAnalysisTimeoutMs: parseInt(
+      process.env.ALBUM_DRAFT_ANALYSIS_TIMEOUT_MS || '12000',
+      10,
+    ),
     ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
     ffprobePath: process.env.FFPROBE_PATH || 'ffprobe',
     videoFrameIntervalSeconds: parseInt(

@@ -557,11 +557,30 @@ export class CloudflareWorkersAiService {
     return {
       hasPerson,
       labels: [...new Set(labels)],
-      sceneSummary: normalized.slice(0, 500),
+      sceneSummary: this.cleanContextSummary(normalized),
       topicMatch: 'UNCERTAIN',
       topicConfidence: 0,
       mismatchReason: '',
     };
+  }
+
+  private cleanContextSummary(text: string) {
+    const withoutMarkdown = text
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/[*_`#>-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const beforeReasoning = withoutMarkdown
+      .split(
+        /\b(?:to determine|we can analyze|let'?s analyze|analysis|therefore|based on)\b/i,
+      )[0]
+      .trim();
+    const candidate = beforeReasoning || withoutMarkdown;
+    const sentence = candidate.match(/^.{20,220}?[.!?](?:\s|$)/)?.[0];
+    return (sentence ?? candidate.slice(0, 220))
+      .replace(/[,;:\s]+$/g, '')
+      .trim()
+      .slice(0, 500);
   }
 
   private parseResultObject(value: unknown): AiModerationResult {
