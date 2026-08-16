@@ -52,6 +52,24 @@ function textResponse(text: string) {
   );
 }
 
+function contextResponse(result: unknown) {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      result,
+      errors: [],
+      messages: [],
+    }),
+    { status: 200 },
+  );
+}
+
+function requestJsonBody<T>(mock: jest.Mock): T {
+  const firstCall = mock.mock.calls[0] as unknown[];
+  const init = firstCall[1] as { body: string };
+  return JSON.parse(init.body) as T;
+}
+
 describe('CloudflareWorkersAiService', () => {
   let service: CloudflareWorkersAiService;
   let fetchMock: jest.Mock;
@@ -76,6 +94,19 @@ describe('CloudflareWorkersAiService', () => {
       decision,
       riskScore: 0.2,
     });
+  });
+
+  it('sends vision images using the Workers AI top-level image field', async () => {
+    fetchMock.mockResolvedValue(response(MediaCheckResult.SAFE));
+
+    await service.moderateImage(png, 'image/png');
+
+    const body = requestJsonBody<{
+      image?: string;
+      messages: Array<{ content: unknown }>;
+    }>(fetchMock);
+    expect(body.image).toMatch(/^data:image\/png;base64,/);
+    expect(typeof body.messages[1].content).toBe('string');
   });
 
   it('rejects invalid JSON', async () => {
@@ -197,5 +228,30 @@ describe('CloudflareWorkersAiService', () => {
         { code: 'NUDITY', score: 0.84 },
       ],
     });
+  });
+
+  it('parses context JSON returned directly in result', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse({
+        hasPerson: true,
+        labels: ['beach', 'sea'],
+        sceneSummary: 'A family beach scene.',
+        topicMatch: 'MATCH',
+        topicConfidence: 0.92,
+        mismatchReason: '',
+      }),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'Beach'),
+    ).resolves.toMatchObject({
+      hasPerson: true,
+      labels: ['beach', 'sea'],
+      topicMatch: 'MATCH',
+      topicConfidence: 0.92,
+    });
+
+    const body = requestJsonBody<{ image?: string }>(fetchMock);
+    expect(body.image).toMatch(/^data:image\/png;base64,/);
   });
 });
