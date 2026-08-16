@@ -35,6 +35,7 @@ import { ALBUM_MAX_FILE_SIZE } from './album-media.validator';
 import { AlbumsService } from './albums.service';
 import { albumMemberTracker } from './album-throttle';
 import {
+  AnalyzeAlbumDraftDto,
   ListAlbumMediaQueryDto,
   PermanentDeleteAlbumMediaDto,
   SoftDeleteAlbumMediaDto,
@@ -49,6 +50,45 @@ import {
 @Controller('families/:familyId/albums/media')
 export class AlbumsController {
   constructor(private readonly albumsService: AlbumsService) {}
+
+  @Post('analyze-draft')
+  @Throttle({
+    default: { limit: 20, ttl: 60_000, getTracker: albumMemberTracker },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: ALBUM_MAX_FILE_SIZE } }),
+  )
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Phân tích nháp media trước upload album',
+    description:
+      'Không lưu DB, không upload R2, không gọi face-scan. Endpoint chỉ cảnh báo mềm về ảnh không có người hoặc không khớp chủ đề collection.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        collectionId: { type: 'string', format: 'uuid' },
+        topic: { type: 'string', maxLength: 120 },
+        declaredContentIntent: {
+          type: 'string',
+          enum: ['PEOPLE', 'SCENE_OR_OBJECT'],
+        },
+      },
+    },
+  })
+  @ResponseMessage('Phân tích nháp album thành công')
+  analyzeDraft(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember() member: FamilyMember,
+    @Body() dto: AnalyzeAlbumDraftDto,
+    @UploadedFile() file: UploadedFilePayload | undefined,
+  ) {
+    return this.albumsService.analyzeDraft(familyId, member, dto, file);
+  }
 
   @Post()
   @Throttle({
@@ -70,6 +110,7 @@ export class AlbumsController {
       required: ['file'],
       properties: {
         file: { type: 'string', format: 'binary' },
+        collectionId: { type: 'string', format: 'uuid' },
         caption: { type: 'string', maxLength: 1000 },
         visibilityScope: {
           type: 'string',

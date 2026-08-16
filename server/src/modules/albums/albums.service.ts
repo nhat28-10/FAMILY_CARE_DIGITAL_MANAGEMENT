@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AlbumMediaType,
   AlbumVisibilityScope,
   FamilyMember,
   MediaModerationStatus,
@@ -19,14 +20,18 @@ import type { UploadedFilePayload } from '../storage/storage.service';
 import { AlbumMediaPolicy } from './album-media.policy';
 import { AlbumStorageCleanupService } from './album-storage-cleanup.service';
 import { AlbumModerationService } from './moderation/album-moderation.service';
+import { CloudflareWorkersAiService } from './moderation/cloudflare-workers-ai.service';
+import { ModerationProviderError } from './moderation/moderation.types';
 import {
   ALBUM_MAX_FILE_SIZE,
   ALBUM_MIME_TO_EXT,
   validateAlbumFile,
 } from './album-media.validator';
 import {
+  AlbumDraftContentIntent,
   AlbumDeletedView,
   AlbumSortOrder,
+  AnalyzeAlbumDraftDto,
   ListAlbumMediaQueryDto,
   SoftDeleteAlbumMediaDto,
   UpdateAlbumMediaDto,
@@ -34,6 +39,14 @@ import {
 } from './dto/album-media.dto';
 
 const albumMediaInclude = {
+  collection: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      deletedAt: true,
+    },
+  },
   uploadedByMember: {
     select: {
       id: true,
@@ -59,12 +72,108 @@ export class AlbumsService {
     private readonly cleanup: AlbumStorageCleanupService,
     private readonly policy: AlbumMediaPolicy,
     private readonly moderation: AlbumModerationService,
+    private readonly workersAi: CloudflareWorkersAiService,
     config: ConfigService,
   ) {
     this.signedUrlTtlSeconds = config.get<number>(
       'storage.signedUrlTtlSeconds',
       600,
     );
+  }
+
+  async analyzeDraft(
+    workspaceId: string,
+    member: FamilyMember,
+    dto: AnalyzeAlbumDraftDto,
+    file: UploadedFilePayload | undefined,
+  ) {
+    void member;
+    const validated = validateAlbumFile(file);
+    const topic = await this.resolveDraftTopic(workspaceId, dto);
+    const declaredContentIntent = dto.declaredContentIntent ?? null;
+    const base = {
+      collectionId: dto.collectionId ?? null,
+      topic,
+      declaredContentIntent,
+      mediaType: validated.mediaType,
+    };
+
+    if (validated.mediaType === AlbumMediaType.VIDEO) {
+      return {
+        ...base,
+        recommendation: 'WARN',
+        analysisStatus: 'SKIPPED',
+        hasPerson: null,
+        topicMatch: 'UNKNOWN',
+        topicConfidence: 0,
+        detectedLabels: [],
+        summary: 'Video sẽ được kiểm duyệt sau khi upload.',
+        warnings: [
+          'Chưa phân tích chủ đề video ở bước nháp. Hệ thống vẫn sẽ kiểm duyệt video sau khi upload.',
+        ],
+        suggestedActions: ['CONFIRM_UPLOAD', 'CHOOSE_ANOTHER_COLLECTION'],
+      };
+    }
+
+    try {
+      const result = await this.workersAi.analyzeAlbumContext(
+        file!.buffer,
+        validated.mimeType,
+        topic,
+      );
+      const warnings: string[] = [];
+      const suggestedActions = new Set<string>(['CONFIRM_UPLOAD']);
+      if (
+        declaredContentIntent === AlbumDraftContentIntent.PEOPLE &&
+        !result.hasPerson
+      ) {
+        warnings.push(
+          'Không phát hiện người trong ảnh. Ảnh vẫn có thể là kỷ niệm gia đình, nhưng sẽ không có gợi ý khuôn mặt nếu hệ thống không tìm thấy khuôn mặt.',
+        );
+      }
+      if (
+        topic &&
+        result.topicMatch === 'MISMATCH' &&
+        result.topicConfidence >= 0.5
+      ) {
+        warnings.push(
+          result.mismatchReason ||
+            `Ảnh có vẻ không khớp với chủ đề album "${topic}".`,
+        );
+        suggestedActions.add('CHOOSE_ANOTHER_COLLECTION');
+      }
+
+      return {
+        ...base,
+        recommendation: warnings.length > 0 ? 'WARN' : 'ALLOW',
+        analysisStatus: 'COMPLETED',
+        hasPerson: result.hasPerson,
+        topicMatch:
+          result.topicMatch === 'UNCERTAIN' ? 'UNKNOWN' : result.topicMatch,
+        topicConfidence: result.topicConfidence,
+        detectedLabels: result.labels,
+        summary: result.sceneSummary,
+        warnings,
+        suggestedActions: [...suggestedActions],
+      };
+    } catch (error) {
+      if (!(error instanceof ModerationProviderError)) throw error;
+      return {
+        ...base,
+        recommendation: 'WARN',
+        analysisStatus: 'UNAVAILABLE',
+        hasPerson: null,
+        topicMatch: 'UNKNOWN',
+        topicConfidence: 0,
+        detectedLabels: [],
+        summary: 'Chưa thể phân tích ảnh ở bước nháp.',
+        warnings: [
+          'Chưa thể phân tích ảnh trước upload. Bạn vẫn có thể upload và hệ thống sẽ kiểm duyệt sau.',
+        ],
+        suggestedActions: ['CONFIRM_UPLOAD', 'TRY_AGAIN'],
+        errorCode: error.code,
+      };
+    }
   }
 
   async upload(
@@ -74,6 +183,10 @@ export class AlbumsService {
     file: UploadedFilePayload | undefined,
   ) {
     const validated = validateAlbumFile(file);
+    const collectionId = await this.resolveCollectionId(
+      workspaceId,
+      dto.collectionId,
+    );
     const saved = await this.storage.savePrivateFile(
       'album-media',
       workspaceId,
@@ -86,6 +199,7 @@ export class AlbumsService {
       media = await this.prisma.albumMedia.create({
         data: {
           workspaceId,
+          collectionId,
           uploadedByMemberId: member.id,
           mediaType: validated.mediaType,
           mediaUrl: null,
@@ -142,6 +256,10 @@ export class AlbumsService {
       }
     }
 
+    if (query.collectionId) {
+      await this.ensureActiveCollection(workspaceId, query.collectionId);
+    }
+
     const from = query.from ? new Date(query.from) : undefined;
     const to = query.to ? new Date(query.to) : undefined;
     if (from && to && from > to) {
@@ -163,6 +281,7 @@ export class AlbumsService {
       filters.push({ uploadedByMemberId: member.id });
     }
     if (query.mediaType) filters.push({ mediaType: query.mediaType });
+    if (query.collectionId) filters.push({ collectionId: query.collectionId });
     if (query.uploaderMemberId) {
       filters.push({ uploadedByMemberId: query.uploaderMemberId });
     }
@@ -241,9 +360,18 @@ export class AlbumsService {
     if (media.deletedAt) {
       throw new BadRequestException('Không thể sửa media đã xóa');
     }
-    if (dto.caption === undefined && dto.visibilityScope === undefined) {
+    if (
+      dto.caption === undefined &&
+      dto.visibilityScope === undefined &&
+      dto.collectionId === undefined
+    ) {
       throw new BadRequestException('Không có nội dung cần cập nhật');
     }
+
+    const collectionId =
+      dto.collectionId === undefined
+        ? undefined
+        : await this.resolveCollectionId(workspaceId, dto.collectionId);
 
     const updated = await this.prisma.albumMedia.update({
       where: { id: mediaId, workspaceId },
@@ -254,6 +382,7 @@ export class AlbumsService {
         ...(dto.visibilityScope !== undefined
           ? { visibilityScope: dto.visibilityScope }
           : {}),
+        ...(dto.collectionId !== undefined ? { collectionId } : {}),
       },
       include: albumMediaInclude,
     });
@@ -420,6 +549,14 @@ export class AlbumsService {
     return {
       id: media.id,
       mediaType: media.mediaType,
+      collection: media.collection
+        ? {
+            id: media.collection.id,
+            name: media.collection.name,
+            description: media.collection.description,
+          }
+        : null,
+      collectionId: media.collection?.id ?? null,
       caption: media.caption,
       visibilityScope: media.visibilityScope,
       moderationStatus: media.moderationStatus,
@@ -455,6 +592,43 @@ export class AlbumsService {
             media.moderationStatus === MediaModerationStatus.FLAGGED),
       },
     };
+  }
+
+  private async resolveCollectionId(
+    workspaceId: string,
+    collectionId: string | null | undefined,
+  ) {
+    if (collectionId === undefined) return undefined;
+    if (collectionId === null || collectionId.trim() === '') return null;
+    await this.ensureActiveCollection(workspaceId, collectionId);
+    return collectionId;
+  }
+
+  private async ensureActiveCollection(
+    workspaceId: string,
+    collectionId: string,
+  ) {
+    const collection = await this.prisma.albumCollection.findFirst({
+      where: { id: collectionId, workspaceId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!collection) throw new NotFoundException('Không tìm thấy album');
+  }
+
+  private async resolveDraftTopic(
+    workspaceId: string,
+    dto: AnalyzeAlbumDraftDto,
+  ) {
+    const explicitTopic = this.normalizeOptionalText(dto.topic);
+    if (dto.collectionId) {
+      const collection = await this.prisma.albumCollection.findFirst({
+        where: { id: dto.collectionId, workspaceId, deletedAt: null },
+        select: { name: true },
+      });
+      if (!collection) throw new NotFoundException('Không tìm thấy album');
+      return explicitTopic ?? collection.name;
+    }
+    return explicitTopic;
   }
 
   private normalizeOptionalText(value: string | null | undefined) {

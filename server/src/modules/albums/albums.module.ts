@@ -6,6 +6,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { StorageModule } from '../storage/storage.module';
 import { UsersModule } from '../users/users.module';
 import { AlbumMediaPolicy } from './album-media.policy';
+import { AlbumCollectionsController } from './album-collections.controller';
+import { AlbumCollectionsService } from './album-collections.service';
 import { AlbumStorageCleanupService } from './album-storage-cleanup.service';
 import { AlbumFaceSuggestionsController } from './album-face-suggestions.controller';
 import { AlbumFaceSuggestionsService } from './album-face-suggestions.service';
@@ -35,6 +37,7 @@ import { VideoFrameService } from './moderation/video-frame.service';
   ],
   controllers: [
     AlbumsController,
+    AlbumCollectionsController,
     AlbumTagsController,
     AlbumFaceSuggestionsController,
     AlbumModerationController,
@@ -42,6 +45,7 @@ import { VideoFrameService } from './moderation/video-frame.service';
   ],
   providers: [
     AlbumsService,
+    AlbumCollectionsService,
     AlbumTagsService,
     AlbumFaceSuggestionsService,
     AlbumStorageCleanupService,
@@ -58,6 +62,7 @@ import { VideoFrameService } from './moderation/video-frame.service';
   ],
   exports: [
     AlbumsService,
+    AlbumCollectionsService,
     AlbumModerationService,
     FaceProfilesService,
     AlbumFaceSuggestionsService,

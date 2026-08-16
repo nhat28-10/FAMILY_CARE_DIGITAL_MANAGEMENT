@@ -444,6 +444,7 @@ model Family {
   conversations              Conversation[]
   familyAnnouncements        FamilyAnnouncement[]
   calendarEvents             CalendarEvent[]
+  albumCollections           AlbumCollection[]
   albumMedia                 AlbumMedia[]
   storageCleanupJobs         StorageCleanupJob[]
   memberFaceProfiles         MemberFaceProfile[]
@@ -514,6 +515,7 @@ model FamilyMember {
   createdAnnouncements             FamilyAnnouncement[]        @relation("CreatedAnnouncements")
   createdCalendarEvents            CalendarEvent[]             @relation("CreatedCalendarEvents")
   calendarEventParticipations      CalendarEventParticipant[]  @relation("CalendarEventParticipations")
+  createdAlbumCollections          AlbumCollection[]           @relation("CreatedAlbumCollections")
   uploadedAlbumMedia               AlbumMedia[]                @relation("UploadedAlbumMedia")
   deletedAlbumMedia                AlbumMedia[]                @relation("DeletedAlbumMedia")
   reviewedModerationChecks         MediaModerationCheck[]      @relation("ReviewedModerationChecks")
@@ -2026,9 +2028,33 @@ model CalendarEventParticipant {
 }
 
 /// Ảnh/video trong album gia đình.
+model AlbumCollection {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @map("collection_id") @db.Uuid
+  workspaceId       String    @map("workspace_id")
+  name              String    @map("name")
+  description       String?   @map("description")
+  coverMediaId      String?   @map("cover_media_id") @db.Uuid
+  createdByMemberId String    @map("created_by_member_id")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  workspace       Family       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember @relation("CreatedAlbumCollections", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  coverMedia      AlbumMedia?  @relation("AlbumCollectionCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  media           AlbumMedia[] @relation("AlbumCollectionMedia")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([createdByMemberId])
+  @@map("album_collections")
+}
+
 model AlbumMedia {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @map("media_id") @db.Uuid
   workspaceId            String                @map("workspace_id")
+  collectionId           String?               @map("collection_id") @db.Uuid
   uploadedByMemberId     String                @map("uploaded_by_member_id")
   mediaType              AlbumMediaType        @map("media_type")
   mediaUrl               String?               @map("media_url")
@@ -2053,6 +2079,8 @@ model AlbumMedia {
   moderationQueuedAt     DateTime?             @map("moderation_queued_at") @db.Timestamptz
 
   workspace        Family        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  collection         AlbumCollection?  @relation("AlbumCollectionMedia", fields: [collectionId], references: [id], onDelete: SetNull)
+  coveredCollections AlbumCollection[] @relation("AlbumCollectionCover")
   uploadedByMember FamilyMember  @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
   deletedByMember  FamilyMember? @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
 
@@ -2064,6 +2092,7 @@ model AlbumMedia {
   tagSuggestions   AlbumTagSuggestion[]
 
   @@index([workspaceId])
+  @@index([workspaceId, collectionId, uploadedAt])
   @@index([uploadedByMemberId])
   @@index([moderationStatus])
   @@index([workspaceId, uploadedAt])

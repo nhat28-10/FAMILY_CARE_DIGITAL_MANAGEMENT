@@ -40,6 +40,32 @@ const RESPONSE_SCHEMA = {
   required: ['decision', 'riskScore', 'categories', 'reasonCode', 'summary'],
 } as const;
 
+const CONTEXT_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    hasPerson: { type: 'boolean' },
+    labels: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    sceneSummary: { type: 'string' },
+    topicMatch: {
+      type: 'string',
+      enum: ['MATCH', 'MISMATCH', 'UNCERTAIN'],
+    },
+    topicConfidence: { type: 'number', minimum: 0, maximum: 1 },
+    mismatchReason: { type: 'string' },
+  },
+  required: [
+    'hasPerson',
+    'labels',
+    'sceneSummary',
+    'topicMatch',
+    'topicConfidence',
+    'mismatchReason',
+  ],
+} as const;
+
 const TEXT_CATEGORY_MAP: Array<{
   pattern: RegExp;
   code: ModerationCategoryCode;
@@ -52,6 +78,15 @@ const TEXT_CATEGORY_MAP: Array<{
   { pattern: /self[-\s]?harm|suicide/i, code: 'SELF_HARM' },
   { pattern: /hate|extrem/i, code: 'HATE_EXTREMISM' },
 ];
+
+export interface AiAlbumContextResult {
+  hasPerson: boolean;
+  labels: string[];
+  sceneSummary: string;
+  topicMatch: 'MATCH' | 'MISMATCH' | 'UNCERTAIN';
+  topicConfidence: number;
+  mismatchReason: string;
+}
 
 @Injectable()
 export class CloudflareWorkersAiService {
@@ -96,6 +131,37 @@ export class CloudflareWorkersAiService {
       new ModerationProviderError(
         'Workers AI không trả kết quả',
         'AI_NO_RESULT',
+        false,
+      )
+    );
+  }
+
+  async analyzeAlbumContext(
+    image: Buffer,
+    mimeType: string,
+    topic?: string | null,
+  ): Promise<AiAlbumContextResult> {
+    const prepared = await this.prepareImage(image, mimeType);
+    let lastError: ModerationProviderError | undefined;
+    for (let attempt = 1; attempt <= this.requestAttempts; attempt += 1) {
+      try {
+        return await this.executeContext(
+          prepared.buffer,
+          prepared.mimeType,
+          topic,
+        );
+      } catch (error) {
+        if (!(error instanceof ModerationProviderError)) throw error;
+        lastError = error;
+        if (!error.transient || attempt === this.requestAttempts) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+      }
+    }
+    throw (
+      lastError ??
+      new ModerationProviderError(
+        'Workers AI không trả kết quả phân tích album',
+        'AI_NO_CONTEXT_RESULT',
         false,
       )
     );
@@ -233,6 +299,109 @@ export class CloudflareWorkersAiService {
     }
   }
 
+  private async executeContext(
+    image: Buffer,
+    mimeType: string,
+    topic?: string | null,
+  ): Promise<AiAlbumContextResult> {
+    if (!this.accountId || !this.token) {
+      throw new ModerationProviderError(
+        'Cloudflare Workers AI chưa được cấu hình',
+        'AI_NOT_CONFIGURED',
+        false,
+      );
+    }
+    const normalizedTopic = topic?.trim();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.accountId)}/ai/run/${this.modelName}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'Analyze the image only for album organization. Do not identify people, infer identity, age, gender, relationships, names, health, or other personal attributes. Return only valid compact JSON.',
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      'Return exactly this JSON shape: {"hasPerson":true,"labels":["beach","sea"],"sceneSummary":"brief neutral scene description","topicMatch":"MATCH|MISMATCH|UNCERTAIN","topicConfidence":0.0,"mismatchReason":"short reason or empty string"}. ' +
+                      `Topic to compare: ${normalizedTopic ? JSON.stringify(normalizedTopic) : 'none'}. ` +
+                      'If no topic is provided, set topicMatch to UNCERTAIN and topicConfidence to 0. Labels must be broad visual objects/scenes only.',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimeType};base64,${image.toString('base64')}`,
+                    },
+                  },
+                ],
+              },
+            ],
+            response_format: {
+              type: 'json_schema',
+              json_schema: CONTEXT_RESPONSE_SCHEMA,
+            },
+            temperature: 0,
+            max_tokens: 512,
+          }),
+          signal: controller.signal,
+        },
+      );
+      const text = await response.text();
+      if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) {
+        throw new ModerationProviderError(
+          'Workers AI context response vượt giới hạn',
+          'AI_RESPONSE_TOO_LARGE',
+          false,
+          response.status,
+        );
+      }
+      if (!response.ok) {
+        throw new ModerationProviderError(
+          `Workers AI HTTP ${response.status}`,
+          `AI_HTTP_${response.status}`,
+          response.status === 429 || response.status >= 500,
+          response.status,
+        );
+      }
+      let envelope: unknown;
+      try {
+        envelope = JSON.parse(text);
+      } catch {
+        throw new ModerationProviderError(
+          'Workers AI trả JSON không hợp lệ',
+          'AI_INVALID_JSON',
+          false,
+        );
+      }
+      return this.parseContextEnvelope(envelope);
+    } catch (error) {
+      if (error instanceof ModerationProviderError) throw error;
+      const timedOut =
+        error instanceof Error &&
+        (error.name === 'AbortError' || controller.signal.aborted);
+      throw new ModerationProviderError(
+        timedOut ? 'Workers AI timeout' : 'Không thể kết nối Workers AI',
+        timedOut ? 'AI_TIMEOUT' : 'AI_NETWORK',
+        true,
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private parseEnvelope(envelope: unknown): AiModerationResult {
     if (!this.isRecord(envelope) || envelope.success !== true) {
       throw this.invalidResponse();
@@ -246,6 +415,31 @@ export class CloudflareWorkersAiService {
       value = this.parseModelText(value);
     }
     return this.parseResultObject(value);
+  }
+
+  private parseContextEnvelope(envelope: unknown): AiAlbumContextResult {
+    if (!this.isRecord(envelope) || envelope.success !== true) {
+      throw this.invalidResponse();
+    }
+    const result = envelope.result;
+    if (!this.isRecord(result) || !('response' in result)) {
+      throw this.invalidResponse();
+    }
+    let value: unknown = result.response;
+    if (typeof value === 'string') {
+      value = this.parseContextModelText(value);
+    }
+    return this.parseContextResultObject(value);
+  }
+
+  private parseContextModelText(text: string): unknown {
+    const jsonCandidate = this.extractJsonCandidate(text.trim());
+    if (!jsonCandidate) throw this.invalidResponse();
+    try {
+      return JSON.parse(jsonCandidate);
+    } catch {
+      throw this.invalidResponse();
+    }
   }
 
   private parseModelText(text: string): unknown {
@@ -384,6 +578,43 @@ export class CloudflareWorkersAiService {
       categories,
       reasonCode: value.reasonCode.replace(/[^A-Z0-9_:-]/gi, '').slice(0, 100),
       summary: value.summary
+        .replace(/[\r\n]+/g, ' ')
+        .trim()
+        .slice(0, 500),
+    };
+  }
+
+  private parseContextResultObject(value: unknown): AiAlbumContextResult {
+    if (!this.isRecord(value)) throw this.invalidResponse();
+    const topicMatches = ['MATCH', 'MISMATCH', 'UNCERTAIN'] as const;
+    if (
+      typeof value.hasPerson !== 'boolean' ||
+      !Array.isArray(value.labels) ||
+      typeof value.sceneSummary !== 'string' ||
+      !topicMatches.includes(
+        value.topicMatch as (typeof topicMatches)[number],
+      ) ||
+      !this.isScore(value.topicConfidence) ||
+      typeof value.mismatchReason !== 'string'
+    ) {
+      throw this.invalidResponse();
+    }
+    const labels = value.labels
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.replace(/[^\p{L}\p{N}\s_-]/gu, '').trim())
+      .filter(Boolean)
+      .slice(0, 12);
+
+    return {
+      hasPerson: value.hasPerson,
+      labels,
+      sceneSummary: value.sceneSummary
+        .replace(/[\r\n]+/g, ' ')
+        .trim()
+        .slice(0, 500),
+      topicMatch: value.topicMatch as AiAlbumContextResult['topicMatch'],
+      topicConfidence: value.topicConfidence,
+      mismatchReason: value.mismatchReason
         .replace(/[\r\n]+/g, ' ')
         .trim()
         .slice(0, 500),
