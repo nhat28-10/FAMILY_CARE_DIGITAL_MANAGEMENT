@@ -542,40 +542,112 @@ export class CloudflareWorkersAiService {
     const normalized = text.replace(/\s+/g, ' ').trim();
     if (!normalized) return null;
 
+    const explicitHasPerson = this.parseBooleanContextField(
+      normalized,
+      'has\\s*person',
+    );
+    const explicitTopicMatch = this.parseTopicMatchContextField(normalized);
+    const explicitTopicConfidence =
+      this.parseTopicConfidenceContextField(normalized);
+    const explicitMismatchReason =
+      this.matchContextField(normalized, 'mismatch\\s*reason') ?? '';
+
     const noPersonPattern =
-      /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b|kh[oÃ´]ng\s+(c[oÃ³]|th[aáº¥]y|ph[aÃ¡]t\s+hi[eá»‡]n)\s+ng[Æ°Æ°]á»i/i;
+      /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b/i;
     const personPattern =
-      /\b(person|people|human|humans|man|woman|child|children|family)\b|ng[Æ°Æ°]á»i|gia\s+Ä‘[iÃ¬]nh|tráº»\s+em|em\s+b[eÃ©]/i;
+      /\b(person|people|human|humans|man|woman|child|children|family)\b/i;
     const hasPerson =
-      !noPersonPattern.test(normalized) && personPattern.test(normalized);
-    const labels = CONTEXT_LABEL_MAP.filter((item) =>
+      explicitHasPerson ??
+      (!noPersonPattern.test(normalized) && personPattern.test(normalized));
+    const explicitLabels = this.parseLabelsContextField(normalized);
+    const inferredLabels = CONTEXT_LABEL_MAP.filter((item) =>
       item.pattern.test(normalized),
-    )
-      .map((item) => item.label)
-      .slice(0, 12);
+    ).map((item) => item.label);
+    const labels = [...new Set([...explicitLabels, ...inferredLabels])].slice(
+      0,
+      12,
+    );
 
     return {
       hasPerson,
       labels: [...new Set(labels)],
       sceneSummary: this.cleanContextSummary(normalized),
-      topicMatch: 'UNCERTAIN',
-      topicConfidence: 0,
-      mismatchReason: '',
+      topicMatch: explicitTopicMatch ?? 'UNCERTAIN',
+      topicConfidence: explicitTopicConfidence ?? 0,
+      mismatchReason: explicitMismatchReason,
     };
   }
 
+  private matchContextField(text: string, label: string) {
+    const knownLabels =
+      'has\\s*person|labels?|detected\\s*labels|scene\\s*summary|summary|topic\\s*match|topic\\s*confidence|mismatch\\s*reason';
+    const match = text.match(
+      new RegExp(
+        `(?:^|\\s)(?:\\*\\*)?(?:${label})(?:\\*\\*)?\\s*:\\s*(.*?)(?=\\s+(?:${knownLabels})\\s*:|$)`,
+        'i',
+      ),
+    );
+    return match?.[1]?.replace(/\*\*/g, '').trim();
+  }
+
+  private parseBooleanContextField(text: string, label: string) {
+    const value = this.matchContextField(text, label);
+    if (!value) return null;
+    if (/^(false|no|0)\b/i.test(value)) return false;
+    if (/^(true|yes|1)\b/i.test(value)) return true;
+    return null;
+  }
+
+  private parseTopicMatchContextField(text: string) {
+    const value = this.matchContextField(text, 'topic\\s*match');
+    if (!value) return null;
+    if (/\bMISMATCH\b/i.test(value)) return 'MISMATCH' as const;
+    if (/\bMATCH\b/i.test(value)) return 'MATCH' as const;
+    if (/\b(UNCERTAIN|UNKNOWN)\b/i.test(value)) return 'UNCERTAIN' as const;
+    return null;
+  }
+
+  private parseTopicConfidenceContextField(text: string) {
+    const value = this.matchContextField(text, 'topic\\s*confidence');
+    const numeric = Number(value?.match(/\d+(?:\.\d+)?/)?.[0]);
+    if (!Number.isFinite(numeric)) return null;
+    const normalized = numeric > 1 && numeric <= 100 ? numeric / 100 : numeric;
+    return Math.min(1, Math.max(0, normalized));
+  }
+
+  private parseLabelsContextField(text: string) {
+    const value =
+      this.matchContextField(text, 'detected\\s*labels') ??
+      this.matchContextField(text, 'labels?');
+    if (!value) return [];
+    return value
+      .split(/[,;|]/)
+      .map((item) =>
+        item
+          .replace(/[^a-z0-9 _-]/gi, '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+
   private cleanContextSummary(text: string) {
+    const explicitSummary =
+      this.matchContextField(text, 'scene\\s*summary') ??
+      this.matchContextField(text, 'summary');
     const withoutMarkdown = text
       .replace(/```[\s\S]*?```/g, ' ')
       .replace(/[*_`#>-]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const beforeReasoning = withoutMarkdown
+    const source = explicitSummary || withoutMarkdown;
+    const beforeReasoning = source
       .split(
-        /\b(?:to determine|we can analyze|let'?s analyze|analysis|therefore|based on)\b/i,
+        /\b(?:has\s*person|labels?|detected\s*labels|scene\s*summary|summary|topic\s*match|topic\s*confidence|mismatch\s*reason|to determine|we can analyze|let'?s analyze|analysis|therefore|based on)\s*:?/i,
       )[0]
       .trim();
-    const candidate = beforeReasoning || withoutMarkdown;
+    const candidate = beforeReasoning || source;
     const sentence = candidate.match(/^.{20,220}?[.!?](?:\s|$)/)?.[0];
     return (sentence ?? candidate.slice(0, 220))
       .replace(/[,;:\s]+$/g, '')

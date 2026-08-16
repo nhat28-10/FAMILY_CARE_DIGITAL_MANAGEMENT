@@ -291,4 +291,22 @@ describe('CloudflareWorkersAiService', () => {
       topicMatch: 'UNCERTAIN',
     });
   });
+
+  it('extracts structured context fields from labeled plain text', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse(
+        "The image shows a still life of fruit. Has Person: False Topic Match: MISMATCH Topic Confidence: 0.0 Mismatch Reason: The topic 'anh LMH' does not match the visual content.",
+      ),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'anh LMH'),
+    ).resolves.toMatchObject({
+      hasPerson: false,
+      sceneSummary: 'The image shows a still life of fruit.',
+      topicMatch: 'MISMATCH',
+      topicConfidence: 0,
+      mismatchReason: "The topic 'anh LMH' does not match the visual content.",
+    });
+  });
 });
