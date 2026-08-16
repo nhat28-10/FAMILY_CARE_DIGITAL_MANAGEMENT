@@ -448,6 +448,36 @@ describe('AlbumsService permissions and deletion flow', () => {
     expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
   });
 
+  it('warns on topic mismatch even when model confidence is low', async () => {
+    workersAi.analyzeAlbumContext.mockResolvedValue({
+      hasPerson: false,
+      labels: ['landscape', 'field'],
+      sceneSummary: 'Outdoor landscape.',
+      topicMatch: 'MISMATCH',
+      topicConfidence: 0.2,
+      mismatchReason: '',
+    });
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      { topic: 'anh LMH' },
+      {
+        originalname: 'landscape.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(result.recommendation).toBe('WARN');
+    expect(result.topicMatch).toBe('MISMATCH');
+    expect(result.warnings).toEqual([
+      'Ảnh có vẻ không khớp với chủ đề album "anh LMH".',
+    ]);
+    expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
+  });
+
   it('returns a soft warning when draft analysis is unavailable', async () => {
     workersAi.analyzeAlbumContext.mockRejectedValue(
       new ModerationProviderError('AI unavailable', 'AI_NOT_CONFIGURED', false),
