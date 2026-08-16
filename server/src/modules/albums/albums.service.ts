@@ -131,11 +131,7 @@ export class AlbumsService {
           'Không phát hiện người trong ảnh. Ảnh vẫn có thể là kỷ niệm gia đình, nhưng sẽ không có gợi ý khuôn mặt nếu hệ thống không tìm thấy khuôn mặt.',
         );
       }
-      if (
-        topic &&
-        result.topicMatch === 'MISMATCH' &&
-        result.topicConfidence >= 0.5
-      ) {
+      if (topic && result.topicMatch === 'MISMATCH') {
         warnings.push(
           result.mismatchReason ||
             `Ảnh có vẻ không khớp với chủ đề album "${topic}".`,
