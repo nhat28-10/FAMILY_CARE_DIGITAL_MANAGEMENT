@@ -254,4 +254,24 @@ describe('CloudflareWorkersAiService', () => {
     const body = requestJsonBody<{ image?: string }>(fetchMock);
     expect(body.image).toMatch(/^data:image\/png;base64,/);
   });
+
+  it('falls back to a completed context result when vision returns plain text', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse(
+        'The image shows a family standing on a beach near the sea.',
+      ),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'Beach'),
+    ).resolves.toMatchObject({
+      hasPerson: true,
+      labels: ['beach'],
+      sceneSummary:
+        'The image shows a family standing on a beach near the sea.',
+      topicMatch: 'UNCERTAIN',
+      topicConfidence: 0,
+      mismatchReason: '',
+    });
+  });
 });

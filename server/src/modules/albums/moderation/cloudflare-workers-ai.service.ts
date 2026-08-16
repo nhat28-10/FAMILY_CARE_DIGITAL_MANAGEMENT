@@ -79,6 +79,19 @@ const TEXT_CATEGORY_MAP: Array<{
   { pattern: /hate|extrem/i, code: 'HATE_EXTREMISM' },
 ];
 
+const CONTEXT_LABEL_MAP: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /beach|sea|ocean|coast|sand/i, label: 'beach' },
+  { pattern: /mountain|hill|snow|ski/i, label: 'mountain' },
+  { pattern: /birthday|cake|party/i, label: 'birthday' },
+  { pattern: /wedding|bride|groom/i, label: 'wedding' },
+  { pattern: /food|meal|restaurant|dinner|lunch/i, label: 'food' },
+  { pattern: /park|garden|tree|flower/i, label: 'outdoor' },
+  { pattern: /home|house|room|indoor/i, label: 'indoor' },
+  { pattern: /school|classroom/i, label: 'school' },
+  { pattern: /hospital|clinic|medical/i, label: 'medical' },
+  { pattern: /car|bus|train|plane|vehicle/i, label: 'travel' },
+];
+
 export interface AiAlbumContextResult {
   hasPerson: boolean;
   labels: string[];
@@ -414,13 +427,18 @@ export class CloudflareWorkersAiService {
   }
 
   private parseContextModelText(text: string): unknown {
-    const jsonCandidate = this.extractJsonCandidate(text.trim());
-    if (!jsonCandidate) throw this.invalidResponse();
-    try {
-      return JSON.parse(jsonCandidate);
-    } catch {
-      throw this.invalidResponse();
+    const trimmed = text.trim();
+    const jsonCandidate = this.extractJsonCandidate(trimmed);
+    if (jsonCandidate) {
+      try {
+        return JSON.parse(jsonCandidate);
+      } catch {
+        // Fall through to best-effort scene parsing below.
+      }
     }
+    const textResult = this.parseContextTextResponse(trimmed);
+    if (textResult) return textResult;
+    throw this.invalidResponse();
   }
 
   private parseModelText(text: string): unknown {
@@ -518,6 +536,32 @@ export class CloudflareWorkersAiService {
     return riskScore > 0
       ? [{ code: 'OTHER_SENSITIVE' as const, score: riskScore }]
       : [];
+  }
+
+  private parseContextTextResponse(text: string): AiAlbumContextResult | null {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+
+    const noPersonPattern =
+      /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b|kh[oÃ´]ng\s+(c[oÃ³]|th[aáº¥]y|ph[aÃ¡]t\s+hi[eá»‡]n)\s+ng[Æ°Æ°]á»i/i;
+    const personPattern =
+      /\b(person|people|human|humans|man|woman|child|children|family)\b|ng[Æ°Æ°]á»i|gia\s+Ä‘[iÃ¬]nh|tráº»\s+em|em\s+b[eÃ©]/i;
+    const hasPerson =
+      !noPersonPattern.test(normalized) && personPattern.test(normalized);
+    const labels = CONTEXT_LABEL_MAP.filter((item) =>
+      item.pattern.test(normalized),
+    )
+      .map((item) => item.label)
+      .slice(0, 12);
+
+    return {
+      hasPerson,
+      labels: [...new Set(labels)],
+      sceneSummary: normalized.slice(0, 500),
+      topicMatch: 'UNCERTAIN',
+      topicConfidence: 0,
+      mismatchReason: '',
+    };
   }
 
   private parseResultObject(value: unknown): AiModerationResult {
