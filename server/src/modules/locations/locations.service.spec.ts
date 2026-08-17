@@ -1,6 +1,7 @@
 import { GpsSourceType, MemberStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { LocationsGateway } from './locations.gateway';
 import { LocationsService } from './locations.service';
 
 describe('LocationsService', () => {
@@ -29,20 +30,39 @@ describe('LocationsService', () => {
   };
 
   let prisma: {
-    familyMember: { findMany: jest.Mock; update: jest.Mock };
+    familyMember: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+    };
     memberLocationPoint: { create: jest.Mock; deleteMany: jest.Mock };
+  };
+  let locationsGateway: {
+    emitLocationUpdated: jest.Mock;
+    emitSharingChanged: jest.Mock;
   };
   let service: LocationsService;
 
   beforeEach(() => {
     prisma = {
-      familyMember: { findMany: jest.fn(), update: jest.fn() },
+      familyMember: {
+        findFirst: jest.fn().mockResolvedValue(sharingMember),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
       memberLocationPoint: {
         create: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
-    service = new LocationsService(prisma as unknown as PrismaService);
+    locationsGateway = {
+      emitLocationUpdated: jest.fn(),
+      emitSharingChanged: jest.fn(),
+    };
+    service = new LocationsService(
+      prisma as unknown as PrismaService,
+      locationsGateway as unknown as LocationsGateway,
+    );
   });
 
   describe('listFamilyLocations', () => {
@@ -107,12 +127,21 @@ describe('LocationsService', () => {
     const dto = { latitude: 10.77689, longitude: 106.70091, accuracy: 18 };
 
     it('inserts a MOBILE_GPS point for the calling member', async () => {
-      prisma.memberLocationPoint.create.mockResolvedValue({ id: 'p1' });
+      prisma.memberLocationPoint.create.mockResolvedValue({
+        id: 'p1',
+        latitude: new Prisma.Decimal(String(dto.latitude)),
+        longitude: new Prisma.Decimal(String(dto.longitude)),
+        accuracy: new Prisma.Decimal(String(dto.accuracy)),
+        recordedAt,
+      });
 
       await service.pushMyLocation(workspaceId, memberId, dto);
 
-      const data = prisma.memberLocationPoint.create.mock.calls[0][0]
-        .data as Record<string, unknown>;
+      const createPoint = prisma.memberLocationPoint.create as jest.Mock<
+        unknown,
+        [{ data: Record<string, unknown> }]
+      >;
+      const data = createPoint.mock.calls[0][0].data;
       expect(data).toEqual(
         expect.objectContaining({
           workspaceId,
@@ -125,6 +154,19 @@ describe('LocationsService', () => {
       );
       expect((data.recordedAt as Date).getTime()).toBeLessThanOrEqual(
         Date.now(),
+      );
+      expect(locationsGateway.emitLocationUpdated).toHaveBeenCalledWith(
+        workspaceId,
+        expect.objectContaining({
+          workspaceId,
+          memberId,
+          userId: 'user-1',
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          accuracy: dto.accuracy,
+          updatedAt: recordedAt,
+          isSharing: true,
+        }),
       );
     });
 
@@ -142,6 +184,18 @@ describe('LocationsService', () => {
         },
       });
     });
+
+    it('does not broadcast the point when the member disabled sharing', async () => {
+      prisma.familyMember.findFirst.mockResolvedValue({
+        ...sharingMember,
+        locationSharingEnabled: false,
+      });
+      prisma.memberLocationPoint.create.mockResolvedValue({ id: 'p-private' });
+
+      await service.pushMyLocation(workspaceId, memberId, dto);
+
+      expect(locationsGateway.emitLocationUpdated).not.toHaveBeenCalled();
+    });
   });
 
   describe('setMyLocationSharing', () => {
@@ -151,7 +205,11 @@ describe('LocationsService', () => {
         locationSharingEnabled: false,
       });
 
-      const result = await service.setMyLocationSharing(memberId, false);
+      const result = await service.setMyLocationSharing(
+        workspaceId,
+        memberId,
+        false,
+      );
 
       expect(prisma.familyMember.update).toHaveBeenCalledWith({
         where: { id: memberId },
@@ -159,6 +217,10 @@ describe('LocationsService', () => {
         select: { id: true, locationSharingEnabled: true },
       });
       expect(result).toEqual({ id: memberId, locationSharingEnabled: false });
+      expect(locationsGateway.emitSharingChanged).toHaveBeenCalledWith(
+        workspaceId,
+        { workspaceId, memberId, isSharing: false },
+      );
     });
   });
 });

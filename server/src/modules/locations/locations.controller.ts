@@ -62,9 +62,14 @@ export class LocationsController {
   @ResponseMessage('Đã cập nhật trạng thái chia sẻ vị trí')
   @ApiOperation({ summary: 'Bật/tắt chia sẻ vị trí của chính mình' })
   setMyLocationSharing(
+    @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
     @Body() dto: ToggleLocationSharingDto,
   ) {
-    return this.locationsService.setMyLocationSharing(memberId, dto.isSharing);
+    return this.locationsService.setMyLocationSharing(
+      familyId,
+      memberId,
+      dto.isSharing,
+    );
   }
 }
