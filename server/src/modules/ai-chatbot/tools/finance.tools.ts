@@ -275,6 +275,68 @@ export class FinanceAiTools implements AiToolProvider {
           ),
       },
       {
+        name: 'get_goal_contribution_suggestions',
+        description:
+          'Lấy gợi ý đóng góp mục tiêu theo từng thành viên từ dữ liệu tài chính tháng. Dùng khi hỏi ai nên góp bao nhiêu, hoặc trước khi lập kế hoạch đóng góp mục tiêu. Kết quả có incomeAmount, personalExpenseAmount, sharedContributionAmount, availableAmount và suggestedContribution; không tự bịa số nếu tool không trả dữ liệu.',
+        parameters: {
+          type: 'object',
+          properties: {
+            goalId: {
+              type: 'string',
+              description: 'UUID mục tiêu tài chính',
+            },
+            month: { ...periodProperties.month, description: 'Tháng cần tính' },
+            year: { ...periodProperties.year, description: 'Năm cần tính' },
+          },
+          required: ['goalId', 'month', 'year'],
+          additionalProperties: false,
+        },
+        module: AiRelatedModule.FINANCE,
+        kind: 'read',
+        allowedRoles: ALL_ROLES,
+        execute: (args, ctx) =>
+          this.financialGoalService.getGoalContributionSuggestions(
+            ctx.familyId,
+            ctx.memberId,
+            String(args.goalId),
+            {
+              month: intOrUndefined(args.month) ?? new Date().getMonth() + 1,
+              year: intOrUndefined(args.year) ?? new Date().getFullYear(),
+            },
+          ),
+      },
+      {
+        name: 'list_member_monthly_finances',
+        description:
+          'Danh sách thu nhập/chi tiêu thực tế và dự kiến theo tháng của từng thành viên active trong gia đình. Dùng cho câu hỏi như "list thu chi thực tế của từng thành viên", "mỗi thành viên thu nhập/chi tiêu bao nhiêu". Manager/deputy xem được danh sách thành viên; các trường private sẽ là null theo visibility, không được nói là không có quyền nếu tool trả dữ liệu.',
+        parameters: {
+          type: 'object',
+          properties: {
+            month: {
+              ...periodProperties.month,
+              description: 'Tháng cần xem, mặc định tháng hiện tại',
+            },
+            year: {
+              ...periodProperties.year,
+              description: 'Năm cần xem, mặc định năm hiện tại',
+            },
+          },
+          additionalProperties: false,
+        },
+        module: AiRelatedModule.FINANCE,
+        kind: 'read',
+        allowedRoles: [...FINANCE_MANAGER_ROLES],
+        execute: (args, ctx) =>
+          this.financeService.listMemberMonthlyFinances(
+            ctx.familyId,
+            ctx.memberId,
+            {
+              month: intOrUndefined(args.month) ?? new Date().getMonth() + 1,
+              year: intOrUndefined(args.year) ?? new Date().getFullYear(),
+            },
+          ),
+      },
+      {
         name: 'get_member_monthly_summary',
         description:
           'Tóm tắt tài chính tháng của CHÍNH người đang hỏi: thu nhập, ngân sách cá nhân, đóng góp vào sổ chung.',
@@ -597,7 +659,7 @@ export class FinanceAiTools implements AiToolProvider {
       {
         name: 'propose_create_goal_contribution_plan',
         description:
-          'ĐỀ XUẤT lập kế hoạch đóng góp theo tháng cho một mục tiêu tài chính, gồm danh sách thành viên và số tiền dự kiến. Chỉ manager/deputy được xác nhận.',
+          'ĐỀ XUẤT lập kế hoạch đóng góp theo tháng cho một mục tiêu tài chính, gồm danh sách thành viên và số tiền dự kiến. Nếu người dùng không chỉ định rõ số tiền của từng thành viên, phải dựa trên get_goal_contribution_suggestions và dùng suggestedContribution. Chỉ manager/deputy được xác nhận.',
         parameters: {
           type: 'object',
           properties: {
@@ -653,12 +715,67 @@ export class FinanceAiTools implements AiToolProvider {
         kind: 'write',
         allowedRoles: [...FINANCE_MANAGER_ROLES],
         actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
-        buildActionPayload: (args) => {
+        buildActionPayload: async (args, ctx) => {
           const dto = validateActionArgs(ProposeGoalContributionPlanDto, args);
-          return Promise.resolve({
+          const suggestions =
+            await this.financialGoalService.getGoalContributionSuggestions(
+              ctx.familyId,
+              ctx.memberId,
+              dto.goalId,
+              {
+                month: dto.contributionPlan.periodMonth,
+                year: dto.contributionPlan.periodYear,
+              },
+            );
+          const suggestedMembers = suggestions.suggestions
+            .filter((item) => item.suggestedContribution > 0)
+            .map((item) => ({
+              memberId: item.memberId,
+              plannedAmount: item.suggestedContribution,
+            }));
+          const members =
+            suggestedMembers.length > 0
+              ? suggestedMembers
+              : dto.contributionPlan.members;
+          const suggestionsByMember = new Map(
+            suggestions.suggestions.map((item) => [item.memberId, item]),
+          );
+          return {
             goalId: dto.goalId,
-            contributionPlan: { ...dto.contributionPlan },
-          });
+            contributionPlan: { ...dto.contributionPlan, members },
+            contributionBasis: {
+              formula:
+                'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount; suggestedContribution = monthlyContributionTarget * availableAmount / totalAvailableAmount',
+              amountPriority:
+                'Ưu tiên số thực tế actual*, nếu chưa có thì dùng số dự kiến expected*.',
+              monthlyContributionTarget: suggestions.monthlyContributionTarget,
+              totalAvailableAmount: suggestions.totalAvailableAmount,
+              members: members.map((memberPlan) => {
+                const suggestion = suggestionsByMember.get(memberPlan.memberId);
+                return {
+                  memberId: memberPlan.memberId,
+                  displayName: suggestion?.displayName,
+                  plannedAmount: memberPlan.plannedAmount,
+                  incomeAmount: suggestion?.incomeAmount ?? null,
+                  personalExpenseAmount:
+                    suggestion?.personalExpenseAmount ?? null,
+                  sharedContributionAmount:
+                    suggestion?.sharedContributionAmount ?? null,
+                  availableAmount: suggestion?.availableAmount ?? null,
+                  suggestedContribution:
+                    suggestion?.suggestedContribution ?? null,
+                  incomeSource: suggestion?.incomeSource,
+                  expenseSource: suggestion?.expenseSource,
+                  sharedContributionSource:
+                    suggestion?.sharedContributionSource,
+                  source: suggestion
+                    ? 'GOAL_CONTRIBUTION_SUGGESTIONS'
+                    : 'MANUAL_OR_UNAVAILABLE',
+                };
+              }),
+              note: 'Các số tiền đề xuất được lấy từ dữ liệu tài chính tháng mà người hỏi được phép xem. Thành viên thiếu dữ liệu hoặc ẩn thu/chi sẽ không có số gợi ý.',
+            },
+          };
         },
       },
       {

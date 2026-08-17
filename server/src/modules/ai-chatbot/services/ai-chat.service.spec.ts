@@ -112,10 +112,7 @@ describe('AiChatService', () => {
     );
   });
 
-  const send = (
-    currentMember: FamilyMember = member,
-    content = 'câu hỏi',
-  ) =>
+  const send = (currentMember: FamilyMember = member, content = 'câu hỏi') =>
     service.sendMessage(familyId, currentMember, conversationId, {
       content,
     });

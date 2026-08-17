@@ -540,15 +540,60 @@ export class AiConversationsService {
     }
     if (actionType === AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN) {
       const contributionPlan = this.asRecord(payload.contributionPlan);
-      const members = Array.isArray(contributionPlan.members)
-        ? contributionPlan.members
-        : [];
+      const contributionBasis = this.asRecord(payload.contributionBasis);
+      const members = this.asUnknownArray(contributionPlan.members);
+      const basisMembers = this.asUnknownArray(contributionBasis.members);
+      const totalPlannedAmount = members.reduce<number>((sum, item) => {
+        const memberPlan = this.asRecord(item);
+        const amount = Number(memberPlan.plannedAmount);
+        return Number.isFinite(amount) ? sum + amount : sum;
+      }, 0);
+      const basisFields = basisMembers
+        .slice(0, 6)
+        .map((item) => {
+          const basis = this.asRecord(item);
+          const label =
+            typeof basis.displayName === 'string' && basis.displayName.trim()
+              ? basis.displayName
+              : typeof basis.memberId === 'string'
+                ? basis.memberId
+                : 'Thành viên';
+          const details = [
+            this.formatMoney(basis.plannedAmount)
+              ? `góp ${this.formatMoney(basis.plannedAmount)}`
+              : null,
+            this.formatMoney(basis.incomeAmount)
+              ? `thu ${this.formatMoney(basis.incomeAmount)}`
+              : null,
+            this.formatMoney(basis.personalExpenseAmount)
+              ? `chi ${this.formatMoney(basis.personalExpenseAmount)}`
+              : null,
+            this.formatMoney(basis.sharedContributionAmount)
+              ? `góp chung ${this.formatMoney(basis.sharedContributionAmount)}`
+              : null,
+            this.formatMoney(basis.availableAmount)
+              ? `khả dụng ${this.formatMoney(basis.availableAmount)}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' / ');
+          return this.field(label, details || basis.source);
+        })
+        .filter(Boolean) as AiActionPreviewField[];
       return [
         this.field('Mục tiêu', payload.goalId),
         this.field('Tháng', contributionPlan.periodMonth),
         this.field('Năm', contributionPlan.periodYear),
         this.field('Hạn đóng góp', contributionPlan.dueDate),
         this.field('Số thành viên', members.length),
+        this.field('Tổng dự kiến', this.formatMoney(totalPlannedAmount)),
+        this.field(
+          'Căn cứ tính',
+          contributionBasis.formula
+            ? 'Ưu tiên số thực tế, thiếu thì dùng số dự kiến; chia theo tỷ lệ khả dụng'
+            : undefined,
+        ),
+        ...basisFields,
       ].filter(Boolean) as AiActionPreviewField[];
     }
     if (actionType === AiActionType.ALLOCATE_FUND_BY_MODEL) {
@@ -623,6 +668,7 @@ export class AiConversationsService {
   }
 
   private formatMoney(value: unknown): string | null {
+    if (value === null || value === undefined || value === '') return null;
     const amount = Number(value);
     if (!Number.isFinite(amount)) return null;
     return `${amount.toLocaleString('vi-VN')}đ`;
@@ -632,6 +678,10 @@ export class AiConversationsService {
     return value && typeof value === 'object'
       ? (value as Record<string, unknown>)
       : {};
+  }
+
+  private asUnknownArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? (value as unknown[]) : [];
   }
 
   private titleForModule(module: AiRelatedModule): string {

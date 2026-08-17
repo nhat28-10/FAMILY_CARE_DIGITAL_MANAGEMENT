@@ -665,6 +665,90 @@ describe('FinancialGoalService financial goals', () => {
     });
   });
 
+  it('prioritizes actual monthly finance values for contribution suggestions', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (
+      prisma.financialGoal as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      ...goal,
+      monthlyContributionTarget: new Prisma.Decimal(4000000),
+    });
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findMany.mockResolvedValue([
+      {
+        id: 'member-le-anh-sy',
+        displayName: 'Lê Anh Sỹ',
+        user: { fullName: 'Lê Anh Sỹ' },
+        monthlyFinances: [
+          {
+            expectedIncome: new Prisma.Decimal(25000000),
+            actualIncome: new Prisma.Decimal(15000000),
+            expectedPersonalExpense: new Prisma.Decimal(0),
+            actualPersonalExpense: new Prisma.Decimal(5000000),
+            expectedSharedContribution: null,
+            actualSharedContribution: null,
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
+          },
+        ],
+      },
+      {
+        id: 'member-minh-nhut',
+        displayName: 'Minh Nhut',
+        user: { fullName: 'Minh Nhut' },
+        monthlyFinances: [
+          {
+            expectedIncome: new Prisma.Decimal(25000000),
+            actualIncome: new Prisma.Decimal(3000000),
+            expectedPersonalExpense: new Prisma.Decimal(0),
+            actualPersonalExpense: new Prisma.Decimal(1000000),
+            expectedSharedContribution: null,
+            actualSharedContribution: null,
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
+          },
+        ],
+      },
+    ]);
+
+    const result = await financialGoalService.getGoalContributionSuggestions(
+      familyId,
+      memberId,
+      goalId,
+      { month: 9, year: 2026 },
+    );
+
+    expect(result.totalAvailableAmount).toBe(12000000);
+    expect(result.suggestions).toEqual([
+      expect.objectContaining({
+        memberId: 'member-le-anh-sy',
+        incomeAmount: 15000000,
+        personalExpenseAmount: 5000000,
+        incomeSource: 'ACTUAL',
+        expenseSource: 'ACTUAL',
+        availableAmount: 10000000,
+        suggestedContribution: 3333333,
+      }),
+      expect.objectContaining({
+        memberId: 'member-minh-nhut',
+        incomeAmount: 3000000,
+        personalExpenseAmount: 1000000,
+        incomeSource: 'ACTUAL',
+        expenseSource: 'ACTUAL',
+        availableAmount: 2000000,
+        suggestedContribution: 666667,
+      }),
+    ]);
+  });
+
   it('confirms contribution plans by upserting active family members', async () => {
     tx.familyMember.findFirst.mockResolvedValue({
       id: memberId,

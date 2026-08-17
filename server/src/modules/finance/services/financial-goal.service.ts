@@ -270,8 +270,11 @@ export class FinancialGoalService {
           },
           select: {
             expectedIncome: true,
+            actualIncome: true,
             expectedPersonalExpense: true,
+            actualPersonalExpense: true,
             expectedSharedContribution: true,
+            actualSharedContribution: true,
             incomeVisibility: true,
             expenseVisibility: true,
           },
@@ -293,21 +296,48 @@ export class FinancialGoalService {
         if (!monthlyFinance || !canUseIncome || !canUseExpense) {
           return null;
         }
-        const expectedIncome =
-          monthlyFinance.expectedIncome ?? new Prisma.Decimal(0);
-        const expectedPersonalExpense =
-          monthlyFinance.expectedPersonalExpense ?? new Prisma.Decimal(0);
-        const expectedSharedContribution =
-          monthlyFinance.expectedSharedContribution ?? new Prisma.Decimal(0);
+        const incomeAmount =
+          monthlyFinance.actualIncome ??
+          monthlyFinance.expectedIncome ??
+          new Prisma.Decimal(0);
+        const personalExpenseAmount =
+          monthlyFinance.actualPersonalExpense ??
+          monthlyFinance.expectedPersonalExpense ??
+          new Prisma.Decimal(0);
+        const sharedContributionAmount =
+          monthlyFinance.actualSharedContribution ??
+          monthlyFinance.expectedSharedContribution ??
+          new Prisma.Decimal(0);
         const availableAmount = Prisma.Decimal.max(
-          expectedIncome
-            .minus(expectedPersonalExpense)
-            .minus(expectedSharedContribution),
+          incomeAmount
+            .minus(personalExpenseAmount)
+            .minus(sharedContributionAmount),
           0,
         );
         return {
           memberId: familyMember.id,
           displayName: this.memberDisplayName(familyMember),
+          incomeAmount,
+          personalExpenseAmount,
+          sharedContributionAmount,
+          incomeSource:
+            monthlyFinance.actualIncome != null
+              ? 'ACTUAL'
+              : monthlyFinance.expectedIncome != null
+                ? 'EXPECTED'
+                : 'MISSING',
+          expenseSource:
+            monthlyFinance.actualPersonalExpense != null
+              ? 'ACTUAL'
+              : monthlyFinance.expectedPersonalExpense != null
+                ? 'EXPECTED'
+                : 'MISSING',
+          sharedContributionSource:
+            monthlyFinance.actualSharedContribution != null
+              ? 'ACTUAL'
+              : monthlyFinance.expectedSharedContribution != null
+                ? 'EXPECTED'
+                : 'MISSING',
           availableAmount,
         };
       })
@@ -332,6 +362,14 @@ export class FinancialGoalService {
       suggestions: suggestionsBase.map((item) => ({
         memberId: item.memberId,
         displayName: item.displayName,
+        incomeAmount: this.decimalToNumber(item.incomeAmount),
+        personalExpenseAmount: this.decimalToNumber(item.personalExpenseAmount),
+        sharedContributionAmount: this.decimalToNumber(
+          item.sharedContributionAmount,
+        ),
+        incomeSource: item.incomeSource,
+        expenseSource: item.expenseSource,
+        sharedContributionSource: item.sharedContributionSource,
         availableAmount: this.decimalToNumber(item.availableAmount),
         suggestedContribution: totalAvailableAmount.equals(0)
           ? 0

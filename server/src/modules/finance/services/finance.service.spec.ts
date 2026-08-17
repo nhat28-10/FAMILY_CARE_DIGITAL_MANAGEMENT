@@ -10,6 +10,7 @@ import {
   BudgetPlanStatus,
   FamilyRole,
   FinanceCategoryType,
+  FinanceVisibility,
   FinanceModelStatus,
   FinanceModelType,
   LedgerEntryStatus,
@@ -35,7 +36,7 @@ describe('FinanceService budget planning', () => {
 
   beforeEach(() => {
     tx = {
-      familyMember: { findFirst: jest.fn() },
+      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
       budgetPlan: {
         findFirst: jest.fn(),
         create: jest.fn(),
@@ -69,7 +70,7 @@ describe('FinanceService budget planning', () => {
         (operation: ((client: typeof tx) => unknown) | unknown[]) =>
           Array.isArray(operation) ? Promise.all(operation) : operation(tx),
       ),
-      familyMember: { findFirst: jest.fn() },
+      familyMember: { findFirst: jest.fn(), findMany: jest.fn() },
       budgetPlan: { findFirst: jest.fn() },
       financeModel: { findFirst: jest.fn() },
       financeCategoryJarMapping: { findMany: jest.fn().mockResolvedValue([]) },
@@ -80,6 +81,104 @@ describe('FinanceService budget planning', () => {
     reportService = new FinanceReportService(
       prisma as unknown as PrismaService,
     );
+  });
+
+  it('lists member monthly finances for finance managers and respects visibility', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: 'manager-id',
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findMany.mockResolvedValue([
+      {
+        id: 'member-public',
+        displayName: 'Public Member',
+        user: { fullName: 'Public User' },
+        monthlyFinances: [
+          {
+            id: 'finance-public',
+            memberId: 'member-public',
+            periodMonth: 9,
+            periodYear: 2026,
+            expectedIncome: new Prisma.Decimal(14000000),
+            actualIncome: new Prisma.Decimal(15000000),
+            expectedPersonalExpense: new Prisma.Decimal(4000000),
+            actualPersonalExpense: new Prisma.Decimal(5000000),
+            expectedSharedContribution: new Prisma.Decimal(1000000),
+            actualSharedContribution: new Prisma.Decimal(1200000),
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
+            note: 'private note',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      },
+      {
+        id: 'member-private',
+        displayName: 'Private Member',
+        user: { fullName: 'Private User' },
+        monthlyFinances: [
+          {
+            id: 'finance-private',
+            memberId: 'member-private',
+            periodMonth: 9,
+            periodYear: 2026,
+            expectedIncome: new Prisma.Decimal(3000000),
+            actualIncome: new Prisma.Decimal(3500000),
+            expectedPersonalExpense: new Prisma.Decimal(1000000),
+            actualPersonalExpense: new Prisma.Decimal(1200000),
+            expectedSharedContribution: null,
+            actualSharedContribution: null,
+            incomeVisibility: FinanceVisibility.PRIVATE,
+            expenseVisibility: FinanceVisibility.PRIVATE,
+            note: 'private note',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.listMemberMonthlyFinances(
+      familyId,
+      'manager-id',
+      { month: 9, year: 2026 },
+    );
+
+    expect(result.scope).toBe('FAMILY_ACTIVE_MEMBERS');
+    expect(result.members).toHaveLength(2);
+    expect(result.members[0]).toMatchObject({
+      member: { id: 'member-public', displayName: 'Public Member' },
+      monthlyFinance: {
+        actualIncome: 15000000,
+        actualPersonalExpense: 5000000,
+        actualSharedContribution: 1200000,
+        note: null,
+      },
+      visibility: {
+        incomeHidden: false,
+        expenseHidden: false,
+      },
+    });
+    expect(result.members[1]).toMatchObject({
+      member: { id: 'member-private', displayName: 'Private Member' },
+      monthlyFinance: {
+        actualIncome: null,
+        actualPersonalExpense: null,
+        actualSharedContribution: null,
+        note: null,
+      },
+      visibility: {
+        incomeHidden: true,
+        expenseHidden: true,
+      },
+    });
   });
 
   it('rejects a budget line without a category or jar', async () => {
@@ -515,8 +614,8 @@ describe('FinanceService budget planning', () => {
     ).findMany.mockResolvedValue([
       { categoryId: 'food-category', jarId: 'spending-jar' },
     ]);
-    (prisma.ledgerEntry as { findMany: jest.Mock })
-      .findMany.mockResolvedValueOnce([
+    (prisma.ledgerEntry as { findMany: jest.Mock }).findMany
+      .mockResolvedValueOnce([
         {
           jarId: 'spending-jar',
           amount: new Prisma.Decimal(2400000),

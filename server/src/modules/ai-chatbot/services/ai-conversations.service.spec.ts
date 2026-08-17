@@ -183,6 +183,80 @@ describe('AiConversationsService UI hints', () => {
     });
   });
 
+  it('includes contribution basis in goal contribution plan previews', () => {
+    const view = service.toMessageView(
+      buildAiMessage({
+        permissionContext: {
+          familyRole: FamilyRole.FAMILY_MANAGER,
+          toolTrace: [],
+          pendingAction: {
+            actionType: AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN,
+            payload: {
+              goalId: 'goal-1',
+              contributionPlan: {
+                periodMonth: 9,
+                periodYear: 2026,
+                dueDate: '2026-09-25',
+                members: [
+                  { memberId: 'member-a', plannedAmount: 3333333 },
+                  { memberId: 'member-b', plannedAmount: 666667 },
+                ],
+              },
+              contributionBasis: {
+                formula:
+                  'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount',
+                members: [
+                  {
+                    memberId: 'member-a',
+                    displayName: 'Lê Anh Sỹ',
+                    plannedAmount: 3333333,
+                    incomeAmount: 15000000,
+                    personalExpenseAmount: 5000000,
+                    sharedContributionAmount: 0,
+                    availableAmount: 10000000,
+                  },
+                  {
+                    memberId: 'member-b',
+                    displayName: 'Minh Nhut',
+                    plannedAmount: 666667,
+                    incomeAmount: 3000000,
+                    personalExpenseAmount: 1000000,
+                    sharedContributionAmount: 0,
+                    availableAmount: 2000000,
+                  },
+                ],
+              },
+            },
+            status: AiActionStatus.PENDING,
+            proposedByMemberId: 'member-1',
+            expiresAt: '2026-08-08T00:15:00.000Z',
+          },
+        },
+      }),
+    );
+
+    expect(view.pendingAction?.uiHints.fields).toEqual(
+      expect.arrayContaining([
+        { label: 'Tổng dự kiến', value: '4.000.000đ' },
+        {
+          label: 'Căn cứ tính',
+          value:
+            'Ưu tiên số thực tế, thiếu thì dùng số dự kiến; chia theo tỷ lệ khả dụng',
+        },
+        {
+          label: 'Lê Anh Sỹ',
+          value:
+            'góp 3.333.333đ / thu 15.000.000đ / chi 5.000.000đ / góp chung 0đ / khả dụng 10.000.000đ',
+        },
+        {
+          label: 'Minh Nhut',
+          value:
+            'góp 666.667đ / thu 3.000.000đ / chi 1.000.000đ / góp chung 0đ / khả dụng 2.000.000đ',
+        },
+      ]),
+    );
+  });
+
   it('maps successful daily brief tool trace to an insight card', () => {
     const view = service.toMessageView(
       buildAiMessage({
