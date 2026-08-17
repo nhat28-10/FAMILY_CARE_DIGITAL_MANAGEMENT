@@ -274,6 +274,60 @@ export class SosService {
   }
 
   /**
+   * Opt-in responder tracking: only members who already replied ON_THE_WAY may
+   * stream their own position for this alert. The point is broadcast live to the
+   * SOS room but not persisted into `SosLocationPoint`, which remains the
+   * trigger's route history.
+   */
+  async pushResponderLocation(
+    workspaceId: string,
+    alertId: string,
+    memberId: string,
+    dto: PushSosLocationDto,
+  ) {
+    const alert = await this.assertActiveAlert(workspaceId, alertId);
+    if (alert.triggeredByMemberId === memberId) {
+      throw new ForbiddenException(
+        'Người kích hoạt SOS đã có luồng vị trí riêng',
+      );
+    }
+    await this.assertDeviceBelongsToMember(memberId, [dto.deviceId]);
+
+    const response = await this.prisma.sosResponse.findFirst({
+      where: {
+        sosAlertId: alertId,
+        responderMemberId: memberId,
+        responseType: SosResponseType.ON_THE_WAY,
+      },
+      include: { responderMember: memberSummary },
+      orderBy: { respondedAt: 'desc' },
+    });
+    if (!response) {
+      throw new ForbiddenException(
+        'Chỉ thành viên đã phản hồi đang tới mới được chia sẻ vị trí hỗ trợ',
+      );
+    }
+
+    const point = {
+      deviceId: dto.deviceId ?? null,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      accuracy: dto.accuracy ?? null,
+      sourceType: dto.sourceType,
+      recordedAt: dto.recordedAt ? new Date(dto.recordedAt) : new Date(),
+    };
+    const payload = {
+      sosAlertId: alertId,
+      responderMemberId: memberId,
+      responderMember: response.responderMember,
+      point,
+    };
+
+    this.sosGateway.emitResponderLocation(workspaceId, payload);
+    return payload;
+  }
+
+  /**
    * Batch ingest — a device that buffered points while offline flushes them in
    * one request. Same authorization as {@link pushLocation}: only the member
    * who triggered the alert (optionally via their own device) may stream.
@@ -357,6 +411,17 @@ export class SosService {
       sosAlertId: alertId,
       response,
     });
+    if (dto.responseType === SosResponseType.ON_THE_WAY) {
+      this.sosGateway.emitToUser(
+        response.responderMember.user.id,
+        'sos:responder:track:start',
+        {
+          alertId,
+          workspaceId,
+          intervalSec: SOS_TRACK_INTERVAL_SEC,
+        },
+      );
+    }
     return response;
   }
 
@@ -468,6 +533,18 @@ export class SosService {
       'sos:track:stop',
       { alertId },
     );
+    const responderUserIds = new Set(
+      (updated.responses ?? [])
+        .filter(
+          (response) => response.responseType === SosResponseType.ON_THE_WAY,
+        )
+        .map((response) => response.responderMember.user.id),
+    );
+    for (const userId of responderUserIds) {
+      this.sosGateway.emitToUser(userId, 'sos:responder:track:stop', {
+        alertId,
+      });
+    }
     return updated;
   }
 
@@ -507,6 +584,13 @@ export class SosService {
       );
     }
 
+    await this.assertDeviceBelongsToMember(memberId, deviceIds);
+  }
+
+  private async assertDeviceBelongsToMember(
+    memberId: string,
+    deviceIds: Array<string | null | undefined>,
+  ) {
     const uniqueDeviceIds = [
       ...new Set(deviceIds.filter((id): id is string => Boolean(id))),
     ];

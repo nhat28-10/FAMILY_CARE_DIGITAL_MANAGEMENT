@@ -202,6 +202,57 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * A responder who explicitly tapped ON_THE_WAY can stream their own location
+   * so the SOS trigger sees who is coming. This is opt-in per alert and is
+   * separate from the trigger's own `sos:location` route.
+   */
+  @SubscribeMessage('sos:responder:location:push')
+  async handleResponderLocationPush(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: LocationPushBody,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const userId = (client.data as SosSocketData)?.userId;
+    if (!userId) {
+      return { ok: false, error: 'Chưa xác thực' };
+    }
+
+    const { workspaceId, alertId } = body ?? {};
+    if (!workspaceId || !alertId) {
+      return { ok: false, error: 'Thiếu workspaceId hoặc alertId' };
+    }
+    if (!this.isValidCoord(body.latitude, body.longitude)) {
+      return { ok: false, error: 'Toạ độ không hợp lệ' };
+    }
+
+    const membership = await this.familyMembersService.findByFamilyAndUser(
+      workspaceId,
+      userId,
+    );
+    if (!membership) {
+      return { ok: false, error: 'Không phải thành viên' };
+    }
+
+    try {
+      await this.sosService.pushResponderLocation(
+        workspaceId,
+        alertId,
+        membership.id,
+        {
+          latitude: body.latitude as number,
+          longitude: body.longitude as number,
+          accuracy: body.accuracy,
+          sourceType: body.sourceType ?? GpsSourceType.MOBILE_GPS,
+          recordedAt: body.recordedAt,
+          deviceId: body.deviceId,
+        },
+      );
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+
   @SubscribeMessage('sos:leave')
   async handleLeave(
     @ConnectedSocket() client: Socket,
@@ -227,6 +278,12 @@ export class SosGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitResponse(workspaceId: string, payload: unknown): void {
     this.server.to(this.room(workspaceId)).emit('sos:response', payload);
+  }
+
+  emitResponderLocation(workspaceId: string, payload: unknown): void {
+    this.server
+      .to(this.room(workspaceId))
+      .emit('sos:responder:location', payload);
   }
 
   emitResolved(workspaceId: string, payload: unknown): void {
