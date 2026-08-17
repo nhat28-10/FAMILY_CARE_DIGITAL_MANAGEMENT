@@ -3,6 +3,7 @@ import { GpsSourceType, MemberStatus } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import type { UpdateMyLocationDto } from './dto/update-my-location.dto';
+import { LocationsGateway } from './locations.gateway';
 
 /**
  * Daily location points are history rows (see `MemberLocationPoint`); to keep
@@ -17,7 +18,10 @@ const LOCATION_RETENTION_MS = 24 * 60 * 60 * 1000;
  */
 @Injectable()
 export class LocationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly locationsGateway: LocationsGateway,
+  ) {}
 
   /**
    * Latest known point of every ACTIVE member who opted in to sharing.
@@ -80,6 +84,20 @@ export class LocationsService {
       },
     });
 
+    const member = await this.prisma.familyMember.findFirst({
+      where: {
+        id: memberId,
+        familyId: workspaceId,
+        status: MemberStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        displayName: true,
+        locationSharingEnabled: true,
+        user: { select: { id: true, fullName: true, avatarUrl: true } },
+      },
+    });
+
     await this.prisma.memberLocationPoint.deleteMany({
       where: {
         workspaceId,
@@ -89,15 +107,77 @@ export class LocationsService {
       },
     });
 
+    if (member?.locationSharingEnabled) {
+      this.locationsGateway.emitLocationUpdated(
+        workspaceId,
+        this.buildLocationPayload(workspaceId, member, point, dto),
+      );
+    }
+
     return point;
   }
 
   /** Opt the calling member in or out of family-map sharing. */
-  async setMyLocationSharing(memberId: string, isSharing: boolean) {
-    return this.prisma.familyMember.update({
+  async setMyLocationSharing(
+    workspaceId: string,
+    memberId: string,
+    isSharing: boolean,
+  ) {
+    const updated = await this.prisma.familyMember.update({
       where: { id: memberId },
       data: { locationSharingEnabled: isSharing },
       select: { id: true, locationSharingEnabled: true },
     });
+
+    this.locationsGateway.emitSharingChanged(workspaceId, {
+      workspaceId,
+      memberId: updated.id,
+      isSharing: updated.locationSharingEnabled,
+    });
+
+    return updated;
+  }
+
+  private buildLocationPayload(
+    workspaceId: string,
+    member: {
+      id: string;
+      displayName: string | null;
+      user: { id: string; fullName: string | null; avatarUrl: string | null };
+    },
+    point: {
+      latitude?: unknown;
+      longitude?: unknown;
+      accuracy?: unknown;
+      recordedAt?: Date;
+    },
+    fallback: UpdateMyLocationDto,
+  ) {
+    return {
+      workspaceId,
+      userId: member.user.id,
+      memberId: member.id,
+      displayName: member.displayName ?? member.user.fullName,
+      avatarUrl: member.user.avatarUrl,
+      latitude: this.toNumber(point.latitude ?? fallback.latitude),
+      longitude: this.toNumber(point.longitude ?? fallback.longitude),
+      accuracy:
+        point.accuracy === null
+          ? null
+          : this.toNullableNumber(point.accuracy ?? fallback.accuracy),
+      updatedAt: point.recordedAt ?? new Date(),
+      isSharing: true,
+    };
+  }
+
+  private toNullableNumber(value: unknown): number | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    return this.toNumber(value);
+  }
+
+  private toNumber(value: unknown): number {
+    return Number(value);
   }
 }
