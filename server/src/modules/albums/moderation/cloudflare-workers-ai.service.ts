@@ -82,6 +82,7 @@ const TEXT_CATEGORY_MAP: Array<{
 const CONTEXT_LABEL_MAP: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /beach|sea|ocean|coast|sand/i, label: 'beach' },
   { pattern: /mountain|hill|snow|ski/i, label: 'mountain' },
+  { pattern: /strawberr|pineapple|peach|fruit|still\s*life/i, label: 'fruit' },
   { pattern: /birthday|cake|party/i, label: 'birthday' },
   { pattern: /wedding|bride|groom/i, label: 'wedding' },
   { pattern: /food|meal|restaurant|dinner|lunch/i, label: 'food' },
@@ -542,40 +543,146 @@ export class CloudflareWorkersAiService {
     const normalized = text.replace(/\s+/g, ' ').trim();
     if (!normalized) return null;
 
+    const explicitHasPerson = this.parseBooleanContextField(
+      normalized,
+      'has\\s*person',
+    );
+    const explicitTopicMatch = this.parseTopicMatchContextField(normalized);
+    const explicitTopicConfidence =
+      this.parseTopicConfidenceContextField(normalized);
+    const explicitMismatchReason = this.cleanMismatchReason(
+      this.matchContextField(normalized, 'mismatch\\s*reason'),
+    );
+
     const noPersonPattern =
-      /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b|kh[oÃ´]ng\s+(c[oÃ³]|th[aáº¥]y|ph[aÃ¡]t\s+hi[eá»‡]n)\s+ng[Æ°Æ°]á»i/i;
+      /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b/i;
     const personPattern =
-      /\b(person|people|human|humans|man|woman|child|children|family)\b|ng[Æ°Æ°]á»i|gia\s+Ä‘[iÃ¬]nh|tráº»\s+em|em\s+b[eÃ©]/i;
-    const hasPerson =
-      !noPersonPattern.test(normalized) && personPattern.test(normalized);
-    const labels = CONTEXT_LABEL_MAP.filter((item) =>
-      item.pattern.test(normalized),
-    )
-      .map((item) => item.label)
-      .slice(0, 12);
+      /\b(person|people|human|humans|man|woman|child|children|family)\b/i;
+    const sceneSummary = this.cleanContextSummary(normalized);
+    let hasPerson =
+      explicitHasPerson ??
+      (!noPersonPattern.test(normalized) && personPattern.test(normalized));
+    const explicitLabels = this.parseLabelsContextField(normalized);
+    const inferredLabels = this.inferContextLabels(sceneSummary);
+    const labels = [
+      ...new Set(explicitLabels.length > 0 ? explicitLabels : inferredLabels),
+    ].slice(0, 12);
+    if (hasPerson && this.looksObjectOnlyScene(sceneSummary, labels)) {
+      hasPerson = false;
+    }
 
     return {
       hasPerson,
-      labels: [...new Set(labels)],
-      sceneSummary: this.cleanContextSummary(normalized),
-      topicMatch: 'UNCERTAIN',
-      topicConfidence: 0,
-      mismatchReason: '',
+      labels,
+      sceneSummary,
+      topicMatch: explicitTopicMatch ?? 'UNCERTAIN',
+      topicConfidence: explicitTopicConfidence ?? 0,
+      mismatchReason: explicitMismatchReason,
     };
   }
 
+  private matchContextField(text: string, label: string) {
+    const knownLabels =
+      'has\\s*person|labels?|detected\\s*labels|scene\\s*summary|summary|topic\\s*match|topic\\s*confidence|mismatch\\s*reason';
+    const match = text.match(
+      new RegExp(
+        `(?:^|\\s)(?:\\*\\*)?(?:${label})(?:\\*\\*)?\\s*:\\s*(.*?)(?=\\s+(?:${knownLabels})\\s*:|$)`,
+        'i',
+      ),
+    );
+    return match?.[1]?.replace(/\*\*/g, '').trim();
+  }
+
+  private parseBooleanContextField(text: string, label: string) {
+    const value = this.matchContextField(text, label);
+    if (!value) return null;
+    if (/^(false|no|0)\b/i.test(value)) return false;
+    if (/^(true|yes|1)\b/i.test(value)) return true;
+    return null;
+  }
+
+  private parseTopicMatchContextField(text: string) {
+    const value = this.matchContextField(text, 'topic\\s*match');
+    if (!value) return null;
+    if (/\bMISMATCH\b/i.test(value)) return 'MISMATCH' as const;
+    if (/\bMATCH\b/i.test(value)) return 'MATCH' as const;
+    if (/\b(UNCERTAIN|UNKNOWN)\b/i.test(value)) return 'UNCERTAIN' as const;
+    return null;
+  }
+
+  private parseTopicConfidenceContextField(text: string) {
+    const value = this.matchContextField(text, 'topic\\s*confidence');
+    const numeric = Number(value?.match(/\d+(?:\.\d+)?/)?.[0]);
+    if (!Number.isFinite(numeric)) return null;
+    const normalized = numeric > 1 && numeric <= 100 ? numeric / 100 : numeric;
+    return Math.min(1, Math.max(0, normalized));
+  }
+
+  private parseLabelsContextField(text: string) {
+    const value =
+      this.matchContextField(text, 'detected\\s*labels') ??
+      this.matchContextField(text, 'labels?');
+    if (!value) return [];
+    return value
+      .split(/[,;|]/)
+      .map((item) =>
+        item
+          .replace(/[^a-z0-9 _-]/gi, '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+
+  private inferContextLabels(text: string) {
+    return CONTEXT_LABEL_MAP.filter((item) => item.pattern.test(text)).map(
+      (item) => item.label,
+    );
+  }
+
+  private looksObjectOnlyScene(summary: string, labels: string[]) {
+    const hasHumanSignal =
+      /\b(person|people|human|man|woman|child|children|family|face|portrait)\b/i.test(
+        summary,
+      );
+    if (hasHumanSignal) return false;
+    const objectOnlySignal =
+      /\b(still\s*life|fruit|strawberr(?:y|ies)|pineapple|peach(?:es)?|durian|apple|banana|orange|grape|vegetable|object|objects)\b/i.test(
+        summary,
+      );
+    return objectOnlySignal || labels.some((label) => label === 'fruit');
+  }
+
+  private cleanMismatchReason(value: string | undefined) {
+    const normalized = value?.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (
+      /^(short reason|empty string|short reason or empty string)$/i.test(
+        normalized,
+      )
+    ) {
+      return '';
+    }
+    return normalized.slice(0, 500);
+  }
+
   private cleanContextSummary(text: string) {
+    const explicitSummary =
+      this.matchContextField(text, 'scene\\s*summary') ??
+      this.matchContextField(text, 'summary');
     const withoutMarkdown = text
       .replace(/```[\s\S]*?```/g, ' ')
       .replace(/[*_`#>-]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const beforeReasoning = withoutMarkdown
+    const source = explicitSummary || withoutMarkdown;
+    const beforeReasoning = source
       .split(
-        /\b(?:to determine|we can analyze|let'?s analyze|analysis|therefore|based on)\b/i,
+        /\b(?:has\s*person|labels?|detected\s*labels|scene\s*summary|summary|topic\s*match|topic\s*confidence|mismatch\s*reason|to determine|we can analyze|let'?s analyze|analysis|therefore|based on)\s*:?/i,
       )[0]
       .trim();
-    const candidate = beforeReasoning || withoutMarkdown;
+    const candidate = beforeReasoning || source;
     const sentence = candidate.match(/^.{20,220}?[.!?](?:\s|$)/)?.[0];
     return (sentence ?? candidate.slice(0, 220))
       .replace(/[,;:\s]+$/g, '')
@@ -658,10 +765,7 @@ export class CloudflareWorkersAiService {
         .slice(0, 500),
       topicMatch: value.topicMatch as AiAlbumContextResult['topicMatch'],
       topicConfidence: value.topicConfidence,
-      mismatchReason: value.mismatchReason
-        .replace(/[\r\n]+/g, ' ')
-        .trim()
-        .slice(0, 500),
+      mismatchReason: this.cleanMismatchReason(value.mismatchReason),
     };
   }
 

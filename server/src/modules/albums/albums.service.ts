@@ -142,9 +142,9 @@ export class AlbumsService {
         suggestedActions.add('CHOOSE_ANOTHER_COLLECTION');
       }
       if (topic && result.topicMatch === 'MISMATCH') {
+        const mismatchReason = this.cleanAiWarningText(result.mismatchReason);
         warnings.push(
-          result.mismatchReason ||
-            `Ảnh có vẻ không khớp với chủ đề album "${topic}".`,
+          mismatchReason || `Ảnh có vẻ không khớp với chủ đề album "${topic}".`,
         );
         suggestedActions.add('CHOOSE_ANOTHER_COLLECTION');
       }
@@ -648,6 +648,19 @@ export class AlbumsService {
     return /\b(anh|chi|em|ong|ba|bo|me|bac|co|chu|di|cau|mo|thay|ban)\b/i.test(
       normalized,
     );
+  }
+
+  private cleanAiWarningText(value: string | null | undefined) {
+    const normalized = value?.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (
+      /^(short reason|empty string|short reason or empty string)$/i.test(
+        normalized,
+      )
+    ) {
+      return '';
+    }
+    return normalized;
   }
 
   private withDraftTimeout<T>(promise: Promise<T>): Promise<T> {
