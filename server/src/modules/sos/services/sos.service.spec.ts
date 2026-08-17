@@ -47,7 +47,7 @@ describe('SosService location tracking', () => {
       createMany: jest.Mock;
       findFirst: jest.Mock;
     };
-    sosResponse: { create: jest.Mock };
+    sosResponse: { create: jest.Mock; findFirst: jest.Mock };
     wearableDevice: { count: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -60,6 +60,7 @@ describe('SosService location tracking', () => {
     emitNewAlert: jest.Mock;
     emitResolved: jest.Mock;
     emitResponse: jest.Mock;
+    emitResponderLocation: jest.Mock;
     emitToUser: jest.Mock;
   };
   let notifications: { notify: jest.Mock; dispatch: jest.Mock };
@@ -75,7 +76,7 @@ describe('SosService location tracking', () => {
         createMany: jest.fn(),
         findFirst: jest.fn(),
       },
-      sosResponse: { create: jest.fn() },
+      sosResponse: { create: jest.fn(), findFirst: jest.fn() },
       wearableDevice: { count: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -91,6 +92,7 @@ describe('SosService location tracking', () => {
       emitNewAlert: jest.fn(),
       emitResolved: jest.fn(),
       emitResponse: jest.fn(),
+      emitResponderLocation: jest.fn(),
       emitToUser: jest.fn(),
     };
     notifications = {
@@ -130,6 +132,60 @@ describe('SosService location tracking', () => {
       service.pushLocation(workspaceId, alertId, otherMemberId, point),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.sosLocationPoint.create).not.toHaveBeenCalled();
+  });
+
+  it('lets an ON_THE_WAY responder stream their location to the SOS room', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    prisma.sosResponse.findFirst.mockResolvedValue({
+      id: 'response-on-way',
+      responderMember: {
+        id: otherMemberId,
+        displayName: 'Người hỗ trợ',
+        user: {
+          id: 'user-helper',
+          fullName: 'Người hỗ trợ',
+          email: 'helper@example.com',
+          phone: null,
+          avatarUrl: null,
+        },
+      },
+    });
+
+    const result = await service.pushResponderLocation(
+      workspaceId,
+      alertId,
+      otherMemberId,
+      point,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        sosAlertId: alertId,
+        responderMemberId: otherMemberId,
+      }),
+    );
+    expect(prisma.sosLocationPoint.create).not.toHaveBeenCalled();
+    expect(gateway.emitResponderLocation).toHaveBeenCalledWith(
+      workspaceId,
+      expect.objectContaining({
+        sosAlertId: alertId,
+        responderMemberId: otherMemberId,
+        point: expect.objectContaining({
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }),
+      }),
+    );
+  });
+
+  it('forbids responder location before the member replies ON_THE_WAY', async () => {
+    prisma.sosAlert.findFirst.mockResolvedValue(activeAlert);
+    prisma.sosResponse.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.pushResponderLocation(workspaceId, alertId, otherMemberId, point),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(gateway.emitResponderLocation).not.toHaveBeenCalled();
   });
 
   it('forbids streaming from a device the member does not own', async () => {
@@ -417,6 +473,7 @@ describe('SosService location tracking', () => {
     prisma.sosResponse.create.mockResolvedValue({
       id: 'r1',
       responseType: SosResponseType.ON_THE_WAY,
+      responderMember: { user: { id: 'user-helper' } },
     });
 
     const response = await service.respond(
@@ -432,6 +489,11 @@ describe('SosService location tracking', () => {
     expect(gateway.emitResponse).toHaveBeenCalledWith(
       workspaceId,
       expect.objectContaining({ sosAlertId: alertId }),
+    );
+    expect(gateway.emitToUser).toHaveBeenCalledWith(
+      'user-helper',
+      'sos:responder:track:start',
+      { alertId, workspaceId, intervalSec: 5 },
     );
   });
 
