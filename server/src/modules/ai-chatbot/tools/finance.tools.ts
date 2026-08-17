@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsDefined, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsDefined,
+  IsIn,
+  IsOptional,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import {
   AiRelatedModule,
   BudgetPlanStatus,
@@ -32,6 +38,9 @@ const ALL_ROLES = [
 ];
 
 const MAX_LIST_LIMIT = 20;
+const CONTRIBUTION_DISTRIBUTION_MODES = ['AI_SUGGESTED', 'MANUAL'] as const;
+type ContributionDistributionMode =
+  (typeof CONTRIBUTION_DISTRIBUTION_MODES)[number];
 
 const periodProperties = {
   month: {
@@ -96,6 +105,10 @@ class ProposeCreateGoalAllocationDto {
 class ProposeGoalContributionPlanDto {
   @IsUUID()
   goalId!: string;
+
+  @IsOptional()
+  @IsIn(CONTRIBUTION_DISTRIBUTION_MODES)
+  distributionMode?: ContributionDistributionMode;
 
   @IsDefined()
   @ValidateNested()
@@ -667,6 +680,12 @@ export class FinanceAiTools implements AiToolProvider {
               type: 'string',
               description: 'UUID mục tiêu tài chính',
             },
+            distributionMode: {
+              type: 'string',
+              enum: CONTRIBUTION_DISTRIBUTION_MODES,
+              description:
+                'AI_SUGGESTED: backend proposes by available amount. MANUAL: keep member amounts from user/FE.',
+            },
             contributionPlan: {
               type: 'object',
               properties: {
@@ -733,23 +752,40 @@ export class FinanceAiTools implements AiToolProvider {
               memberId: item.memberId,
               plannedAmount: item.suggestedContribution,
             }));
-          const members =
-            suggestedMembers.length > 0
-              ? suggestedMembers
-              : dto.contributionPlan.members;
+          const useSuggestedMembers =
+            dto.distributionMode !== 'MANUAL' && suggestedMembers.length > 0;
+          const members = useSuggestedMembers
+            ? suggestedMembers
+            : dto.contributionPlan.members;
           const suggestionsByMember = new Map(
             suggestions.suggestions.map((item) => [item.memberId, item]),
           );
           return {
             goalId: dto.goalId,
+            distributionMode:
+              dto.distributionMode ??
+              (useSuggestedMembers ? 'AI_SUGGESTED' : 'MANUAL'),
             contributionPlan: { ...dto.contributionPlan, members },
             contributionBasis: {
               formula:
+                suggestions.basis ??
                 'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount; suggestedContribution = monthlyContributionTarget * availableAmount / totalAvailableAmount',
               amountPriority:
                 'Ưu tiên số thực tế actual*, nếu chưa có thì dùng số dự kiến expected*.',
+              distributionMode:
+                dto.distributionMode ??
+                (useSuggestedMembers ? 'AI_SUGGESTED' : 'MANUAL'),
               monthlyContributionTarget: suggestions.monthlyContributionTarget,
+              explicitMonthlyContributionTarget:
+                suggestions.explicitMonthlyContributionTarget,
+              recommendedMonthlyContribution:
+                suggestions.recommendedMonthlyContribution,
+              remainingAmount: suggestions.remainingAmount,
               totalAvailableAmount: suggestions.totalAvailableAmount,
+              skippedMembers: suggestions.skippedMembers,
+              warnings: suggestions.warnings,
+              safetyNote:
+                'Already-paid shared family fund contributions reduce availableAmount; do not reuse them as this goal contribution.',
               members: members.map((memberPlan) => {
                 const suggestion = suggestionsByMember.get(memberPlan.memberId);
                 return {

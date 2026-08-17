@@ -97,7 +97,11 @@ describe('FinancialGoalService financial goals', () => {
       financeLedger: { findUnique: jest.fn() },
       ledgerEntry: { findMany: jest.fn() },
       financialGoal: { findFirst: jest.fn() },
-      goalAllocation: { aggregate: jest.fn() },
+      goalAllocation: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { amount: new Prisma.Decimal(0) } }),
+      },
     };
     notifications = {
       notify: jest.fn().mockResolvedValue({ ids: [] }),
@@ -663,6 +667,16 @@ describe('FinancialGoalService financial goals', () => {
       availableAmount: 5000000,
       suggestedContribution: 2272727,
     });
+    expect(result.skippedMembers).toEqual([
+      {
+        memberId: 'member-c',
+        displayName: 'Member C',
+        reason: 'NO_AVAILABLE_AMOUNT',
+      },
+    ]);
+    expect(result.warnings).toEqual([
+      'Some active members were excluded because monthly finance data is missing, private, or has no remaining available amount.',
+    ]);
   });
 
   it('prioritizes actual monthly finance values for contribution suggestions', async () => {
@@ -747,6 +761,66 @@ describe('FinancialGoalService financial goals', () => {
         suggestedContribution: 666667,
       }),
     ]);
+  });
+
+  it('uses deadline-based recommended monthly contribution when goal has no explicit monthly target', async () => {
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      id: memberId,
+      familyId,
+      familyRole: FamilyRole.FAMILY_MANAGER,
+      status: MemberStatus.ACTIVE,
+    });
+    (
+      prisma.financialGoal as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
+      ...goal,
+      targetAmount: new Prisma.Decimal(12000000),
+      deadline: new Date('2026-09-15T00:00:00.000Z'),
+      monthlyContributionTarget: null,
+    });
+    (
+      prisma.familyMember as { findFirst: jest.Mock; findMany: jest.Mock }
+    ).findMany.mockResolvedValue([
+      {
+        id: 'member-a',
+        displayName: 'Member A',
+        user: { fullName: 'User A' },
+        monthlyFinances: [
+          {
+            expectedIncome: new Prisma.Decimal(10000000),
+            actualIncome: null,
+            expectedPersonalExpense: new Prisma.Decimal(2000000),
+            actualPersonalExpense: null,
+            expectedSharedContribution: new Prisma.Decimal(1000000),
+            actualSharedContribution: null,
+            incomeVisibility: FinanceVisibility.FAMILY,
+            expenseVisibility: FinanceVisibility.FAMILY,
+          },
+        ],
+      },
+    ]);
+
+    const result = await financialGoalService.getGoalContributionSuggestions(
+      familyId,
+      memberId,
+      goalId,
+      { month: 6, year: 2026 },
+    );
+
+    expect(result.explicitMonthlyContributionTarget).toBeNull();
+    expect(result.recommendedMonthlyContribution).toBe(3000000);
+    expect(result.monthlyContributionTarget).toBe(3000000);
+    expect(result.suggestions[0]).toMatchObject({
+      memberId: 'member-a',
+      sharedContributionAmount: 1000000,
+      availableAmount: 7000000,
+      suggestedContribution: 3000000,
+    });
+    expect(result.warnings).toContain(
+      'Goal has no monthlyContributionTarget; suggestions use the remaining amount divided by months remaining until deadline.',
+    );
   });
 
   it('confirms contribution plans by upserting active family members', async () => {

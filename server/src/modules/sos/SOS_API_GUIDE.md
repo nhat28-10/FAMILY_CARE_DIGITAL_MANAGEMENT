@@ -83,7 +83,7 @@ Nếu cài đặt `notifyAllMembers=false` → chỉ `FAMILY_MANAGER`/`DEPUTY_ME
 
 - `GET /settings` — cài đặt SOS của gia đình (tự tạo mặc định lần đầu):
   `{ isEnabled, notifyAllMembers, autoCreateAlertFromFall, locationRequired }`.
-- `PATCH /settings` — cập nhật (chỉ MANAGER/DEPUTY), body là các field trên (optional từng field).
+- `PATCH /settings` — cập nhật (MANAGER/DEPUTY/MEMBER), body là các field trên (optional từng field).
 - `GET /emergency-contacts` — danh bạ khẩn cấp (mọi thành viên; sắp theo `priorityOrder`).
 - `POST /emergency-contacts` — thêm (MANAGER/DEPUTY): `{ contactName, phoneNumber, relationshipNote?, priorityOrder?, isActive? }`.
 - `PATCH /emergency-contacts/:contactId` / `DELETE /emergency-contacts/:contactId` — sửa/xóa (MANAGER/DEPUTY).

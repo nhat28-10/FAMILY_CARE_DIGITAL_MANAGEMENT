@@ -15,9 +15,10 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { UpdateSosSettingsDto } from '../dto/update-sos-settings.dto';
 import { SosSettingsService } from '../services/sos-settings.service';
 
-const MANAGER_ROLES = [
+const SOS_SETTINGS_ROLES = [
   FamilyRole.FAMILY_MANAGER,
   FamilyRole.DEPUTY_MEMBER,
+  FamilyRole.FAMILY_MEMBER,
 ] as const;
 
 @ApiTags('SOS')
@@ -41,10 +42,11 @@ export class SosSettingsController {
   }
 
   @Patch()
-  @FamilyRoles(...MANAGER_ROLES)
+  @FamilyRoles(...SOS_SETTINGS_ROLES)
   @ResponseMessage('Đã cập nhật cài đặt SOS')
   @ApiOperation({
-    summary: 'Cập nhật cài đặt SOS (FAMILY_MANAGER / DEPUTY_MEMBER)',
+    summary:
+      'Cập nhật cài đặt SOS (FAMILY_MANAGER / DEPUTY_MEMBER / FAMILY_MEMBER)',
   })
   update(
     @Param('familyId') familyId: string,

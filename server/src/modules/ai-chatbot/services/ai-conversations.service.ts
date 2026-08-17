@@ -543,6 +543,16 @@ export class AiConversationsService {
       const contributionBasis = this.asRecord(payload.contributionBasis);
       const members = this.asUnknownArray(contributionPlan.members);
       const basisMembers = this.asUnknownArray(contributionBasis.members);
+      const warnings = this.asUnknownArray(contributionBasis.warnings)
+        .filter((item): item is string => typeof item === 'string')
+        .slice(0, 2)
+        .join(' | ');
+      const distributionMode =
+        typeof contributionBasis.distributionMode === 'string'
+          ? contributionBasis.distributionMode
+          : typeof payload.distributionMode === 'string'
+            ? payload.distributionMode
+            : undefined;
       const totalPlannedAmount = members.reduce<number>((sum, item) => {
         const memberPlan = this.asRecord(item);
         const amount = Number(memberPlan.plannedAmount);
@@ -593,6 +603,15 @@ export class AiConversationsService {
             ? 'Ưu tiên số thực tế, thiếu thì dùng số dự kiến; chia theo tỷ lệ khả dụng'
             : undefined,
         ),
+        this.field(
+          'Kieu phan bo',
+          distributionMode === 'MANUAL'
+            ? 'Nguoi dung tu nhap'
+            : distributionMode === 'AI_SUGGESTED'
+              ? 'AI goi y theo kha dung'
+              : undefined,
+        ),
+        this.field('Luu y', warnings || undefined),
         ...basisFields,
       ].filter(Boolean) as AiActionPreviewField[];
     }
