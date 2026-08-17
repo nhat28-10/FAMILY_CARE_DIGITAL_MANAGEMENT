@@ -186,6 +186,72 @@ export class FinanceService {
     );
   }
 
+  async listMemberMonthlyFinances(
+    familyId: string,
+    viewerMemberId: string,
+    period: RequiredFinancePeriodDto,
+  ) {
+    const viewer = await this.getMemberInFamilyOrThrow(
+      familyId,
+      viewerMemberId,
+    );
+    const canViewAllMembers = this.isFinanceManager(viewer.familyRole);
+    const members = await this.prisma.familyMember.findMany({
+      where: {
+        familyId,
+        status: MemberStatus.ACTIVE,
+        ...(canViewAllMembers ? {} : { id: viewerMemberId }),
+      },
+      select: {
+        id: true,
+        displayName: true,
+        user: { select: { fullName: true } },
+        monthlyFinances: {
+          where: {
+            periodMonth: period.month,
+            periodYear: period.year,
+          },
+          take: 1,
+        },
+      },
+      orderBy: [{ displayName: 'asc' }, { joinedAt: 'asc' }],
+    });
+
+    return {
+      period: { month: period.month, year: period.year },
+      scope: canViewAllMembers ? 'FAMILY_ACTIVE_MEMBERS' : 'SELF',
+      members: members.map((member) => {
+        const monthlyFinance = member.monthlyFinances[0] ?? null;
+        const isSelf = viewer.id === member.id;
+        return {
+          member: {
+            id: member.id,
+            displayName: this.memberDisplayName(member),
+          },
+          monthlyFinance: this.buildMonthlyFinanceSummaryView(
+            monthlyFinance,
+            isSelf,
+          ),
+          visibility: monthlyFinance
+            ? {
+                incomeVisibility: monthlyFinance.incomeVisibility,
+                expenseVisibility: monthlyFinance.expenseVisibility,
+                incomeHidden:
+                  !isSelf &&
+                  monthlyFinance.incomeVisibility !== FinanceVisibility.FAMILY,
+                expenseHidden:
+                  !isSelf &&
+                  monthlyFinance.expenseVisibility !== FinanceVisibility.FAMILY,
+              }
+            : null,
+        };
+      }),
+      note: canViewAllMembers
+        ? 'Manager/deputy xem được danh sách active member; các trường thu nhập/chi tiêu riêng tư được trả null theo visibility.'
+        : 'Member thường chỉ xem được thông tin tài chính của chính mình.',
+    };
+  }
+
   getMyMonthlySummary(
     familyId: string,
     memberId: string,
