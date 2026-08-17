@@ -541,13 +541,9 @@ export class AiConversationsService {
     if (actionType === AiActionType.CREATE_GOAL_CONTRIBUTION_PLAN) {
       const contributionPlan = this.asRecord(payload.contributionPlan);
       const contributionBasis = this.asRecord(payload.contributionBasis);
-      const members = Array.isArray(contributionPlan.members)
-        ? contributionPlan.members
-        : [];
-      const basisMembers = Array.isArray(contributionBasis.members)
-        ? contributionBasis.members
-        : [];
-      const totalPlannedAmount = members.reduce((sum, item) => {
+      const members = this.asUnknownArray(contributionPlan.members);
+      const basisMembers = this.asUnknownArray(contributionBasis.members);
+      const totalPlannedAmount = members.reduce<number>((sum, item) => {
         const memberPlan = this.asRecord(item);
         const amount = Number(memberPlan.plannedAmount);
         return Number.isFinite(amount) ? sum + amount : sum;
@@ -682,6 +678,10 @@ export class AiConversationsService {
     return value && typeof value === 'object'
       ? (value as Record<string, unknown>)
       : {};
+  }
+
+  private asUnknownArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? (value as unknown[]) : [];
   }
 
   private titleForModule(module: AiRelatedModule): string {
