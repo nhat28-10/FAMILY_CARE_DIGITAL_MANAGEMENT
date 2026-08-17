@@ -82,6 +82,7 @@ const TEXT_CATEGORY_MAP: Array<{
 const CONTEXT_LABEL_MAP: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /beach|sea|ocean|coast|sand/i, label: 'beach' },
   { pattern: /mountain|hill|snow|ski/i, label: 'mountain' },
+  { pattern: /strawberr|pineapple|peach|fruit|still\s*life/i, label: 'fruit' },
   { pattern: /birthday|cake|party/i, label: 'birthday' },
   { pattern: /wedding|bride|groom/i, label: 'wedding' },
   { pattern: /food|meal|restaurant|dinner|lunch/i, label: 'food' },
@@ -549,29 +550,31 @@ export class CloudflareWorkersAiService {
     const explicitTopicMatch = this.parseTopicMatchContextField(normalized);
     const explicitTopicConfidence =
       this.parseTopicConfidenceContextField(normalized);
-    const explicitMismatchReason =
-      this.matchContextField(normalized, 'mismatch\\s*reason') ?? '';
+    const explicitMismatchReason = this.cleanMismatchReason(
+      this.matchContextField(normalized, 'mismatch\\s*reason'),
+    );
 
     const noPersonPattern =
       /\b(no|without|not)\s+(visible\s+)?(person|people|human|humans)\b/i;
     const personPattern =
       /\b(person|people|human|humans|man|woman|child|children|family)\b/i;
-    const hasPerson =
+    const sceneSummary = this.cleanContextSummary(normalized);
+    let hasPerson =
       explicitHasPerson ??
       (!noPersonPattern.test(normalized) && personPattern.test(normalized));
     const explicitLabels = this.parseLabelsContextField(normalized);
-    const inferredLabels = CONTEXT_LABEL_MAP.filter((item) =>
-      item.pattern.test(normalized),
-    ).map((item) => item.label);
-    const labels = [...new Set([...explicitLabels, ...inferredLabels])].slice(
-      0,
-      12,
-    );
+    const inferredLabels = this.inferContextLabels(sceneSummary);
+    const labels = [
+      ...new Set(explicitLabels.length > 0 ? explicitLabels : inferredLabels),
+    ].slice(0, 12);
+    if (hasPerson && this.looksObjectOnlyScene(sceneSummary, labels)) {
+      hasPerson = false;
+    }
 
     return {
       hasPerson,
-      labels: [...new Set(labels)],
-      sceneSummary: this.cleanContextSummary(normalized),
+      labels,
+      sceneSummary,
       topicMatch: explicitTopicMatch ?? 'UNCERTAIN',
       topicConfidence: explicitTopicConfidence ?? 0,
       mismatchReason: explicitMismatchReason,
@@ -630,6 +633,38 @@ export class CloudflareWorkersAiService {
       )
       .filter(Boolean)
       .slice(0, 12);
+  }
+
+  private inferContextLabels(text: string) {
+    return CONTEXT_LABEL_MAP.filter((item) => item.pattern.test(text)).map(
+      (item) => item.label,
+    );
+  }
+
+  private looksObjectOnlyScene(summary: string, labels: string[]) {
+    const hasHumanSignal =
+      /\b(person|people|human|man|woman|child|children|family|face|portrait)\b/i.test(
+        summary,
+      );
+    if (hasHumanSignal) return false;
+    const objectOnlySignal =
+      /\b(still\s*life|fruit|strawberr(?:y|ies)|pineapple|peach(?:es)?|durian|apple|banana|orange|grape|vegetable|object|objects)\b/i.test(
+        summary,
+      );
+    return objectOnlySignal || labels.some((label) => label === 'fruit');
+  }
+
+  private cleanMismatchReason(value: string | undefined) {
+    const normalized = value?.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (
+      /^(short reason|empty string|short reason or empty string)$/i.test(
+        normalized,
+      )
+    ) {
+      return '';
+    }
+    return normalized.slice(0, 500);
   }
 
   private cleanContextSummary(text: string) {
@@ -730,10 +765,7 @@ export class CloudflareWorkersAiService {
         .slice(0, 500),
       topicMatch: value.topicMatch as AiAlbumContextResult['topicMatch'],
       topicConfidence: value.topicConfidence,
-      mismatchReason: value.mismatchReason
-        .replace(/[\r\n]+/g, ' ')
-        .trim()
-        .slice(0, 500),
+      mismatchReason: this.cleanMismatchReason(value.mismatchReason),
     };
   }
 

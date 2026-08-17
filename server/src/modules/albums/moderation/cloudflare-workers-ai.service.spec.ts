@@ -309,4 +309,57 @@ describe('CloudflareWorkersAiService', () => {
       mismatchReason: "The topic 'anh LMH' does not match the visual content.",
     });
   });
+
+  it('overrides text false positives for object-only fruit scenes', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse(
+        'The image shows strawberries arranged on a plate. Has Person: True Labels: strawberry, fruit Topic Match: UNKNOWN Topic Confidence: 0.0',
+      ),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'anh LMH'),
+    ).resolves.toMatchObject({
+      hasPerson: false,
+      labels: ['strawberry', 'fruit'],
+      sceneSummary: 'The image shows strawberries arranged on a plate.',
+    });
+  });
+
+  it('does not infer labels from mismatch reasoning text', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse(
+        'The image shows pineapple and peaches on a table. Topic Match: MISMATCH Topic Confidence: 0.0 Mismatch Reason: The album topic mountain does not match the fruit.',
+      ),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'mountain'),
+    ).resolves.toMatchObject({
+      hasPerson: false,
+      labels: ['fruit'],
+      sceneSummary: 'The image shows pineapple and peaches on a table.',
+      topicMatch: 'MISMATCH',
+    });
+  });
+
+  it('drops placeholder mismatch reasons from structured context JSON', async () => {
+    fetchMock.mockResolvedValue(
+      contextResponse({
+        hasPerson: false,
+        labels: ['fruit'],
+        sceneSummary: 'A bowl of fruit.',
+        topicMatch: 'MISMATCH',
+        topicConfidence: 0,
+        mismatchReason: 'short reason or empty string',
+      }),
+    );
+
+    await expect(
+      service.analyzeAlbumContext(png, 'image/png', 'sea'),
+    ).resolves.toMatchObject({
+      topicMatch: 'MISMATCH',
+      mismatchReason: '',
+    });
+  });
 });

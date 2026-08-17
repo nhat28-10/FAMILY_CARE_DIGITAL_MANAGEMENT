@@ -481,6 +481,34 @@ describe('AlbumsService permissions and deletion flow', () => {
     expect(result.suggestedActions).toContain('CHOOSE_ANOTHER_COLLECTION');
   });
 
+  it('does not expose placeholder mismatch reasons in warnings', async () => {
+    workersAi.analyzeAlbumContext.mockResolvedValue({
+      hasPerson: false,
+      labels: ['fruit'],
+      sceneSummary: 'A bowl of fruit.',
+      topicMatch: 'MISMATCH',
+      topicConfidence: 0,
+      mismatchReason: 'short reason or empty string',
+    });
+
+    const result = await service.analyzeDraft(
+      'family-1',
+      familyMember('uploader', FamilyRole.FAMILY_MEMBER),
+      { topic: 'sea' },
+      {
+        originalname: 'fruit.jpg',
+        mimetype: 'image/jpeg',
+        size: 4,
+        buffer: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      },
+    );
+
+    expect(result.recommendation).toBe('WARN');
+    expect(result.warnings).toEqual([
+      'Ảnh có vẻ không khớp với chủ đề album "sea".',
+    ]);
+  });
+
   it('warns when a person-like topic has no person even if topic match is unknown', async () => {
     workersAi.analyzeAlbumContext.mockResolvedValue({
       hasPerson: false,
