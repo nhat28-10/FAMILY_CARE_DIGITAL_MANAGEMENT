@@ -156,8 +156,15 @@ describe('FinanceAiTools write proposals', () => {
       goalId: '00000000-0000-4000-8000-000000000001',
       periodMonth: 9,
       periodYear: 2026,
+      basis:
+        'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount',
       monthlyContributionTarget: 4000000,
+      explicitMonthlyContributionTarget: 4000000,
+      recommendedMonthlyContribution: null,
+      remainingAmount: 10000000,
       totalAvailableAmount: 12000000,
+      skippedMembers: [],
+      warnings: [],
       suggestions: [],
     });
 
@@ -217,8 +224,15 @@ describe('FinanceAiTools write proposals', () => {
       goalId: '00000000-0000-4000-8000-000000000001',
       periodMonth: 9,
       periodYear: 2026,
+      basis:
+        'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount',
       monthlyContributionTarget: 4000000,
+      explicitMonthlyContributionTarget: 4000000,
+      recommendedMonthlyContribution: null,
+      remainingAmount: 10000000,
       totalAvailableAmount: 12000000,
+      skippedMembers: [],
+      warnings: [],
       suggestions: [
         {
           memberId: '00000000-0000-4000-8000-000000000011',
@@ -286,6 +300,7 @@ describe('FinanceAiTools write proposals', () => {
       ],
     });
     expect(payload.contributionBasis).toMatchObject({
+      distributionMode: 'AI_SUGGESTED',
       monthlyContributionTarget: 4000000,
       members: [
         expect.objectContaining({
@@ -299,6 +314,81 @@ describe('FinanceAiTools write proposals', () => {
           availableAmount: 2000000,
         }),
       ],
+    });
+  });
+
+  it('keeps user-entered member amounts when contribution distribution is manual', async () => {
+    financialGoalService.getGoalContributionSuggestions.mockResolvedValue({
+      goalId: '00000000-0000-4000-8000-000000000001',
+      periodMonth: 9,
+      periodYear: 2026,
+      basis:
+        'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount',
+      monthlyContributionTarget: 4000000,
+      explicitMonthlyContributionTarget: 4000000,
+      recommendedMonthlyContribution: null,
+      remainingAmount: 10000000,
+      totalAvailableAmount: 12000000,
+      skippedMembers: [],
+      warnings: [],
+      suggestions: [
+        {
+          memberId: '00000000-0000-4000-8000-000000000011',
+          displayName: 'Le Anh Sy',
+          incomeAmount: 15000000,
+          personalExpenseAmount: 5000000,
+          sharedContributionAmount: 0,
+          incomeSource: 'ACTUAL',
+          expenseSource: 'ACTUAL',
+          sharedContributionSource: 'MISSING',
+          availableAmount: 10000000,
+          suggestedContribution: 3333333,
+        },
+      ],
+    });
+
+    const payload = await goalContributionPlanTool().buildActionPayload!(
+      {
+        goalId: '00000000-0000-4000-8000-000000000001',
+        distributionMode: 'MANUAL',
+        contributionPlan: {
+          periodMonth: 9,
+          periodYear: 2026,
+          dueDate: '2026-09-25',
+          members: [
+            {
+              memberId: '00000000-0000-4000-8000-000000000011',
+              plannedAmount: 5000000,
+            },
+          ],
+        },
+      },
+      {
+        familyId: 'family-1',
+        memberId: 'member-1',
+        familyRole: FamilyRole.FAMILY_MANAGER,
+      },
+    );
+
+    expect(payload).toMatchObject({
+      distributionMode: 'MANUAL',
+      contributionPlan: {
+        members: [
+          {
+            memberId: '00000000-0000-4000-8000-000000000011',
+            plannedAmount: 5000000,
+          },
+        ],
+      },
+      contributionBasis: {
+        distributionMode: 'MANUAL',
+        members: [
+          expect.objectContaining({
+            plannedAmount: 5000000,
+            suggestedContribution: 3333333,
+          }),
+        ],
+      },
     });
   });
 });

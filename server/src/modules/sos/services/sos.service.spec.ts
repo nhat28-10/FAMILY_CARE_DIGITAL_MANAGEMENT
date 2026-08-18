@@ -5,6 +5,7 @@ import {
   SosAlertStatus,
   SosResponseType,
   SosSourceType,
+  SosTriggerReason,
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -295,6 +296,14 @@ describe('SosService location tracking', () => {
 
     expect(result).toEqual(expect.objectContaining({ id: alertId }));
     expect(result).not.toHaveProperty('sosAlertId');
+    expect(prisma.sosAlert.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceType: SosSourceType.MOBILE_APP,
+          triggerReason: SosTriggerReason.MANUAL,
+        }),
+      }),
+    );
     expect(gateway.emitNewAlert).toHaveBeenCalledWith(workspaceId, created);
     expect(gateway.emitToUser).toHaveBeenCalledWith(
       'user-1',
@@ -389,6 +398,35 @@ describe('SosService location tracking', () => {
         sourceType: SosSourceType.WEARABLE,
       }),
     ).resolves.toEqual(expect.objectContaining({ id: alertId }));
+  });
+
+  it('allows fall detection triggers without coordinates even when locationRequired', async () => {
+    prisma.sosAlert.create.mockResolvedValue({
+      id: alertId,
+      triggeredByMember: {
+        id: triggerMemberId,
+        displayName: 'Người A',
+        user: { id: 'user-1', fullName: 'Người A' },
+      },
+    });
+
+    await expect(
+      service.trigger(workspaceId, triggerMemberId, {
+        sourceType: SosSourceType.MOBILE_APP,
+        triggerReason: SosTriggerReason.FALL_DETECTION,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ id: alertId }));
+
+    expect(prisma.sosAlert.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceType: SosSourceType.MOBILE_APP,
+          triggerReason: SosTriggerReason.FALL_DETECTION,
+          initialLatitude: null,
+          initialLongitude: null,
+        }),
+      }),
+    );
   });
 
   it('notifies only managers/deputies when notifyAllMembers is off', async () => {

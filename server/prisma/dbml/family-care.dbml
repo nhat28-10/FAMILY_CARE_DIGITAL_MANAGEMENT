@@ -849,6 +849,7 @@ Table sos_alerts {
   triggeredByMemberId String [not null]
   deviceId String
   sourceType SosSourceType [not null]
+  triggerReason SosTriggerReason [not null, default: 'MANUAL']
   status SosAlertStatus [not null, default: 'ACTIVE']
   severity SosSeverity
   initialLatitude Decimal
@@ -1696,6 +1697,11 @@ Enum SosSourceType {
   MOBILE_APP
   WEARABLE
   SIMULATED_DEVICE
+}
+
+Enum SosTriggerReason {
+  MANUAL
+  FALL_DETECTION
 }
 
 Enum SosAlertStatus {

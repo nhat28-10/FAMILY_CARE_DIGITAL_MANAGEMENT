@@ -78,6 +78,8 @@ const FAMILY_FUND_CASH_OUT_TYPES = [
   LedgerEntryType.ALLOWANCE,
   LedgerEntryType.REWARD,
 ] as const;
+const CONTRIBUTION_SUGGESTION_FORMULA =
+  'availableAmount = incomeAmount - personalExpenseAmount - sharedContributionAmount; suggestedContribution = contributionTargetAmount * availableAmount / totalAvailableAmount';
 
 @Injectable()
 export class FinancialGoalService {
@@ -127,6 +129,11 @@ export class FinancialGoalService {
     const member = await this.getMemberInFamilyOrThrow(familyId, memberId);
     const goal = await this.requireFinancialGoal(familyId, goalId);
     this.assertCanViewGoal(member.familyRole, goal);
+    const currentAmount = await this.calculateGoalAllocatedAmount(
+      this.prisma,
+      goal.id,
+    );
+    const progress = this.buildGoalProgress(goal, currentAmount);
     return this.goalWithProgress(goal);
   }
 
@@ -256,6 +263,11 @@ export class FinancialGoalService {
     const member = await this.getMemberInFamilyOrThrow(familyId, memberId);
     const goal = await this.requireFinancialGoal(familyId, goalId);
     this.assertCanViewGoal(member.familyRole, goal);
+    const currentAmount = await this.calculateGoalAllocatedAmount(
+      this.prisma,
+      goal.id,
+    );
+    const progress = this.buildGoalProgress(goal, currentAmount);
 
     const members = await this.prisma.familyMember.findMany({
       where: { familyId, status: MemberStatus.ACTIVE },
@@ -284,16 +296,47 @@ export class FinancialGoalService {
       orderBy: { joinedAt: 'asc' },
     });
 
+    const skippedMembers: {
+      memberId: string;
+      displayName: string;
+      reason:
+        | 'MISSING_MONTHLY_FINANCE'
+        | 'INCOME_NOT_VISIBLE'
+        | 'EXPENSE_NOT_VISIBLE'
+        | 'NO_AVAILABLE_AMOUNT';
+    }[] = [];
     const suggestionsBase = members
       .map((familyMember) => {
         const monthlyFinance = familyMember.monthlyFinances[0];
+        const displayName = this.memberDisplayName(familyMember);
         const canUseIncome =
           familyMember.id === memberId ||
           monthlyFinance?.incomeVisibility === FinanceVisibility.FAMILY;
         const canUseExpense =
           familyMember.id === memberId ||
           monthlyFinance?.expenseVisibility === FinanceVisibility.FAMILY;
-        if (!monthlyFinance || !canUseIncome || !canUseExpense) {
+        if (!monthlyFinance) {
+          skippedMembers.push({
+            memberId: familyMember.id,
+            displayName,
+            reason: 'MISSING_MONTHLY_FINANCE',
+          });
+          return null;
+        }
+        if (!canUseIncome) {
+          skippedMembers.push({
+            memberId: familyMember.id,
+            displayName,
+            reason: 'INCOME_NOT_VISIBLE',
+          });
+          return null;
+        }
+        if (!canUseExpense) {
+          skippedMembers.push({
+            memberId: familyMember.id,
+            displayName,
+            reason: 'EXPENSE_NOT_VISIBLE',
+          });
           return null;
         }
         const incomeAmount =
@@ -316,7 +359,7 @@ export class FinancialGoalService {
         );
         return {
           memberId: familyMember.id,
-          displayName: this.memberDisplayName(familyMember),
+          displayName,
           incomeAmount,
           personalExpenseAmount,
           sharedContributionAmount,
@@ -342,23 +385,64 @@ export class FinancialGoalService {
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
-      .filter((item) => item.availableAmount.greaterThan(0));
+      .filter((item) => {
+        const hasAvailableAmount = item.availableAmount.greaterThan(0);
+        if (!hasAvailableAmount) {
+          skippedMembers.push({
+            memberId: item.memberId,
+            displayName: item.displayName,
+            reason: 'NO_AVAILABLE_AMOUNT',
+          });
+        }
+        return hasAvailableAmount;
+      });
 
     const totalAvailableAmount = suggestionsBase.reduce(
       (sum, item) => sum.plus(item.availableAmount),
       new Prisma.Decimal(0),
     );
-    const monthlyContributionTarget =
-      goal.monthlyContributionTarget ?? new Prisma.Decimal(0);
+    const contributionTargetAmount =
+      goal.monthlyContributionTarget ??
+      progress.recommendedMonthlyContribution ??
+      new Prisma.Decimal(0);
+    const warnings: string[] = [];
+    if (
+      !goal.monthlyContributionTarget &&
+      progress.recommendedMonthlyContribution
+    ) {
+      warnings.push(
+        'Goal has no monthlyContributionTarget; suggestions use the remaining amount divided by months remaining until deadline.',
+      );
+    }
+    if (totalAvailableAmount.equals(0)) {
+      warnings.push(
+        'No visible member has positive availableAmount, so suggestedContribution is 0 and manual confirmation is required.',
+      );
+    }
+    if (skippedMembers.length > 0) {
+      warnings.push(
+        'Some active members were excluded because monthly finance data is missing, private, or has no remaining available amount.',
+      );
+    }
 
     return {
       goalId,
       periodMonth: period.month,
       periodYear: period.year,
+      basis: CONTRIBUTION_SUGGESTION_FORMULA,
       monthlyContributionTarget: this.decimalToNumber(
-        monthlyContributionTarget,
+        contributionTargetAmount,
       ),
+      explicitMonthlyContributionTarget: goal.monthlyContributionTarget
+        ? this.decimalToNumber(goal.monthlyContributionTarget)
+        : null,
+      recommendedMonthlyContribution: progress.recommendedMonthlyContribution
+        ? this.decimalToNumber(progress.recommendedMonthlyContribution)
+        : null,
+      remainingAmount: this.decimalToNumber(progress.remainingAmount),
       totalAvailableAmount: this.decimalToNumber(totalAvailableAmount),
+      skippedMembers,
+      warnings,
       suggestions: suggestionsBase.map((item) => ({
         memberId: item.memberId,
         displayName: item.displayName,
@@ -374,7 +458,7 @@ export class FinancialGoalService {
         suggestedContribution: totalAvailableAmount.equals(0)
           ? 0
           : this.decimalToNumber(
-              monthlyContributionTarget
+              contributionTargetAmount
                 .times(item.availableAmount)
                 .dividedBy(totalAvailableAmount)
                 .toDecimalPlaces(0),

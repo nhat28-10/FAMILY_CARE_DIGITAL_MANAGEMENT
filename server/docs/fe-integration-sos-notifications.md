@@ -196,7 +196,7 @@ Lưu ý nghiệp vụ:
 
 | Method & Path | Quyền | Mô tả |
 |---|---|---|
-| `POST .../alerts` | Mọi thành viên | Kích hoạt SOS. Body (đều optional): `{ sourceType?, severity?, initialLatitude?, initialLongitude?, message? }` |
+| `POST .../alerts` | Mọi thành viên | Kích hoạt SOS. Body (đều optional): `{ sourceType?, triggerReason?, severity?, initialLatitude?, initialLongitude?, message? }` |
 | `GET .../alerts` | Mọi thành viên | Lịch sử alert. Query `?status=ACTIVE\|RESOLVED\|CANCELED\|FALSE_ALARM`. Mỗi item kèm `triggeredByMember`, `resolvedByMember`, `_count.responses`, `_count.locationPoints` |
 | `GET .../alerts/:alertId` | Mọi thành viên | Chi tiết alert kèm toàn bộ `responses` + `locationPoints` (vẽ lại lộ trình lịch sử) |
 | `POST .../alerts/:alertId/locations` | **Chỉ người kích hoạt** | Gửi 1 điểm GPS. Body: `{ latitude, longitude, sourceType, accuracy?, recordedAt?, deviceId? }` |
@@ -212,6 +212,7 @@ Lưu ý nghiệp vụ:
 | Enum | Giá trị |
 |---|---|
 | `SosSourceType` | `MOBILE_APP` (default), `WEARABLE`, `SIMULATED_DEVICE` |
+| `SosTriggerReason` | `MANUAL` (default), `FALL_DETECTION` |
 | `SosSeverity` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
 | `SosAlertStatus` | `ACTIVE`, `RESOLVED`, `CANCELED`, `FALSE_ALARM` |
 | `SosResponseType` (member gửi được) | `VIEWED`, `ON_THE_WAY`, `CONFIRM_SAFE`, `NEED_HELP` |
@@ -279,6 +280,17 @@ socket.on('disconnect', async () => {
 // 1. Kích hoạt
 const { data: alert } = await api.post(`/families/${familyId}/sos/alerts`, {
   initialLatitude: lat, initialLongitude: lng, message: 'Tôi cần giúp đỡ',
+});
+
+// Native fall detection: vẫn nên gửi GPS nếu có, nhưng BE cho phép thiếu tọa độ
+// ban đầu để không chặn cảnh báo khẩn cấp khi GPS chưa fix.
+await api.post(`/families/${familyId}/sos/alerts`, {
+  sourceType: 'MOBILE_APP',
+  triggerReason: 'FALL_DETECTION',
+  severity: 'HIGH',
+  initialLatitude: lat,
+  initialLongitude: lng,
+  message: 'Tự động tạo SOS do phát hiện té ngã',
 });
 
 // 2. Server bảo bắt đầu stream (nhận qua WS /sos, kể cả khi bấm lặp)
