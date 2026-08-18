@@ -53,3 +53,7 @@ Heart-rate demo messages from Garmin must be forwarded as
 
 Do not add a manual fall-test button in the production watch app. Transport tests
 can be done with controlled sensor movement and Android logs.
+
+Important: Android must send a Connect IQ message object/map, not a raw JSON
+string. The Monkey C app expects `msg.data` to be a Dictionary with keys such as
+`type`, `deviceId`, and `memberName`.

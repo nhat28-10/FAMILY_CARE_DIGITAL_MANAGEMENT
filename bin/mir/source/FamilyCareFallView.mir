@@ -1,0 +1,971 @@
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Graphics,1,13,21]; ]
+using Toybox.Graphics;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Lang,2,13,17]; ]
+using Toybox.Lang;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [WatchUi,3,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 5; @symbol_classdef = [FamilyCareFallView,5,6,24]; @symbol_extends<0> = [WatchUi,5,33,40]; @symbol_extends<1> = [View,5,41,45]; ]
+class FamilyCareFallView extends WatchUi.View {
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 5; ]
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 5; ]
+    static
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 6; @position = 16; @symbol_vardef = [_model,6,16,22]; ]
+    private
+    var _model;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 8; @symbol_functiondef = [initialize,8,13,23]; @symbol_param<0> = [model,8,24,29]; ]
+    function initialize(model) as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_8_31_12_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 9 8 ]
+        symbol [ View %tmp.2 9 8 12 ];
+        %tmp.2 = getv ? :View;
+        symbol [ initialize %tmp.3 9 13 23 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 10 8 ]
+        %tmp.4 = lgetv %model;
+        symbol [ model %tmp.4 10 17 22 ];
+        symbol [ _model ? 10 8 14 ];
+        putv self :_model %tmp.4;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 11 8 ]
+        symbol [ _model %tmp.6 11 8 14 ];
+        %tmp.6 = getv ? :_model;
+        symbol [ setView %tmp.7 11 15 22 ];
+        %tmp.7 = getv function %tmp.6 :setView;
+        %tmp.8 = self;
+        symbol [ self %tmp.8 11 23 27 ];
+        invoke %tmp.6 %tmp.7(%tmp.8);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_8_31_12_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 14; @symbol_functiondef = [onUpdate,14,13,21]; @symbol_param<0> = [dc,14,22,24]; ]
+    function onUpdate(dc) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_14_26_29_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 15 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 15 8 10 ];
+        symbol [ setColor %tmp.2 15 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        symbol [ Graphics %tmp.3 15 20 28 ];
+        %tmp.3 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.4 15 29 40 ];
+        %tmp.4 = getv %tmp.3 :COLOR_BLACK;
+        symbol [ Graphics %tmp.5 15 42 50 ];
+        %tmp.5 = getm $.Toybox.Graphics;
+        symbol [ COLOR_BLACK %tmp.6 15 51 62 ];
+        %tmp.6 = getv %tmp.5 :COLOR_BLACK;
+        invoke %tmp.1 %tmp.2(%tmp.4, %tmp.6);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 16 8 ]
+        %tmp.7 = lgetv %dc;
+        symbol [ dc %tmp.7 16 8 10 ];
+        symbol [ clear %tmp.8 16 11 16 ];
+        %tmp.8 = getv function %tmp.7 :clear;
+        invoke %tmp.7 %tmp.8();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 18 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_8_21_8_if_stmt:
+        symbol [ _model %tmp.10 18 12 18 ];
+        %tmp.10 = getv ? :_model;
+        symbol [ countdown %tmp.11 18 19 28 ];
+        %tmp.11 = getv %tmp.10 :countdown;
+        %tmp.12 = 0;
+        %tmp.13 = gt %tmp.11 %tmp.12;
+        bf %tmp.13 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_8_21_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_8_21_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_34_21_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 19 12 ]
+        %tmp.14 = self;
+        symbol [ drawFallAlert %tmp.15 19 12 25 ];
+        %tmp.15 = getv function %tmp.14 :drawFallAlert;
+        %tmp.16 = lgetv %dc;
+        symbol [ dc %tmp.16 19 26 28 ];
+        invoke %tmp.14 %tmp.15(%tmp.16);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 20 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_34_21_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_8_21_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_18_8_21_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 23 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_8_26_8_if_stmt:
+        symbol [ _model %tmp.18 23 13 19 ];
+        %tmp.18 = getv ? :_model;
+        symbol [ paired %tmp.19 23 20 26 ];
+        %tmp.19 = getv %tmp.18 :paired;
+        %tmp.20 = not %tmp.19;
+        bf %tmp.20 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_8_26_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_8_26_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_28_26_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 24 12 ]
+        %tmp.21 = self;
+        symbol [ drawPairing %tmp.22 24 12 23 ];
+        %tmp.22 = getv function %tmp.21 :drawPairing;
+        %tmp.23 = lgetv %dc;
+        symbol [ dc %tmp.23 24 24 26 ];
+        invoke %tmp.21 %tmp.22(%tmp.23);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 25 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_28_26_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_8_26_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_23_8_26_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 28 8 ]
+        %tmp.24 = self;
+        symbol [ drawProtected %tmp.25 28 8 21 ];
+        %tmp.25 = getv function %tmp.24 :drawProtected;
+        %tmp.26 = lgetv %dc;
+        symbol [ dc %tmp.26 28 22 24 ];
+        invoke %tmp.24 %tmp.25(%tmp.26);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_14_26_29_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 31; @symbol_functiondef = [drawPairing,31,21,32]; @symbol_param<0> = [dc,31,33,35]; ]
+    private
+    function drawPairing(dc) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_31_37_53_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 32 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_31_37_53_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_31_37_53_4_stop" ]
+        %y.1 = local;
+        symbol [ y %y.1 32 12 13 ];
+        %tmp.1 = 8;
+        lputv %y.1 %tmp.1;
+        symbol [ y %y.1 32 12 13 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 34 8 ]
+        %tmp.2 = self;
+        symbol [ drawCenter %tmp.3 34 8 18 ];
+        %tmp.3 = getv function %tmp.2 :drawCenter;
+        %tmp.4 = lgetv %dc;
+        symbol [ dc %tmp.4 34 19 21 ];
+        %tmp.5 = "Family Care";
+        %tmp.6 = lgetv %y.1;
+        symbol [ y %tmp.6 34 38 39 ];
+        symbol [ Graphics %tmp.7 34 41 49 ];
+        %tmp.7 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.8 34 50 60 ];
+        %tmp.8 = getv %tmp.7 :FONT_SMALL;
+        symbol [ Graphics %tmp.9 34 62 70 ];
+        %tmp.9 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.10 34 71 82 ];
+        %tmp.10 = getv %tmp.9 :COLOR_WHITE;
+        invoke %tmp.2 %tmp.3(%tmp.4, %tmp.5, %tmp.6, %tmp.8, %tmp.10);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 35 8 ]
+        %tmp.11 = lgetv %y.1;
+        symbol [ y %tmp.11 35 8 9 ];
+        %tmp.12 = 24;
+        %tmp.13 = add %tmp.11 %tmp.12;
+        lputv %y.1 %tmp.13;
+        symbol [ y %y.1 35 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 36 8 ]
+        %tmp.14 = self;
+        symbol [ drawCenter %tmp.15 36 8 18 ];
+        %tmp.15 = getv function %tmp.14 :drawCenter;
+        %tmp.16 = lgetv %dc;
+        symbol [ dc %tmp.16 36 19 21 ];
+        %tmp.17 = "NOT PAIRED";
+        %tmp.18 = lgetv %y.1;
+        symbol [ y %tmp.18 36 37 38 ];
+        symbol [ Graphics %tmp.19 36 40 48 ];
+        %tmp.19 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.20 36 49 59 ];
+        %tmp.20 = getv %tmp.19 :FONT_SMALL;
+        symbol [ Graphics %tmp.21 36 61 69 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.22 36 70 83 ];
+        %tmp.22 = getv %tmp.21 :COLOR_LT_GRAY;
+        invoke %tmp.14 %tmp.15(%tmp.16, %tmp.17, %tmp.18, %tmp.20, %tmp.22);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 37 8 ]
+        %tmp.23 = lgetv %y.1;
+        symbol [ y %tmp.23 37 8 9 ];
+        %tmp.24 = 24;
+        %tmp.25 = add %tmp.23 %tmp.24;
+        lputv %y.1 %tmp.25;
+        symbol [ y %y.1 37 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 38 8 ]
+        %tmp.26 = self;
+        symbol [ drawCenter %tmp.27 38 8 18 ];
+        %tmp.27 = getv function %tmp.26 :drawCenter;
+        %tmp.28 = lgetv %dc;
+        symbol [ dc %tmp.28 38 19 21 ];
+        %tmp.29 = self;
+        symbol [ pairPrefix %tmp.30 38 23 33 ];
+        %tmp.30 = getv function %tmp.29 :pairPrefix;
+        %tmp.31 = invoke %tmp.29 %tmp.30();
+        %tmp.32 = lgetv %y.1;
+        symbol [ y %tmp.32 38 37 38 ];
+        symbol [ Graphics %tmp.33 38 40 48 ];
+        %tmp.33 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.34 38 49 58 ];
+        %tmp.34 = getv %tmp.33 :FONT_TINY;
+        symbol [ Graphics %tmp.35 38 60 68 ];
+        %tmp.35 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.36 38 69 82 ];
+        %tmp.36 = getv %tmp.35 :COLOR_LT_GRAY;
+        invoke %tmp.26 %tmp.27(%tmp.28, %tmp.31, %tmp.32, %tmp.34, %tmp.36);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 39 8 ]
+        %tmp.37 = lgetv %y.1;
+        symbol [ y %tmp.37 39 8 9 ];
+        %tmp.38 = 16;
+        %tmp.39 = add %tmp.37 %tmp.38;
+        lputv %y.1 %tmp.39;
+        symbol [ y %y.1 39 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 40 8 ]
+        %tmp.40 = self;
+        symbol [ drawCenter %tmp.41 40 8 18 ];
+        %tmp.41 = getv function %tmp.40 :drawCenter;
+        %tmp.42 = lgetv %dc;
+        symbol [ dc %tmp.42 40 19 21 ];
+        %tmp.43 = self;
+        symbol [ pairSuffix %tmp.44 40 23 33 ];
+        %tmp.44 = getv function %tmp.43 :pairSuffix;
+        %tmp.45 = invoke %tmp.43 %tmp.44();
+        %tmp.46 = lgetv %y.1;
+        symbol [ y %tmp.46 40 37 38 ];
+        symbol [ Graphics %tmp.47 40 40 48 ];
+        %tmp.47 = getm $.Toybox.Graphics;
+        symbol [ FONT_MEDIUM %tmp.48 40 49 60 ];
+        %tmp.48 = getv %tmp.47 :FONT_MEDIUM;
+        symbol [ Graphics %tmp.49 40 62 70 ];
+        %tmp.49 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.50 40 71 82 ];
+        %tmp.50 = getv %tmp.49 :COLOR_WHITE;
+        invoke %tmp.40 %tmp.41(%tmp.42, %tmp.45, %tmp.46, %tmp.48, %tmp.50);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 41 8 ]
+        %tmp.51 = lgetv %y.1;
+        symbol [ y %tmp.51 41 8 9 ];
+        %tmp.52 = 32;
+        %tmp.53 = add %tmp.51 %tmp.52;
+        lputv %y.1 %tmp.53;
+        symbol [ y %y.1 41 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 42 8 ]
+        %tmp.54 = self;
+        symbol [ drawCenter %tmp.55 42 8 18 ];
+        %tmp.55 = getv function %tmp.54 :drawCenter;
+        %tmp.56 = lgetv %dc;
+        symbol [ dc %tmp.56 42 19 21 ];
+        %tmp.57 = "Open Family Care";
+        %tmp.58 = lgetv %y.1;
+        symbol [ y %tmp.58 42 43 44 ];
+        symbol [ Graphics %tmp.59 42 46 54 ];
+        %tmp.59 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.60 42 55 64 ];
+        %tmp.60 = getv %tmp.59 :FONT_TINY;
+        symbol [ Graphics %tmp.61 42 66 74 ];
+        %tmp.61 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.62 42 75 86 ];
+        %tmp.62 = getv %tmp.61 :COLOR_WHITE;
+        invoke %tmp.54 %tmp.55(%tmp.56, %tmp.57, %tmp.58, %tmp.60, %tmp.62);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 43 8 ]
+        %tmp.63 = lgetv %y.1;
+        symbol [ y %tmp.63 43 8 9 ];
+        %tmp.64 = 16;
+        %tmp.65 = add %tmp.63 %tmp.64;
+        lputv %y.1 %tmp.65;
+        symbol [ y %y.1 43 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 44 8 ]
+        %tmp.66 = self;
+        symbol [ drawCenter %tmp.67 44 8 18 ];
+        %tmp.67 = getv function %tmp.66 :drawCenter;
+        %tmp.68 = lgetv %dc;
+        symbol [ dc %tmp.68 44 19 21 ];
+        %tmp.69 = "on phone";
+        %tmp.70 = lgetv %y.1;
+        symbol [ y %tmp.70 44 35 36 ];
+        symbol [ Graphics %tmp.71 44 38 46 ];
+        %tmp.71 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.72 44 47 56 ];
+        %tmp.72 = getv %tmp.71 :FONT_TINY;
+        symbol [ Graphics %tmp.73 44 58 66 ];
+        %tmp.73 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.74 44 67 80 ];
+        %tmp.74 = getv %tmp.73 :COLOR_LT_GRAY;
+        invoke %tmp.66 %tmp.67(%tmp.68, %tmp.69, %tmp.70, %tmp.72, %tmp.74);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 45 8 ]
+        %tmp.75 = lgetv %y.1;
+        symbol [ y %tmp.75 45 8 9 ];
+        %tmp.76 = 18;
+        %tmp.77 = add %tmp.75 %tmp.76;
+        lputv %y.1 %tmp.77;
+        symbol [ y %y.1 45 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 46 8 ]
+        %tmp.78 = self;
+        symbol [ drawCenter %tmp.79 46 8 18 ];
+        %tmp.79 = getv function %tmp.78 :drawCenter;
+        %tmp.80 = lgetv %dc;
+        symbol [ dc %tmp.80 46 19 21 ];
+        %tmp.81 = "Status: ";
+        symbol [ _model %tmp.83 46 36 42 ];
+        %tmp.83 = getv ? :_model;
+        symbol [ status %tmp.84 46 43 49 ];
+        %tmp.84 = getv %tmp.83 :status;
+        %tmp.85 = add %tmp.81 %tmp.84;
+        %tmp.86 = lgetv %y.1;
+        symbol [ y %tmp.86 46 51 52 ];
+        symbol [ Graphics %tmp.87 46 54 62 ];
+        %tmp.87 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.88 46 63 72 ];
+        %tmp.88 = getv %tmp.87 :FONT_TINY;
+        symbol [ Graphics %tmp.89 46 74 82 ];
+        %tmp.89 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.90 46 83 96 ];
+        %tmp.90 = getv %tmp.89 :COLOR_LT_GRAY;
+        invoke %tmp.78 %tmp.79(%tmp.80, %tmp.85, %tmp.86, %tmp.88, %tmp.90);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 47 8 ]
+        %tmp.91 = lgetv %y.1;
+        symbol [ y %tmp.91 47 8 9 ];
+        %tmp.92 = 14;
+        %tmp.93 = add %tmp.91 %tmp.92;
+        lputv %y.1 %tmp.93;
+        symbol [ y %y.1 47 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 48 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_12_48_77_begin:
+        symbol [ _model %tmp.95 48 12 18 ];
+        %tmp.95 = getv ? :_model;
+        symbol [ lastSendStatus %tmp.96 48 19 33 ];
+        %tmp.96 = getv %tmp.95 :lastSendStatus;
+        %tmp.97 = null;
+        %tmp.98 = ne %tmp.96 %tmp.97;
+        bf %tmp.98 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_45_48_77_true:
+        symbol [ _model %tmp.100 48 46 52 ];
+        %tmp.100 = getv ? :_model;
+        symbol [ lastSendStatus %tmp.101 48 53 67 ];
+        %tmp.101 = getv %tmp.100 :lastSendStatus;
+        symbol [ equals %tmp.102 48 68 74 ];
+        %tmp.102 = getv function %tmp.101 :equals;
+        %tmp.103 = "";
+        %tmp.104 = invoke %tmp.101 %tmp.102(%tmp.103);
+        %tmp.105 = not %tmp.104;
+        push %tmp.105;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_45_48_77_end:
+        %tmp.106 = phi [%tmp.98 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_12_48_77_begin] [%tmp.105 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_45_48_77_true] [%tmp.106 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_45_48_77_end];
+        bf %tmp.106 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_80_51_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 49 12 ]
+        %tmp.107 = self;
+        symbol [ drawCenter %tmp.108 49 12 22 ];
+        %tmp.108 = getv function %tmp.107 :drawCenter;
+        %tmp.109 = lgetv %dc;
+        symbol [ dc %tmp.109 49 23 25 ];
+        symbol [ _model %tmp.111 49 27 33 ];
+        %tmp.111 = getv ? :_model;
+        symbol [ lastSendStatus %tmp.112 49 34 48 ];
+        %tmp.112 = getv %tmp.111 :lastSendStatus;
+        %tmp.113 = lgetv %y.1;
+        symbol [ y %tmp.113 49 50 51 ];
+        symbol [ Graphics %tmp.114 49 53 61 ];
+        %tmp.114 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.115 49 62 71 ];
+        %tmp.115 = getv %tmp.114 :FONT_TINY;
+        symbol [ Graphics %tmp.116 49 73 81 ];
+        %tmp.116 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.117 49 82 95 ];
+        %tmp.117 = getv %tmp.116 :COLOR_LT_GRAY;
+        invoke %tmp.107 %tmp.108(%tmp.109, %tmp.112, %tmp.113, %tmp.115, %tmp.117);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 50 12 ]
+        %tmp.118 = lgetv %y.1;
+        symbol [ y %tmp.118 50 12 13 ];
+        %tmp.119 = 14;
+        %tmp.120 = add %tmp.118 %tmp.119;
+        lputv %y.1 %tmp.120;
+        symbol [ y %y.1 50 12 13 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_80_51_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_48_8_51_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 52 8 ]
+        %tmp.121 = self;
+        symbol [ drawCenter %tmp.122 52 8 18 ];
+        %tmp.122 = getv function %tmp.121 :drawCenter;
+        %tmp.123 = lgetv %dc;
+        symbol [ dc %tmp.123 52 19 21 ];
+        %tmp.124 = "M ";
+        %tmp.125 = self;
+        symbol [ formatNumber %tmp.126 52 30 42 ];
+        %tmp.126 = getv function %tmp.125 :formatNumber;
+        symbol [ _model %tmp.128 52 43 49 ];
+        %tmp.128 = getv ? :_model;
+        symbol [ magnitude %tmp.129 52 50 59 ];
+        %tmp.129 = getv %tmp.128 :magnitude;
+        %tmp.130 = invoke %tmp.125 %tmp.126(%tmp.129);
+        %tmp.131 = add %tmp.124 %tmp.130;
+        %tmp.132 = " HR ";
+        %tmp.133 = add %tmp.131 %tmp.132;
+        symbol [ _model %tmp.135 52 72 78 ];
+        %tmp.135 = getv ? :_model;
+        symbol [ demoHeartRate %tmp.136 52 79 92 ];
+        %tmp.136 = getv %tmp.135 :demoHeartRate;
+        %tmp.137 = add %tmp.133 %tmp.136;
+        %tmp.138 = lgetv %y.1;
+        symbol [ y %tmp.138 52 94 95 ];
+        symbol [ Graphics %tmp.139 52 97 105 ];
+        %tmp.139 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.140 52 106 115 ];
+        %tmp.140 = getv %tmp.139 :FONT_TINY;
+        symbol [ Graphics %tmp.141 52 117 125 ];
+        %tmp.141 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.142 52 126 139 ];
+        %tmp.142 = getv %tmp.141 :COLOR_LT_GRAY;
+        invoke %tmp.121 %tmp.122(%tmp.123, %tmp.137, %tmp.138, %tmp.140, %tmp.142);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_31_37_53_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 55; @symbol_functiondef = [drawProtected,55,21,34]; @symbol_param<0> = [dc,55,35,37]; ]
+    private
+    function drawProtected(dc) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_55_39_75_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 56 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_55_39_75_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_55_39_75_4_stop" ]
+        %y.1 = local;
+        symbol [ y %y.1 56 12 13 ];
+        %tmp.1 = 8;
+        lputv %y.1 %tmp.1;
+        symbol [ y %y.1 56 12 13 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 58 8 ]
+        %tmp.2 = self;
+        symbol [ drawCenter %tmp.3 58 8 18 ];
+        %tmp.3 = getv function %tmp.2 :drawCenter;
+        %tmp.4 = lgetv %dc;
+        symbol [ dc %tmp.4 58 19 21 ];
+        %tmp.5 = "Family Care";
+        %tmp.6 = lgetv %y.1;
+        symbol [ y %tmp.6 58 38 39 ];
+        symbol [ Graphics %tmp.7 58 41 49 ];
+        %tmp.7 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.8 58 50 60 ];
+        %tmp.8 = getv %tmp.7 :FONT_SMALL;
+        symbol [ Graphics %tmp.9 58 62 70 ];
+        %tmp.9 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.10 58 71 82 ];
+        %tmp.10 = getv %tmp.9 :COLOR_WHITE;
+        invoke %tmp.2 %tmp.3(%tmp.4, %tmp.5, %tmp.6, %tmp.8, %tmp.10);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 59 8 ]
+        %tmp.11 = lgetv %y.1;
+        symbol [ y %tmp.11 59 8 9 ];
+        %tmp.12 = 24;
+        %tmp.13 = add %tmp.11 %tmp.12;
+        lputv %y.1 %tmp.13;
+        symbol [ y %y.1 59 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 60 8 ]
+        %tmp.14 = self;
+        symbol [ drawCenter %tmp.15 60 8 18 ];
+        %tmp.15 = getv function %tmp.14 :drawCenter;
+        %tmp.16 = lgetv %dc;
+        symbol [ dc %tmp.16 60 19 21 ];
+        %tmp.17 = "PROTECTED";
+        %tmp.18 = lgetv %y.1;
+        symbol [ y %tmp.18 60 36 37 ];
+        symbol [ Graphics %tmp.19 60 39 47 ];
+        %tmp.19 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.20 60 48 58 ];
+        %tmp.20 = getv %tmp.19 :FONT_SMALL;
+        symbol [ Graphics %tmp.21 60 60 68 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.22 60 69 80 ];
+        %tmp.22 = getv %tmp.21 :COLOR_WHITE;
+        invoke %tmp.14 %tmp.15(%tmp.16, %tmp.17, %tmp.18, %tmp.20, %tmp.22);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 61 8 ]
+        %tmp.23 = lgetv %y.1;
+        symbol [ y %tmp.23 61 8 9 ];
+        %tmp.24 = 22;
+        %tmp.25 = add %tmp.23 %tmp.24;
+        lputv %y.1 %tmp.25;
+        symbol [ y %y.1 61 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 62 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_8_65_8_if_stmt:
+        symbol [ _model %tmp.27 62 12 18 ];
+        %tmp.27 = getv ? :_model;
+        symbol [ memberName %tmp.28 62 19 29 ];
+        %tmp.28 = getv %tmp.27 :memberName;
+        %tmp.29 = null;
+        %tmp.30 = ne %tmp.28 %tmp.29;
+        bf %tmp.30 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_8_65_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_8_65_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_39_65_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 63 12 ]
+        %tmp.31 = self;
+        symbol [ drawCenter %tmp.32 63 12 22 ];
+        %tmp.32 = getv function %tmp.31 :drawCenter;
+        %tmp.33 = lgetv %dc;
+        symbol [ dc %tmp.33 63 23 25 ];
+        symbol [ _model %tmp.35 63 27 33 ];
+        %tmp.35 = getv ? :_model;
+        symbol [ memberName %tmp.36 63 34 44 ];
+        %tmp.36 = getv %tmp.35 :memberName;
+        %tmp.37 = lgetv %y.1;
+        symbol [ y %tmp.37 63 46 47 ];
+        symbol [ Graphics %tmp.38 63 49 57 ];
+        %tmp.38 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.39 63 58 67 ];
+        %tmp.39 = getv %tmp.38 :FONT_TINY;
+        symbol [ Graphics %tmp.40 63 69 77 ];
+        %tmp.40 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.41 63 78 91 ];
+        %tmp.41 = getv %tmp.40 :COLOR_LT_GRAY;
+        invoke %tmp.31 %tmp.32(%tmp.33, %tmp.36, %tmp.37, %tmp.39, %tmp.41);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 64 12 ]
+        %tmp.42 = lgetv %y.1;
+        symbol [ y %tmp.42 64 12 13 ];
+        %tmp.43 = 16;
+        %tmp.44 = add %tmp.42 %tmp.43;
+        lputv %y.1 %tmp.44;
+        symbol [ y %y.1 64 12 13 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_39_65_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_8_65_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_62_8_65_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 66 8 ]
+        %tmp.45 = self;
+        symbol [ drawCenter %tmp.46 66 8 18 ];
+        %tmp.46 = getv function %tmp.45 :drawCenter;
+        %tmp.47 = lgetv %dc;
+        symbol [ dc %tmp.47 66 19 21 ];
+        %tmp.48 = "Fall detection ON";
+        %tmp.49 = lgetv %y.1;
+        symbol [ y %tmp.49 66 44 45 ];
+        symbol [ Graphics %tmp.50 66 47 55 ];
+        %tmp.50 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.51 66 56 65 ];
+        %tmp.51 = getv %tmp.50 :FONT_TINY;
+        symbol [ Graphics %tmp.52 66 67 75 ];
+        %tmp.52 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.53 66 76 89 ];
+        %tmp.53 = getv %tmp.52 :COLOR_LT_GRAY;
+        invoke %tmp.45 %tmp.46(%tmp.47, %tmp.48, %tmp.49, %tmp.51, %tmp.53);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 67 8 ]
+        %tmp.54 = lgetv %y.1;
+        symbol [ y %tmp.54 67 8 9 ];
+        %tmp.55 = 22;
+        %tmp.56 = add %tmp.54 %tmp.55;
+        lputv %y.1 %tmp.56;
+        symbol [ y %y.1 67 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 68 8 ]
+        %tmp.57 = self;
+        symbol [ drawCenter %tmp.58 68 8 18 ];
+        %tmp.58 = getv function %tmp.57 :drawCenter;
+        %tmp.59 = lgetv %dc;
+        symbol [ dc %tmp.59 68 19 21 ];
+        %tmp.60 = "M ";
+        %tmp.61 = self;
+        symbol [ formatNumber %tmp.62 68 30 42 ];
+        %tmp.62 = getv function %tmp.61 :formatNumber;
+        symbol [ _model %tmp.64 68 43 49 ];
+        %tmp.64 = getv ? :_model;
+        symbol [ magnitude %tmp.65 68 50 59 ];
+        %tmp.65 = getv %tmp.64 :magnitude;
+        %tmp.66 = invoke %tmp.61 %tmp.62(%tmp.65);
+        %tmp.67 = add %tmp.60 %tmp.66;
+        %tmp.68 = lgetv %y.1;
+        symbol [ y %tmp.68 68 62 63 ];
+        symbol [ Graphics %tmp.69 68 65 73 ];
+        %tmp.69 = getm $.Toybox.Graphics;
+        symbol [ FONT_MEDIUM %tmp.70 68 74 85 ];
+        %tmp.70 = getv %tmp.69 :FONT_MEDIUM;
+        symbol [ Graphics %tmp.71 68 87 95 ];
+        %tmp.71 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.72 68 96 107 ];
+        %tmp.72 = getv %tmp.71 :COLOR_WHITE;
+        invoke %tmp.57 %tmp.58(%tmp.59, %tmp.67, %tmp.68, %tmp.70, %tmp.72);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 69 8 ]
+        %tmp.73 = lgetv %y.1;
+        symbol [ y %tmp.73 69 8 9 ];
+        %tmp.74 = 26;
+        %tmp.75 = add %tmp.73 %tmp.74;
+        lputv %y.1 %tmp.75;
+        symbol [ y %y.1 69 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 70 8 ]
+        %tmp.76 = self;
+        symbol [ drawCenter %tmp.77 70 8 18 ];
+        %tmp.77 = getv function %tmp.76 :drawCenter;
+        %tmp.78 = lgetv %dc;
+        symbol [ dc %tmp.78 70 19 21 ];
+        %tmp.79 = "HR demo ";
+        symbol [ _model %tmp.81 70 36 42 ];
+        %tmp.81 = getv ? :_model;
+        symbol [ demoHeartRate %tmp.82 70 43 56 ];
+        %tmp.82 = getv %tmp.81 :demoHeartRate;
+        %tmp.83 = add %tmp.79 %tmp.82;
+        %tmp.84 = lgetv %y.1;
+        symbol [ y %tmp.84 70 58 59 ];
+        symbol [ Graphics %tmp.85 70 61 69 ];
+        %tmp.85 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.86 70 70 79 ];
+        %tmp.86 = getv %tmp.85 :FONT_TINY;
+        symbol [ Graphics %tmp.87 70 81 89 ];
+        %tmp.87 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.88 70 90 101 ];
+        %tmp.88 = getv %tmp.87 :COLOR_WHITE;
+        invoke %tmp.76 %tmp.77(%tmp.78, %tmp.83, %tmp.84, %tmp.86, %tmp.88);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 71 8 ]
+        %tmp.89 = lgetv %y.1;
+        symbol [ y %tmp.89 71 8 9 ];
+        %tmp.90 = 16;
+        %tmp.91 = add %tmp.89 %tmp.90;
+        lputv %y.1 %tmp.91;
+        symbol [ y %y.1 71 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 72 8 ]
+        %tmp.92 = self;
+        symbol [ drawCenter %tmp.93 72 8 18 ];
+        %tmp.93 = getv function %tmp.92 :drawCenter;
+        %tmp.94 = lgetv %dc;
+        symbol [ dc %tmp.94 72 19 21 ];
+        symbol [ _model %tmp.96 72 23 29 ];
+        %tmp.96 = getv ? :_model;
+        symbol [ demoHeartRateStatus %tmp.97 72 30 49 ];
+        %tmp.97 = getv %tmp.96 :demoHeartRateStatus;
+        %tmp.98 = lgetv %y.1;
+        symbol [ y %tmp.98 72 51 52 ];
+        symbol [ Graphics %tmp.99 72 54 62 ];
+        %tmp.99 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.100 72 63 72 ];
+        %tmp.100 = getv %tmp.99 :FONT_TINY;
+        symbol [ Graphics %tmp.101 72 74 82 ];
+        %tmp.101 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.102 72 83 96 ];
+        %tmp.102 = getv %tmp.101 :COLOR_LT_GRAY;
+        invoke %tmp.92 %tmp.93(%tmp.94, %tmp.97, %tmp.98, %tmp.100, %tmp.102);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 73 8 ]
+        %tmp.103 = lgetv %y.1;
+        symbol [ y %tmp.103 73 8 9 ];
+        %tmp.104 = 16;
+        %tmp.105 = add %tmp.103 %tmp.104;
+        lputv %y.1 %tmp.105;
+        symbol [ y %y.1 73 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 74 8 ]
+        %tmp.106 = self;
+        symbol [ drawCenter %tmp.107 74 8 18 ];
+        %tmp.107 = getv function %tmp.106 :drawCenter;
+        %tmp.108 = lgetv %dc;
+        symbol [ dc %tmp.108 74 19 21 ];
+        %tmp.109 = "Samples ";
+        symbol [ _model %tmp.111 74 36 42 ];
+        %tmp.111 = getv ? :_model;
+        symbol [ sampleCount %tmp.112 74 43 54 ];
+        %tmp.112 = getv %tmp.111 :sampleCount;
+        %tmp.113 = add %tmp.109 %tmp.112;
+        %tmp.114 = lgetv %y.1;
+        symbol [ y %tmp.114 74 56 57 ];
+        symbol [ Graphics %tmp.115 74 59 67 ];
+        %tmp.115 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.116 74 68 77 ];
+        %tmp.116 = getv %tmp.115 :FONT_TINY;
+        symbol [ Graphics %tmp.117 74 79 87 ];
+        %tmp.117 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.118 74 88 101 ];
+        %tmp.118 = getv %tmp.117 :COLOR_LT_GRAY;
+        invoke %tmp.106 %tmp.107(%tmp.108, %tmp.113, %tmp.114, %tmp.116, %tmp.118);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_55_39_75_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 77; @symbol_functiondef = [drawFallAlert,77,21,34]; @symbol_param<0> = [dc,77,35,37]; ]
+    private
+    function drawFallAlert(dc) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_77_39_87_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 78 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_77_39_87_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_77_39_87_4_stop" ]
+        %y.1 = local;
+        symbol [ y %y.1 78 12 13 ];
+        %tmp.1 = 8;
+        lputv %y.1 %tmp.1;
+        symbol [ y %y.1 78 12 13 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 80 8 ]
+        %tmp.2 = self;
+        symbol [ drawCenter %tmp.3 80 8 18 ];
+        %tmp.3 = getv function %tmp.2 :drawCenter;
+        %tmp.4 = lgetv %dc;
+        symbol [ dc %tmp.4 80 19 21 ];
+        %tmp.5 = "FALL DETECTED";
+        %tmp.6 = lgetv %y.1;
+        symbol [ y %tmp.6 80 40 41 ];
+        symbol [ Graphics %tmp.7 80 43 51 ];
+        %tmp.7 = getm $.Toybox.Graphics;
+        symbol [ FONT_SMALL %tmp.8 80 52 62 ];
+        %tmp.8 = getv %tmp.7 :FONT_SMALL;
+        symbol [ Graphics %tmp.9 80 64 72 ];
+        %tmp.9 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.10 80 73 84 ];
+        %tmp.10 = getv %tmp.9 :COLOR_WHITE;
+        invoke %tmp.2 %tmp.3(%tmp.4, %tmp.5, %tmp.6, %tmp.8, %tmp.10);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 81 8 ]
+        %tmp.11 = lgetv %y.1;
+        symbol [ y %tmp.11 81 8 9 ];
+        %tmp.12 = 28;
+        %tmp.13 = add %tmp.11 %tmp.12;
+        lputv %y.1 %tmp.13;
+        symbol [ y %y.1 81 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 82 8 ]
+        %tmp.14 = self;
+        symbol [ drawCenter %tmp.15 82 8 18 ];
+        %tmp.15 = getv function %tmp.14 :drawCenter;
+        %tmp.16 = lgetv %dc;
+        symbol [ dc %tmp.16 82 19 21 ];
+        %tmp.17 = "Sending SOS in";
+        %tmp.18 = lgetv %y.1;
+        symbol [ y %tmp.18 82 41 42 ];
+        symbol [ Graphics %tmp.19 82 44 52 ];
+        %tmp.19 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.20 82 53 62 ];
+        %tmp.20 = getv %tmp.19 :FONT_TINY;
+        symbol [ Graphics %tmp.21 82 64 72 ];
+        %tmp.21 = getm $.Toybox.Graphics;
+        symbol [ COLOR_LT_GRAY %tmp.22 82 73 86 ];
+        %tmp.22 = getv %tmp.21 :COLOR_LT_GRAY;
+        invoke %tmp.14 %tmp.15(%tmp.16, %tmp.17, %tmp.18, %tmp.20, %tmp.22);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 83 8 ]
+        %tmp.23 = lgetv %y.1;
+        symbol [ y %tmp.23 83 8 9 ];
+        %tmp.24 = 16;
+        %tmp.25 = add %tmp.23 %tmp.24;
+        lputv %y.1 %tmp.25;
+        symbol [ y %y.1 83 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 84 8 ]
+        %tmp.26 = self;
+        symbol [ drawCenter %tmp.27 84 8 18 ];
+        %tmp.27 = getv function %tmp.26 :drawCenter;
+        %tmp.28 = lgetv %dc;
+        symbol [ dc %tmp.28 84 19 21 ];
+        symbol [ _model %tmp.30 84 23 29 ];
+        %tmp.30 = getv ? :_model;
+        symbol [ countdown %tmp.31 84 30 39 ];
+        %tmp.31 = getv %tmp.30 :countdown;
+        %tmp.32 = "";
+        %tmp.33 = add %tmp.31 %tmp.32;
+        %tmp.34 = lgetv %y.1;
+        symbol [ y %tmp.34 84 46 47 ];
+        symbol [ Graphics %tmp.35 84 49 57 ];
+        %tmp.35 = getm $.Toybox.Graphics;
+        symbol [ FONT_NUMBER_MEDIUM %tmp.36 84 58 76 ];
+        %tmp.36 = getv %tmp.35 :FONT_NUMBER_MEDIUM;
+        symbol [ Graphics %tmp.37 84 78 86 ];
+        %tmp.37 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.38 84 87 98 ];
+        %tmp.38 = getv %tmp.37 :COLOR_WHITE;
+        invoke %tmp.26 %tmp.27(%tmp.28, %tmp.33, %tmp.34, %tmp.36, %tmp.38);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 85 8 ]
+        %tmp.39 = lgetv %y.1;
+        symbol [ y %tmp.39 85 8 9 ];
+        %tmp.40 = 44;
+        %tmp.41 = add %tmp.39 %tmp.40;
+        lputv %y.1 %tmp.41;
+        symbol [ y %y.1 85 8 9 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 86 8 ]
+        %tmp.42 = self;
+        symbol [ drawCenter %tmp.43 86 8 18 ];
+        %tmp.43 = getv function %tmp.42 :drawCenter;
+        %tmp.44 = lgetv %dc;
+        symbol [ dc %tmp.44 86 19 21 ];
+        %tmp.45 = "START to cancel";
+        %tmp.46 = lgetv %y.1;
+        symbol [ y %tmp.46 86 42 43 ];
+        symbol [ Graphics %tmp.47 86 45 53 ];
+        %tmp.47 = getm $.Toybox.Graphics;
+        symbol [ FONT_TINY %tmp.48 86 54 63 ];
+        %tmp.48 = getv %tmp.47 :FONT_TINY;
+        symbol [ Graphics %tmp.49 86 65 73 ];
+        %tmp.49 = getm $.Toybox.Graphics;
+        symbol [ COLOR_WHITE %tmp.50 86 74 85 ];
+        %tmp.50 = getv %tmp.49 :COLOR_WHITE;
+        invoke %tmp.42 %tmp.43(%tmp.44, %tmp.45, %tmp.46, %tmp.48, %tmp.50);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_77_39_87_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 89; @symbol_functiondef = [drawCenter,89,21,31]; @symbol_param<0> = [dc,89,32,34]; @symbol_param<1> = [text,89,36,40]; @symbol_param<2> = [y,89,42,43]; @symbol_param<3> = [font,89,45,49]; @symbol_param<4> = [color,89,51,56]; ]
+    private
+    function drawCenter(dc, text, y, font, color) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_89_58_92_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 90 8 ]
+        %tmp.1 = lgetv %dc;
+        symbol [ dc %tmp.1 90 8 10 ];
+        symbol [ setColor %tmp.2 90 11 19 ];
+        %tmp.2 = getv function %tmp.1 :setColor;
+        %tmp.3 = lgetv %color;
+        symbol [ color %tmp.3 90 20 25 ];
+        symbol [ Graphics %tmp.4 90 27 35 ];
+        %tmp.4 = getm $.Toybox.Graphics;
+        symbol [ COLOR_TRANSPARENT %tmp.5 90 36 53 ];
+        %tmp.5 = getv %tmp.4 :COLOR_TRANSPARENT;
+        invoke %tmp.1 %tmp.2(%tmp.3, %tmp.5);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 91 8 ]
+        %tmp.6 = lgetv %dc;
+        symbol [ dc %tmp.6 91 8 10 ];
+        symbol [ drawText %tmp.7 91 11 19 ];
+        %tmp.7 = getv function %tmp.6 :drawText;
+        %tmp.8 = lgetv %dc;
+        symbol [ dc %tmp.8 91 20 22 ];
+        symbol [ getWidth %tmp.9 91 23 31 ];
+        %tmp.9 = getv function %tmp.8 :getWidth;
+        %tmp.10 = invoke %tmp.8 %tmp.9();
+        %tmp.11 = 2;
+        %tmp.12 = div %tmp.10 %tmp.11;
+        %tmp.13 = lgetv %y;
+        symbol [ y %tmp.13 91 39 40 ];
+        %tmp.14 = lgetv %font;
+        symbol [ font %tmp.14 91 42 46 ];
+        %tmp.15 = lgetv %text;
+        symbol [ text %tmp.15 91 48 52 ];
+        symbol [ Graphics %tmp.16 91 54 62 ];
+        %tmp.16 = getm $.Toybox.Graphics;
+        symbol [ TEXT_JUSTIFY_CENTER %tmp.17 91 63 82 ];
+        %tmp.17 = getv %tmp.16 :TEXT_JUSTIFY_CENTER;
+        invoke %tmp.6 %tmp.7(%tmp.12, %tmp.13, %tmp.14, %tmp.15, %tmp.17);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_89_58_92_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 94; @symbol_functiondef = [formatNumber,94,21,33]; @symbol_param<0> = [value,94,34,39]; ]
+    private
+    function formatNumber(value) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 95 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_stop" ]
+        %scaled.1 = local;
+        symbol [ scaled %scaled.1 95 12 18 ];
+        %tmp.1 = lgetv %value;
+        symbol [ value %tmp.1 95 22 27 ];
+        %tmp.2 = 10;
+        %tmp.3 = mul %tmp.1 %tmp.2;
+        symbol [ toNumber %tmp.4 95 34 42 ];
+        %tmp.4 = getv function %tmp.3 :toNumber;
+        %tmp.5 = invoke %tmp.3 %tmp.4();
+        lputv %scaled.1 %tmp.5;
+        symbol [ scaled %scaled.1 95 12 18 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 96 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_stop" ]
+        %decimal.2 = local;
+        symbol [ decimal %decimal.2 96 12 19 ];
+        %tmp.6 = lgetv %scaled.1;
+        symbol [ scaled %tmp.6 96 22 28 ];
+        %tmp.7 = 10;
+        %tmp.8 = mod %tmp.6 %tmp.7;
+        lputv %decimal.2 %tmp.8;
+        symbol [ decimal %decimal.2 96 12 19 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 97 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_8_99_8_if_stmt:
+        %tmp.9 = lgetv %decimal.2;
+        symbol [ decimal %tmp.9 97 12 19 ];
+        %tmp.10 = 0;
+        %tmp.11 = lt %tmp.9 %tmp.10;
+        bf %tmp.11 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_8_99_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_8_99_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_25_99_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 98 12 ]
+        %tmp.12 = lgetv %decimal.2;
+        symbol [ decimal %tmp.12 98 23 30 ];
+        %tmp.13 = sub 0 %tmp.12;
+        lputv %decimal.2 %tmp.13;
+        symbol [ decimal %decimal.2 98 12 19 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_25_99_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_8_99_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_97_8_99_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 100 8 ]
+        %tmp.14 = lgetv %scaled.1;
+        symbol [ scaled %tmp.14 100 16 22 ];
+        %tmp.15 = 10;
+        %tmp.16 = div %tmp.14 %tmp.15;
+        %tmp.17 = ".";
+        %tmp.18 = add %tmp.16 %tmp.17;
+        %tmp.19 = lgetv %decimal.2;
+        symbol [ decimal %tmp.19 100 37 44 ];
+        %tmp.20 = add %tmp.18 %tmp.19;
+        ret %tmp.20;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_94_41_101_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 103; @symbol_functiondef = [pairPrefix,103,21,31]; ]
+    private
+    function pairPrefix() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_103_34_109_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 104 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_103_34_109_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_103_34_109_4_stop" ]
+        %len.1 = local;
+        symbol [ len %len.1 104 12 15 ];
+        symbol [ _model %tmp.2 104 18 24 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ pairCode %tmp.3 104 25 33 ];
+        %tmp.3 = getv %tmp.2 :pairCode;
+        symbol [ length %tmp.4 104 34 40 ];
+        %tmp.4 = getv function %tmp.3 :length;
+        %tmp.5 = invoke %tmp.3 %tmp.4();
+        lputv %len.1 %tmp.5;
+        symbol [ len %len.1 104 12 15 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 105 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_8_107_8_if_stmt:
+        %tmp.6 = lgetv %len.1;
+        symbol [ len %tmp.6 105 12 15 ];
+        %tmp.7 = 6;
+        %tmp.8 = gt %tmp.6 %tmp.7;
+        bf %tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_8_107_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_8_107_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_21_107_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 106 12 ]
+        symbol [ _model %tmp.10 106 19 25 ];
+        %tmp.10 = getv ? :_model;
+        symbol [ pairCode %tmp.11 106 26 34 ];
+        %tmp.11 = getv %tmp.10 :pairCode;
+        symbol [ substring %tmp.12 106 35 44 ];
+        %tmp.12 = getv function %tmp.11 :substring;
+        %tmp.13 = 0;
+        %tmp.14 = lgetv %len.1;
+        symbol [ len %tmp.14 106 48 51 ];
+        %tmp.15 = 6;
+        %tmp.16 = sub %tmp.14 %tmp.15;
+        %tmp.17 = invoke %tmp.11 %tmp.12(%tmp.13, %tmp.16);
+        ret %tmp.17;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_21_107_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_8_107_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_105_8_107_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 108 8 ]
+        symbol [ _model %tmp.19 108 15 21 ];
+        %tmp.19 = getv ? :_model;
+        symbol [ pairCode %tmp.20 108 22 30 ];
+        %tmp.20 = getv %tmp.19 :pairCode;
+        ret %tmp.20;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_103_34_109_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 111; @symbol_functiondef = [pairSuffix,111,21,31]; ]
+    private
+    function pairSuffix() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_111_34_117_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 112 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_111_34_117_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_111_34_117_4_stop" ]
+        %len.1 = local;
+        symbol [ len %len.1 112 12 15 ];
+        symbol [ _model %tmp.2 112 18 24 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ pairCode %tmp.3 112 25 33 ];
+        %tmp.3 = getv %tmp.2 :pairCode;
+        symbol [ length %tmp.4 112 34 40 ];
+        %tmp.4 = getv function %tmp.3 :length;
+        %tmp.5 = invoke %tmp.3 %tmp.4();
+        lputv %len.1 %tmp.5;
+        symbol [ len %len.1 112 12 15 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 113 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_8_115_8_if_stmt:
+        %tmp.6 = lgetv %len.1;
+        symbol [ len %tmp.6 113 12 15 ];
+        %tmp.7 = 6;
+        %tmp.8 = gt %tmp.6 %tmp.7;
+        bf %tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_8_115_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_8_115_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_21_115_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 114 12 ]
+        symbol [ _model %tmp.10 114 19 25 ];
+        %tmp.10 = getv ? :_model;
+        symbol [ pairCode %tmp.11 114 26 34 ];
+        %tmp.11 = getv %tmp.10 :pairCode;
+        symbol [ substring %tmp.12 114 35 44 ];
+        %tmp.12 = getv function %tmp.11 :substring;
+        %tmp.13 = lgetv %len.1;
+        symbol [ len %tmp.13 114 45 48 ];
+        %tmp.14 = 6;
+        %tmp.15 = sub %tmp.13 %tmp.14;
+        %tmp.16 = lgetv %len.1;
+        symbol [ len %tmp.16 114 54 57 ];
+        %tmp.17 = invoke %tmp.11 %tmp.12(%tmp.15, %tmp.16);
+        ret %tmp.17;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_21_115_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_8_115_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_113_8_115_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc" 116 8 ]
+        symbol [ _model %tmp.19 116 15 21 ];
+        %tmp.19 = getv ? :_model;
+        symbol [ pairCode %tmp.20 116 22 30 ];
+        %tmp.20 = getv %tmp.19 :pairCode;
+        ret %tmp.20;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareFallView_mc_111_34_117_4_stop:
+    }
+}
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareFallView.mc"; @line = 1; ]
+<init> {
+}

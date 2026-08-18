@@ -16,6 +16,7 @@ export interface ApiErrorResponse {
   code?: string;
   errorCode?: string;
   feature?: string;
+  featureKey?: string;
   errors?: unknown;
   retryAfterSeconds?: number;
   cooldownSeconds?: number;
@@ -45,6 +46,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let code: string | undefined;
     let errorCode: string | undefined;
     let feature: string | undefined;
+    let featureKey: string | undefined;
     let errors: unknown;
     let retryAfterSeconds: number | undefined;
     let cooldownSeconds: number | undefined;
@@ -73,6 +75,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         if (typeof body.code === 'string') code = body.code;
         if (typeof body.errorCode === 'string') errorCode = body.errorCode;
         if (typeof body.feature === 'string') feature = body.feature;
+        if (typeof body.featureKey === 'string') {
+          featureKey = body.featureKey;
+        }
         if ('errors' in body) errors = body.errors;
         if (typeof body.retryAfterSeconds === 'number') {
           retryAfterSeconds = body.retryAfterSeconds;
@@ -107,7 +112,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       errorCode = errorCode ?? code;
     }
     if (!code && errorCode) code = errorCode;
-    if (!errorCode && code) errorCode = code;
+    if (!errorCode && code && code !== 'FEATURE_LOCKED') errorCode = code;
     if (retryAfterSeconds !== undefined) {
       response.setHeader('Retry-After', String(retryAfterSeconds));
     }
@@ -119,6 +124,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(code ? { code } : {}),
       ...(errorCode ? { errorCode } : {}),
       ...(feature ? { feature } : {}),
+      ...(featureKey ? { featureKey } : {}),
       ...(errors !== undefined ? { errors } : {}),
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
       ...(cooldownSeconds !== undefined ? { cooldownSeconds } : {}),

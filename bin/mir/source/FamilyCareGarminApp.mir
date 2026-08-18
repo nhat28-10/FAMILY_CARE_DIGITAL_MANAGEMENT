@@ -1,0 +1,101 @@
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Application,1,13,24]; ]
+using Toybox.Application;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Lang,2,13,17]; ]
+using Toybox.Lang;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [WatchUi,3,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 5; @symbol_classdef = [FamilyCareGarminApp,5,6,25]; @symbol_extends<0> = [Application,5,34,45]; @symbol_extends<1> = [AppBase,5,46,53]; ]
+class FamilyCareGarminApp extends Application.AppBase {
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 5; ]
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 5; ]
+    static
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 6; @position = 16; @symbol_vardef = [_model,6,16,22]; ]
+    private
+    var _model;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 8; @symbol_functiondef = [initialize,8,13,23]; ]
+    function initialize() as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_8_26_11_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 9 8 ]
+        symbol [ AppBase %tmp.2 9 8 15 ];
+        %tmp.2 = getv ? :AppBase;
+        symbol [ initialize %tmp.3 9 16 26 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 10 8 ]
+        symbol [ FamilyCareModel %tmp.7 10 21 36 ];
+        %tmp.7 = getv ? :FamilyCareModel;
+        %tmp.4 = newc %tmp.7 ();
+        symbol [ _model ? 10 8 14 ];
+        putv self :_model %tmp.4;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_8_26_11_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 13; @symbol_functiondef = [onStart,13,13,20]; @symbol_param<0> = [state,13,21,26]; ]
+    function onStart(state) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_13_28_15_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 14 8 ]
+        symbol [ _model %tmp.2 14 8 14 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ load %tmp.3 14 15 19 ];
+        %tmp.3 = getv function %tmp.2 :load;
+        invoke %tmp.2 %tmp.3();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_13_28_15_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 17; @symbol_functiondef = [onStop,17,13,19]; @symbol_param<0> = [state,17,20,25]; ]
+    function onStop(state) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_17_27_19_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 18 8 ]
+        symbol [ _model %tmp.2 18 8 14 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ stopSensors %tmp.3 18 15 26 ];
+        %tmp.3 = getv function %tmp.2 :stopSensors;
+        invoke %tmp.2 %tmp.3();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_17_27_19_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 21; @symbol_functiondef = [getInitialView,21,13,27]; ]
+    function getInitialView() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 22 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_stop" ]
+        %view.1 = local;
+        symbol [ view %view.1 22 12 16 ];
+        symbol [ FamilyCareFallView %tmp.4 22 23 41 ];
+        %tmp.4 = getv ? :FamilyCareFallView;
+        symbol [ _model %tmp.6 22 42 48 ];
+        %tmp.6 = getv ? :_model;
+        %tmp.1 = newc %tmp.4 (%tmp.6);
+        lputv %view.1 %tmp.1;
+        symbol [ view %view.1 22 12 16 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 23 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_stop" ]
+        %delegate.2 = local;
+        symbol [ delegate %delegate.2 23 12 20 ];
+        symbol [ FamilyCareFallDelegate %tmp.10 23 27 49 ];
+        %tmp.10 = getv ? :FamilyCareFallDelegate;
+        symbol [ _model %tmp.12 23 50 56 ];
+        %tmp.12 = getv ? :_model;
+        %tmp.13 = lgetv %view.1;
+        symbol [ view %tmp.13 23 58 62 ];
+        %tmp.7 = newc %tmp.10 (%tmp.12, %tmp.13);
+        lputv %delegate.2 %tmp.7;
+        symbol [ delegate %delegate.2 23 12 20 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc" 24 8 ]
+        %tmp.14 = newa 2;
+        %tmp.15 = lgetv %view.1;
+        symbol [ view %tmp.15 24 17 21 ];
+        %tmp.16 = dup %tmp.14;
+        %tmp.17 = aputv %tmp.16 0 %tmp.15;
+        %tmp.18 = lgetv %delegate.2;
+        symbol [ delegate %tmp.18 24 23 31 ];
+        %tmp.19 = dup %tmp.17;
+        %tmp.20 = aputv %tmp.19 1 %tmp.18;
+        ret %tmp.20;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareGarminApp_mc_21_30_25_4_stop:
+    }
+}
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareGarminApp.mc"; @line = 1; ]
+<init> {
+}

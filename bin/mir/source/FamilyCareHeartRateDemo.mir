@@ -1,0 +1,356 @@
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Lang,1,13,17]; ]
+using Toybox.Lang;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 3; @symbol_classdef = [FamilyCareHeartRateDemo,3,6,29]; ]
+class FamilyCareHeartRateDemo {
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 3; ]
+    <init> {
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 14 8 ]
+        symbol [ BASE_HR %tmp.2 14 20 27 ];
+        %tmp.2 = getv ? :BASE_HR;
+        putv self :heartRate %tmp.2;
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 3; ]
+    static
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 4; @position = 10; @symbol_constdef = [BASE_HR,4,10,17]; ]
+    const BASE_HR = 82;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 5; @position = 10; @symbol_constdef = [THRESHOLD_HIGH,5,10,24]; ]
+    const THRESHOLD_HIGH = 140;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 6; @position = 10; @symbol_constdef = [THRESHOLD_LOW,6,10,23]; ]
+    const THRESHOLD_LOW = 45;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 7; @position = 10; @symbol_constdef = [TRIGGER_HR,7,10,20]; ]
+    const TRIGGER_HR = 150;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 8; @position = 10; @symbol_constdef = [TRIGGER_AFTER_MS,8,10,26]; ]
+    const TRIGGER_AFTER_MS = 20000;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 9; @position = 10; @symbol_constdef = [COOLDOWN_MS,9,10,21]; ]
+    const COOLDOWN_MS = 60000;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 10; @position = 10; @symbol_constdef = [MOTION_DELTA_MG,10,10,25]; ]
+    const MOTION_DELTA_MG = 180;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 11; @position = 10; @symbol_constdef = [HARD_MOTION_MG,11,10,24]; ]
+    const HARD_MOTION_MG = 1500;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 12; @position = 10; @symbol_constdef = [SAMPLE_INTERVAL_MS,12,10,28]; ]
+    const SAMPLE_INTERVAL_MS = 40;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 14; @position = 8; @symbol_vardef = [heartRate,14,8,17]; ]
+    var heartRate;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 15; @position = 8; @symbol_vardef = [status,15,8,14]; ]
+    var status = "HR demo idle";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 17; @position = 16; @symbol_vardef = [_motionMs,17,16,25]; ]
+    private
+    var _motionMs = 0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 18; @position = 16; @symbol_vardef = [_lastMagnitude,18,16,30]; ]
+    private
+    var _lastMagnitude = null;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 19; @position = 16; @symbol_vardef = [_lastTrigger,19,16,28]; ]
+    private
+    var _lastTrigger = null;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 21; @symbol_functiondef = [addSample,21,13,22]; @symbol_param<0> = [magnitude,21,23,32]; @symbol_param<1> = [nowMs,21,34,39]; ]
+    function addSample(magnitude, nowMs) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_21_41_63_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 22 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_21_41_63_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_21_41_63_4_stop" ]
+        %active.1 = local;
+        symbol [ active %active.1 22 12 18 ];
+        %tmp.1 = self;
+        symbol [ isActiveMotion %tmp.2 22 21 35 ];
+        %tmp.2 = getv function %tmp.1 :isActiveMotion;
+        %tmp.3 = lgetv %magnitude;
+        symbol [ magnitude %tmp.3 22 36 45 ];
+        %tmp.4 = invoke %tmp.1 %tmp.2(%tmp.3);
+        lputv %active.1 %tmp.4;
+        symbol [ active %active.1 22 12 18 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 23 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_stmt:
+        %tmp.5 = lgetv %active.1;
+        symbol [ active %tmp.5 23 12 18 ];
+        bf %tmp.5 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_20_28_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 24 12 ]
+        symbol [ _motionMs %tmp.6 24 12 21 ];
+        %tmp.6 = getv self :_motionMs;
+        symbol [ SAMPLE_INTERVAL_MS %tmp.8 24 25 43 ];
+        %tmp.8 = getv ? :SAMPLE_INTERVAL_MS;
+        %tmp.9 = add %tmp.6 %tmp.8;
+        symbol [ _motionMs ? 24 12 21 ];
+        putv self :_motionMs dup %tmp.9;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 25 12 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_12_27_12_if_stmt:
+        symbol [ _motionMs %tmp.11 25 16 25 ];
+        %tmp.11 = getv ? :_motionMs;
+        symbol [ TRIGGER_AFTER_MS %tmp.13 25 28 44 ];
+        %tmp.13 = getv ? :TRIGGER_AFTER_MS;
+        %tmp.14 = gt %tmp.11 %tmp.13;
+        bf %tmp.14 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_12_27_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_12_27_12_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_46_27_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 26 16 ]
+        symbol [ TRIGGER_AFTER_MS %tmp.16 26 28 44 ];
+        %tmp.16 = getv ? :TRIGGER_AFTER_MS;
+        symbol [ _motionMs ? 26 16 25 ];
+        putv self :_motionMs %tmp.16;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_46_27_12_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_12_27_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_25_12_27_12_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_20_28_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_28_15_33_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 29 12 ]
+        symbol [ _motionMs %tmp.17 29 12 21 ];
+        %tmp.17 = getv self :_motionMs;
+        symbol [ SAMPLE_INTERVAL_MS %tmp.19 29 25 43 ];
+        %tmp.19 = getv ? :SAMPLE_INTERVAL_MS;
+        %tmp.20 = 2;
+        %tmp.21 = mul %tmp.19 %tmp.20;
+        %tmp.22 = sub %tmp.17 %tmp.21;
+        symbol [ _motionMs ? 29 12 21 ];
+        putv self :_motionMs dup %tmp.22;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 30 12 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_12_32_12_if_stmt:
+        symbol [ _motionMs %tmp.24 30 16 25 ];
+        %tmp.24 = getv ? :_motionMs;
+        %tmp.25 = 0;
+        %tmp.26 = lt %tmp.24 %tmp.25;
+        bf %tmp.26 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_12_32_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_12_32_12_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_31_32_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 31 16 ]
+        %tmp.27 = 0;
+        symbol [ _motionMs ? 31 16 25 ];
+        putv self :_motionMs %tmp.27;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_31_32_12_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_12_32_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_30_12_32_12_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_28_15_33_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_23_8_33_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 35 8 ]
+        symbol [ BASE_HR %tmp.29 35 20 27 ];
+        %tmp.29 = getv ? :BASE_HR;
+        symbol [ _motionMs %tmp.31 35 32 41 ];
+        %tmp.31 = getv ? :_motionMs;
+        %tmp.32 = 72;
+        %tmp.33 = mul %tmp.31 %tmp.32;
+        symbol [ TRIGGER_AFTER_MS %tmp.35 35 50 66 ];
+        %tmp.35 = getv ? :TRIGGER_AFTER_MS;
+        %tmp.36 = div %tmp.33 %tmp.35;
+        %tmp.37 = add %tmp.29 %tmp.36;
+        symbol [ heartRate ? 35 8 17 ];
+        putv self :heartRate %tmp.37;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 36 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_stmt:
+        symbol [ heartRate %tmp.39 36 12 21 ];
+        %tmp.39 = getv ? :heartRate;
+        symbol [ THRESHOLD_HIGH %tmp.41 36 25 39 ];
+        %tmp.41 = getv ? :THRESHOLD_HIGH;
+        %tmp.42 = gte %tmp.39 %tmp.41;
+        bf %tmp.42 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_41_38_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 37 12 ]
+        %tmp.43 = "HR demo high";
+        symbol [ status ? 37 12 18 ];
+        putv self :status %tmp.43;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_41_38_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_false:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 38 15 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_stmt:
+        symbol [ _motionMs %tmp.45 38 19 28 ];
+        %tmp.45 = getv ? :_motionMs;
+        %tmp.46 = 0;
+        %tmp.47 = gt %tmp.45 %tmp.46;
+        bf %tmp.47 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_34_40_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 39 12 ]
+        %tmp.48 = "HR demo rising";
+        symbol [ status ? 39 12 18 ];
+        putv self :status %tmp.48;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_34_40_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_40_15_42_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 41 12 ]
+        %tmp.49 = "HR demo idle";
+        symbol [ status ? 41 12 18 ];
+        putv self :status %tmp.49;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_40_15_42_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_38_15_42_8_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_36_8_42_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 44 8 ]
+        %tmp.50 = lgetv %magnitude;
+        symbol [ magnitude %tmp.50 44 25 34 ];
+        symbol [ _lastMagnitude ? 44 8 22 ];
+        putv self :_lastMagnitude %tmp.50;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 46 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_8_48_8_if_stmt:
+        symbol [ heartRate %tmp.52 46 12 21 ];
+        %tmp.52 = getv ? :heartRate;
+        symbol [ TRIGGER_HR %tmp.54 46 24 34 ];
+        %tmp.54 = getv ? :TRIGGER_HR;
+        %tmp.55 = lt %tmp.52 %tmp.54;
+        bf %tmp.55 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_8_48_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_8_48_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_36_48_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 47 12 ]
+        %tmp.56 = null;
+        ret %tmp.56;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_36_48_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_8_48_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_46_8_48_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 49 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_8_51_8_if_stmt:
+        symbol [ _motionMs %tmp.58 49 12 21 ];
+        %tmp.58 = getv ? :_motionMs;
+        symbol [ TRIGGER_AFTER_MS %tmp.60 49 24 40 ];
+        %tmp.60 = getv ? :TRIGGER_AFTER_MS;
+        %tmp.61 = lt %tmp.58 %tmp.60;
+        bf %tmp.61 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_8_51_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_8_51_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_42_51_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 50 12 ]
+        %tmp.62 = null;
+        ret %tmp.62;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_42_51_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_8_51_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_49_8_51_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 52 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_12_52_59_begin:
+        symbol [ _lastTrigger %tmp.64 52 12 24 ];
+        %tmp.64 = getv ? :_lastTrigger;
+        %tmp.65 = null;
+        %tmp.66 = ne %tmp.64 %tmp.65;
+        bf %tmp.66 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_36_52_59_true:
+        %tmp.67 = lgetv %nowMs;
+        symbol [ nowMs %tmp.67 52 36 41 ];
+        symbol [ _lastTrigger %tmp.69 52 44 56 ];
+        %tmp.69 = getv ? :_lastTrigger;
+        %tmp.70 = as %tmp.69 { (!Null) };
+        %tmp.71 = sub %tmp.67 %tmp.70;
+        symbol [ COOLDOWN_MS %tmp.73 52 59 70 ];
+        %tmp.73 = getv ? :COOLDOWN_MS;
+        %tmp.74 = lt %tmp.71 %tmp.73;
+        push %tmp.74;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_36_52_59_end:
+        %tmp.75 = phi [%tmp.66 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_12_52_59_begin] [%tmp.74 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_36_52_59_true] [%tmp.75 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_36_52_59_end];
+        bf %tmp.75 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_72_54_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 53 12 ]
+        %tmp.76 = null;
+        ret %tmp.76;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_72_54_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_52_8_54_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 56 8 ]
+        %tmp.77 = lgetv %nowMs;
+        symbol [ nowMs %tmp.77 56 23 28 ];
+        symbol [ _lastTrigger ? 56 8 20 ];
+        putv self :_lastTrigger %tmp.77;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 57 8 ]
+        %tmp.78 = newd 4;
+        %tmp.79 = "heartRate";
+        symbol [ heartRate %tmp.81 58 27 36 ];
+        %tmp.81 = getv ? :heartRate;
+        %tmp.82 = dup %tmp.78;
+        %tmp.83 = aputv %tmp.82 %tmp.79 %tmp.81;
+        %tmp.84 = "thresholdHigh";
+        symbol [ THRESHOLD_HIGH %tmp.86 59 31 45 ];
+        %tmp.86 = getv ? :THRESHOLD_HIGH;
+        %tmp.87 = dup %tmp.83;
+        %tmp.88 = aputv %tmp.87 %tmp.84 %tmp.86;
+        %tmp.89 = "thresholdLow";
+        symbol [ THRESHOLD_LOW %tmp.91 60 30 43 ];
+        %tmp.91 = getv ? :THRESHOLD_LOW;
+        %tmp.92 = dup %tmp.88;
+        %tmp.93 = aputv %tmp.92 %tmp.89 %tmp.91;
+        %tmp.94 = "durationSeconds";
+        symbol [ TRIGGER_AFTER_MS %tmp.96 61 33 49 ];
+        %tmp.96 = getv ? :TRIGGER_AFTER_MS;
+        %tmp.97 = 1000;
+        %tmp.98 = div %tmp.96 %tmp.97;
+        %tmp.99 = dup %tmp.93;
+        %tmp.100 = aputv %tmp.99 %tmp.94 %tmp.98;
+        ret %tmp.100;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_21_41_63_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 65; @symbol_functiondef = [isActiveMotion,65,21,35]; @symbol_param<0> = [magnitude,65,36,45]; ]
+    private
+    function isActiveMotion(magnitude) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_65_47_78_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 66 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_8_68_8_if_stmt:
+        %tmp.1 = lgetv %magnitude;
+        symbol [ magnitude %tmp.1 66 12 21 ];
+        symbol [ HARD_MOTION_MG %tmp.3 66 25 39 ];
+        %tmp.3 = getv ? :HARD_MOTION_MG;
+        %tmp.4 = gte %tmp.1 %tmp.3;
+        bf %tmp.4 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_8_68_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_8_68_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_41_68_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 67 12 ]
+        %tmp.5 = true;
+        ret %tmp.5;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_41_68_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_8_68_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_66_8_68_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 69 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_8_71_8_if_stmt:
+        symbol [ _lastMagnitude %tmp.7 69 12 26 ];
+        %tmp.7 = getv ? :_lastMagnitude;
+        %tmp.8 = null;
+        %tmp.9 = eq %tmp.7 %tmp.8;
+        bf %tmp.9 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_8_71_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_8_71_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_36_71_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 70 12 ]
+        %tmp.10 = false;
+        ret %tmp.10;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_36_71_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_8_71_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_69_8_71_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 73 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_65_47_78_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_65_47_78_4_stop" ]
+        %delta.1 = local;
+        symbol [ delta %delta.1 73 12 17 ];
+        %tmp.11 = lgetv %magnitude;
+        symbol [ magnitude %tmp.11 73 20 29 ];
+        symbol [ _lastMagnitude %tmp.13 73 32 46 ];
+        %tmp.13 = getv ? :_lastMagnitude;
+        %tmp.14 = sub %tmp.11 %tmp.13;
+        lputv %delta.1 %tmp.14;
+        symbol [ delta %delta.1 73 12 17 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 74 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_8_76_8_if_stmt:
+        %tmp.15 = lgetv %delta.1;
+        symbol [ delta %tmp.15 74 12 17 ];
+        %tmp.16 = 0;
+        %tmp.17 = lt %tmp.15 %tmp.16;
+        bf %tmp.17 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_8_76_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_8_76_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_23_76_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 75 12 ]
+        %tmp.18 = lgetv %delta.1;
+        symbol [ delta %tmp.18 75 21 26 ];
+        %tmp.19 = sub 0 %tmp.18;
+        lputv %delta.1 %tmp.19;
+        symbol [ delta %delta.1 75 12 17 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_23_76_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_8_76_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_74_8_76_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc" 77 8 ]
+        %tmp.20 = lgetv %delta.1;
+        symbol [ delta %tmp.20 77 15 20 ];
+        symbol [ MOTION_DELTA_MG %tmp.22 77 24 39 ];
+        %tmp.22 = getv ? :MOTION_DELTA_MG;
+        %tmp.23 = gte %tmp.20 %tmp.22;
+        ret %tmp.23;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareHeartRateDemo_mc_65_47_78_4_stop:
+    }
+}
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareHeartRateDemo.mc"; @line = 1; ]
+<init> {
+}

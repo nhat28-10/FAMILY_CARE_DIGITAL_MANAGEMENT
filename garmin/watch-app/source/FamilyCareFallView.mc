@@ -45,6 +45,10 @@ class FamilyCareFallView extends WatchUi.View {
         y += 18;
         drawCenter(dc, "Status: " + _model.status, y, Graphics.FONT_TINY, Graphics.COLOR_LT_GRAY);
         y += 14;
+        if (_model.lastSendStatus != null && !_model.lastSendStatus.equals("")) {
+            drawCenter(dc, _model.lastSendStatus, y, Graphics.FONT_TINY, Graphics.COLOR_LT_GRAY);
+            y += 14;
+        }
         drawCenter(dc, "M " + formatNumber(_model.magnitude) + " HR " + _model.demoHeartRate, y, Graphics.FONT_TINY, Graphics.COLOR_LT_GRAY);
     }
 

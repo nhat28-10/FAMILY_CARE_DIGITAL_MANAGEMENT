@@ -1,0 +1,1811 @@
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 1; @symbol_usingdef<0> = [Toybox,1,6,12]; @symbol_usingdef<1> = [Application,1,13,24]; ]
+using Toybox.Application;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 2; @symbol_usingdef<0> = [Toybox,2,6,12]; @symbol_usingdef<1> = [Communications,2,13,27]; ]
+using Toybox.Communications;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 3; @symbol_usingdef<0> = [Toybox,3,6,12]; @symbol_usingdef<1> = [Lang,3,13,17]; ]
+using Toybox.Lang;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 4; @symbol_usingdef<0> = [Toybox,4,6,12]; @symbol_usingdef<1> = [Math,4,13,17]; ]
+using Toybox.Math;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 5; @symbol_usingdef<0> = [Toybox,5,6,12]; @symbol_usingdef<1> = [Sensor,5,13,19]; ]
+using Toybox.Sensor;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 6; @symbol_usingdef<0> = [Toybox,6,6,12]; @symbol_usingdef<1> = [System,6,13,19]; ]
+using Toybox.System;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 7; @symbol_usingdef<0> = [Toybox,7,6,12]; @symbol_usingdef<1> = [Time,7,13,17]; ]
+using Toybox.Time;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 8; @symbol_usingdef<0> = [Toybox,8,6,12]; @symbol_usingdef<1> = [Timer,8,13,18]; ]
+using Toybox.Timer;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 9; @symbol_usingdef<0> = [Toybox,9,6,12]; @symbol_usingdef<1> = [WatchUi,9,13,20]; ]
+using Toybox.WatchUi;
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 11; @symbol_classdef = [FamilyCareModel,11,6,21]; ]
+class FamilyCareModel {
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 11; ]
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 11; ]
+    static
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 12; @position = 10; @symbol_constdef = [PROP_PAIR_CODE,12,10,24]; ]
+    const PROP_PAIR_CODE = "pairCode";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 13; @position = 10; @symbol_constdef = [PROP_PAIRED,13,10,21]; ]
+    const PROP_PAIRED = "paired";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 14; @position = 10; @symbol_constdef = [PROP_DEVICE_ID,14,10,24]; ]
+    const PROP_DEVICE_ID = "deviceId";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 16; @position = 10; @symbol_constdef = [SENSOR_PERIOD_SEC,16,10,27]; ]
+    const SENSOR_PERIOD_SEC = 1;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 17; @position = 10; @symbol_constdef = [SAMPLE_RATE_HZ,17,10,24]; ]
+    const SAMPLE_RATE_HZ = 25;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 18; @position = 10; @symbol_constdef = [SAMPLE_INTERVAL_MS,18,10,28]; ]
+    const SAMPLE_INTERVAL_MS = 40;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 19; @position = 10; @symbol_constdef = [COUNTDOWN_SEC,19,10,23]; ]
+    const COUNTDOWN_SEC = 20;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 21; @position = 8; @symbol_vardef = [pairCode,21,8,16]; ]
+    var pairCode = "";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 22; @position = 8; @symbol_vardef = [paired,22,8,14]; ]
+    var paired = false;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 23; @position = 8; @symbol_vardef = [deviceId,23,8,16]; ]
+    var deviceId = null;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 24; @position = 8; @symbol_vardef = [memberName,24,8,18]; ]
+    var memberName = null;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 26; @position = 8; @symbol_vardef = [x,26,8,9]; ]
+    var x = 0.0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 27; @position = 8; @symbol_vardef = [y,27,8,9]; ]
+    var y = 0.0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 28; @position = 8; @symbol_vardef = [z,28,8,9]; ]
+    var z = 0.0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 29; @position = 8; @symbol_vardef = [magnitude,29,8,17]; ]
+    var magnitude = 0.0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 30; @position = 8; @symbol_vardef = [demoHeartRate,30,8,21]; ]
+    var demoHeartRate = 82;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 31; @position = 8; @symbol_vardef = [demoHeartRateStatus,31,8,27]; ]
+    var demoHeartRateStatus = "HR demo idle";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 32; @position = 8; @symbol_vardef = [sampleCount,32,8,19]; ]
+    var sampleCount = 0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 33; @position = 8; @symbol_vardef = [status,33,8,14]; ]
+    var status = "WAIT_PAIR";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 34; @position = 8; @symbol_vardef = [lastSendStatus,34,8,22]; ]
+    var lastSendStatus = "";
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 35; @position = 8; @symbol_vardef = [countdown,35,8,17]; ]
+    var countdown = 0;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 36; @position = 8; @symbol_vardef = [sensorRunning,36,8,21]; ]
+    var sensorRunning = false;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 38; @position = 16; @symbol_vardef = [_detector,38,16,25]; ]
+    private
+    var _detector;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 39; @position = 16; @symbol_vardef = [_heartRateDemo,39,16,30]; ]
+    private
+    var _heartRateDemo;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 40; @position = 16; @symbol_vardef = [_countdownTimer,40,16,31]; ]
+    private
+    var _countdownTimer;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 41; @position = 16; @symbol_vardef = [_pendingFall,41,16,28]; ]
+    private
+    var _pendingFall;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 42; @position = 16; @symbol_vardef = [_view,42,16,21]; ]
+    private
+    var _view;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 43; @position = 16; @symbol_vardef = [_transmitListener,43,16,33]; ]
+    private
+    var _transmitListener;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 45; @symbol_functiondef = [initialize,45,13,23]; ]
+    function initialize() as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_45_26_51_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 46 8 ]
+        symbol [ FamilyCareFallDetector %tmp.4 46 24 46 ];
+        %tmp.4 = getv ? :FamilyCareFallDetector;
+        %tmp.1 = newc %tmp.4 ();
+        symbol [ _detector ? 46 8 17 ];
+        putv self :_detector %tmp.1;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 47 8 ]
+        symbol [ FamilyCareHeartRateDemo %tmp.8 47 29 52 ];
+        %tmp.8 = getv ? :FamilyCareHeartRateDemo;
+        %tmp.5 = newc %tmp.8 ();
+        symbol [ _heartRateDemo ? 47 8 22 ];
+        putv self :_heartRateDemo %tmp.5;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 48 8 ]
+        %tmp.9 = null;
+        symbol [ _countdownTimer ? 48 8 23 ];
+        putv self :_countdownTimer %tmp.9;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 49 8 ]
+        %tmp.10 = null;
+        symbol [ _pendingFall ? 49 8 20 ];
+        putv self :_pendingFall %tmp.10;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 50 8 ]
+        symbol [ FamilyCareTransmitListener %tmp.14 50 32 58 ];
+        %tmp.14 = getv ? :FamilyCareTransmitListener;
+        %tmp.15 = self;
+        symbol [ self %tmp.15 50 59 63 ];
+        %tmp.11 = newc %tmp.14 (%tmp.15);
+        symbol [ _transmitListener ? 50 8 25 ];
+        putv self :_transmitListener %tmp.11;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_45_26_51_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 53; @symbol_functiondef = [setView,53,13,20]; @symbol_param<0> = [view,53,21,25]; ]
+    function setView(view) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_53_27_55_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 54 8 ]
+        %tmp.1 = lgetv %view;
+        symbol [ view %tmp.1 54 16 20 ];
+        symbol [ _view ? 54 8 13 ];
+        putv self :_view %tmp.1;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_53_27_55_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 57; @symbol_functiondef = [load,57,13,17]; ]
+    function load() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_57_20_75_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 58 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_57_20_75_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_57_20_75_4_stop" ]
+        %app.1 = local;
+        symbol [ app %app.1 58 12 15 ];
+        symbol [ Application %tmp.1 58 18 29 ];
+        %tmp.1 = getm $.Toybox.Application;
+        symbol [ getApp %tmp.2 58 30 36 ];
+        %tmp.2 = getv function %tmp.1 :getApp;
+        %tmp.3 = invoke %tmp.1 %tmp.2();
+        lputv %app.1 %tmp.3;
+        symbol [ app %app.1 58 12 15 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 59 8 ]
+        %tmp.4 = lgetv %app.1;
+        symbol [ app %tmp.4 59 19 22 ];
+        symbol [ getProperty %tmp.5 59 23 34 ];
+        %tmp.5 = getv function %tmp.4 :getProperty;
+        symbol [ PROP_PAIR_CODE %tmp.7 59 35 49 ];
+        %tmp.7 = getv ? :PROP_PAIR_CODE;
+        %tmp.8 = invoke %tmp.4 %tmp.5(%tmp.7);
+        symbol [ pairCode ? 59 8 16 ];
+        putv self :pairCode %tmp.8;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 60 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_12_60_50_begin:
+        symbol [ pairCode %tmp.10 60 12 20 ];
+        %tmp.10 = getv ? :pairCode;
+        %tmp.11 = null;
+        %tmp.12 = eq %tmp.10 %tmp.11;
+        bt %tmp.12 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_32_60_50_false:
+        symbol [ pairCode %tmp.14 60 32 40 ];
+        %tmp.14 = getv ? :pairCode;
+        %tmp.15 = as %tmp.14 { (!Null) };
+        symbol [ equals %tmp.16 60 41 47 ];
+        %tmp.16 = getv function %tmp.15 :equals;
+        %tmp.17 = "";
+        %tmp.18 = invoke %tmp.15 %tmp.16(%tmp.17);
+        push %tmp.18;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_32_60_50_end:
+        %tmp.19 = phi [%tmp.12 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_12_60_50_begin] [%tmp.18 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_32_60_50_false] [%tmp.19 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_32_60_50_end];
+        bf %tmp.19 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_53_63_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 61 12 ]
+        %tmp.20 = self;
+        symbol [ makePairCode %tmp.21 61 23 35 ];
+        %tmp.21 = getv function %tmp.20 :makePairCode;
+        %tmp.22 = invoke %tmp.20 %tmp.21();
+        symbol [ pairCode ? 61 12 20 ];
+        putv self :pairCode %tmp.22;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 62 12 ]
+        %tmp.23 = lgetv %app.1;
+        symbol [ app %tmp.23 62 12 15 ];
+        symbol [ setProperty %tmp.24 62 16 27 ];
+        %tmp.24 = getv function %tmp.23 :setProperty;
+        symbol [ PROP_PAIR_CODE %tmp.26 62 28 42 ];
+        %tmp.26 = getv ? :PROP_PAIR_CODE;
+        symbol [ pairCode %tmp.28 62 44 52 ];
+        %tmp.28 = getv ? :pairCode;
+        invoke %tmp.23 %tmp.24(%tmp.26, %tmp.28);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_53_63_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_60_8_63_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 65 8 ]
+        %tmp.29 = lgetv %app.1;
+        symbol [ app %tmp.29 65 17 20 ];
+        symbol [ getProperty %tmp.30 65 21 32 ];
+        %tmp.30 = getv function %tmp.29 :getProperty;
+        symbol [ PROP_PAIRED %tmp.32 65 33 44 ];
+        %tmp.32 = getv ? :PROP_PAIRED;
+        %tmp.33 = invoke %tmp.29 %tmp.30(%tmp.32);
+        %tmp.34 = true;
+        %tmp.35 = eq %tmp.33 %tmp.34;
+        symbol [ paired ? 65 8 14 ];
+        putv self :paired %tmp.35;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 66 8 ]
+        %tmp.36 = lgetv %app.1;
+        symbol [ app %tmp.36 66 19 22 ];
+        symbol [ getProperty %tmp.37 66 23 34 ];
+        %tmp.37 = getv function %tmp.36 :getProperty;
+        symbol [ PROP_DEVICE_ID %tmp.39 66 35 49 ];
+        %tmp.39 = getv ? :PROP_DEVICE_ID;
+        %tmp.40 = invoke %tmp.36 %tmp.37(%tmp.39);
+        symbol [ deviceId ? 66 8 16 ];
+        putv self :deviceId %tmp.40;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 67 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_stmt:
+        symbol [ paired %tmp.42 67 12 18 ];
+        %tmp.42 = getv ? :paired;
+        bf %tmp.42 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_20_69_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 68 12 ]
+        %tmp.43 = "ARMED";
+        symbol [ status ? 68 12 18 ];
+        putv self :status %tmp.43;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_20_69_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_69_15_71_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 70 12 ]
+        %tmp.44 = "WAIT_PAIR";
+        symbol [ status ? 70 12 18 ];
+        putv self :status %tmp.44;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_69_15_71_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_67_8_71_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 73 8 ]
+        symbol [ Communications %tmp.45 73 8 22 ];
+        %tmp.45 = getm $.Toybox.Communications;
+        symbol [ registerForPhoneAppMessages %tmp.46 73 23 50 ];
+        %tmp.46 = getv function %tmp.45 :registerForPhoneAppMessages;
+        %tmp.47 = self;
+        symbol [ method %tmp.48 73 51 57 ];
+        %tmp.48 = getv function %tmp.47 :method;
+        %tmp.50 = const :onPhoneMessage;
+        symbol [ onPhoneMessage %tmp.50 73 59 73 const ];
+        %tmp.51 = invoke %tmp.47 %tmp.48(%tmp.50);
+        invoke %tmp.45 %tmp.46(%tmp.51);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 74 8 ]
+        %tmp.52 = self;
+        symbol [ startSensors %tmp.53 74 8 20 ];
+        %tmp.53 = getv function %tmp.52 :startSensors;
+        invoke %tmp.52 %tmp.53();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_57_20_75_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 77; @symbol_functiondef = [startSensors,77,13,25]; ]
+    function startSensors() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_77_28_95_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 78 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_8_80_8_if_stmt:
+        symbol [ sensorRunning %tmp.2 78 12 25 ];
+        %tmp.2 = getv ? :sensorRunning;
+        bf %tmp.2 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_8_80_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_8_80_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_27_80_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 79 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_27_80_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_8_80_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_78_8_80_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 82 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_77_28_95_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_77_28_95_4_stop" ]
+        %legacyOptions.1 = local;
+        symbol [ legacyOptions %legacyOptions.1 82 12 25 ];
+        %tmp.3 = newd 3;
+        %tmp.5 = const :period;
+        symbol [ period %tmp.5 83 13 19 const ];
+        symbol [ SENSOR_PERIOD_SEC %tmp.7 83 23 40 ];
+        %tmp.7 = getv ? :SENSOR_PERIOD_SEC;
+        %tmp.8 = dup %tmp.3;
+        %tmp.9 = aputv %tmp.8 %tmp.5 %tmp.7;
+        %tmp.11 = const :sampleRate;
+        symbol [ sampleRate %tmp.11 84 13 23 const ];
+        symbol [ SAMPLE_RATE_HZ %tmp.13 84 27 41 ];
+        %tmp.13 = getv ? :SAMPLE_RATE_HZ;
+        %tmp.14 = dup %tmp.9;
+        %tmp.15 = aputv %tmp.14 %tmp.11 %tmp.13;
+        %tmp.17 = const :enableAccelerometer;
+        symbol [ enableAccelerometer %tmp.17 85 13 32 const ];
+        %tmp.18 = true;
+        %tmp.19 = dup %tmp.15;
+        %tmp.20 = aputv %tmp.19 %tmp.17 %tmp.18;
+        lputv %legacyOptions.1 %tmp.20;
+        symbol [ legacyOptions %legacyOptions.1 82 12 25 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 88 8 ]
+        try @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_beginTry @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_endTry @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_catch @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_beginTry:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_12_92_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 89 12 ]
+        symbol [ Sensor %tmp.21 89 12 18 ];
+        %tmp.21 = getm $.Toybox.Sensor;
+        symbol [ registerSensorDataListener %tmp.22 89 19 45 ];
+        %tmp.22 = getv function %tmp.21 :registerSensorDataListener;
+        %tmp.23 = self;
+        symbol [ method %tmp.24 89 46 52 ];
+        %tmp.24 = getv function %tmp.23 :method;
+        %tmp.26 = const :onSensorData;
+        symbol [ onSensorData %tmp.26 89 54 66 const ];
+        %tmp.27 = invoke %tmp.23 %tmp.24(%tmp.26);
+        %tmp.28 = lgetv %legacyOptions.1;
+        symbol [ legacyOptions %tmp.28 89 69 82 ];
+        invoke %tmp.21 %tmp.22(%tmp.27, %tmp.28);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 90 12 ]
+        %tmp.29 = true;
+        symbol [ sensorRunning ? 90 12 25 ];
+        putv self :sensorRunning %tmp.29;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 91 12 ]
+        %tmp.30 = "sensor legacy";
+        symbol [ lastSendStatus ? 91 12 26 ];
+        putv self :lastSendStatus %tmp.30;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_12_92_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_endTry:
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally;
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_catch:
+        %tmp.31 = exception;
+        push %tmp.31;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 92 10 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_catch" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_10_94_8_end" ]
+        %e.2 = local;
+        symbol [ e %e.2 92 16 17 ];
+        %tmp.32 = dup %tmp.31;
+        lputv %e.2 %tmp.32;
+        symbol [ e %e.2 92 16 17 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_19_94_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 93 12 ]
+        %tmp.33 = self;
+        symbol [ startSensorsNested %tmp.34 93 12 30 ];
+        %tmp.34 = getv function %tmp.33 :startSensorsNested;
+        invoke %tmp.33 %tmp.34();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_19_94_8_stop:
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally;
+        pop;
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_10_94_8_end:
+        try @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_catch @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_10_94_8_end @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_92_10_94_8_end @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally;
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally;
+        throw %tmp.31;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_finally:
+        jsrret;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_88_8_94_8_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_77_28_95_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 97; @symbol_functiondef = [startSensorsNested,97,21,39]; ]
+    private
+    function startSensorsNested() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_97_42_115_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 98 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_97_42_115_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_97_42_115_4_stop" ]
+        %nestedOptions.1 = local;
+        symbol [ nestedOptions %nestedOptions.1 98 12 25 ];
+        %tmp.1 = newd 2;
+        %tmp.3 = const :period;
+        symbol [ period %tmp.3 99 13 19 const ];
+        symbol [ SENSOR_PERIOD_SEC %tmp.5 99 23 40 ];
+        %tmp.5 = getv ? :SENSOR_PERIOD_SEC;
+        %tmp.6 = dup %tmp.1;
+        %tmp.7 = aputv %tmp.6 %tmp.3 %tmp.5;
+        %tmp.9 = const :accelerometer;
+        symbol [ accelerometer %tmp.9 100 13 26 const ];
+        %tmp.10 = newd 2;
+        %tmp.12 = const :enabled;
+        symbol [ enabled %tmp.12 101 17 24 const ];
+        %tmp.13 = true;
+        %tmp.14 = dup %tmp.10;
+        %tmp.15 = aputv %tmp.14 %tmp.12 %tmp.13;
+        %tmp.17 = const :sampleRate;
+        symbol [ sampleRate %tmp.17 102 17 27 const ];
+        symbol [ SAMPLE_RATE_HZ %tmp.19 102 31 45 ];
+        %tmp.19 = getv ? :SAMPLE_RATE_HZ;
+        %tmp.20 = dup %tmp.15;
+        %tmp.21 = aputv %tmp.20 %tmp.17 %tmp.19;
+        %tmp.22 = dup %tmp.7;
+        %tmp.23 = aputv %tmp.22 %tmp.9 %tmp.21;
+        lputv %nestedOptions.1 %tmp.23;
+        symbol [ nestedOptions %nestedOptions.1 98 12 25 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 106 8 ]
+        try @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_beginTry @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_endTry @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_catch @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_beginTry:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_12_110_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 107 12 ]
+        symbol [ Sensor %tmp.24 107 12 18 ];
+        %tmp.24 = getm $.Toybox.Sensor;
+        symbol [ registerSensorDataListener %tmp.25 107 19 45 ];
+        %tmp.25 = getv function %tmp.24 :registerSensorDataListener;
+        %tmp.26 = self;
+        symbol [ method %tmp.27 107 46 52 ];
+        %tmp.27 = getv function %tmp.26 :method;
+        %tmp.29 = const :onSensorData;
+        symbol [ onSensorData %tmp.29 107 54 66 const ];
+        %tmp.30 = invoke %tmp.26 %tmp.27(%tmp.29);
+        %tmp.31 = lgetv %nestedOptions.1;
+        symbol [ nestedOptions %tmp.31 107 69 82 ];
+        invoke %tmp.24 %tmp.25(%tmp.30, %tmp.31);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 108 12 ]
+        %tmp.32 = true;
+        symbol [ sensorRunning ? 108 12 25 ];
+        putv self :sensorRunning %tmp.32;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 109 12 ]
+        %tmp.33 = "sensor nested";
+        symbol [ lastSendStatus ? 109 12 26 ];
+        putv self :lastSendStatus %tmp.33;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_12_110_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_endTry:
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally;
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_catch:
+        %tmp.34 = exception;
+        push %tmp.34;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 110 10 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_catch" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_10_114_8_end" ]
+        %e.2 = local;
+        symbol [ e %e.2 110 16 17 ];
+        %tmp.35 = dup %tmp.34;
+        lputv %e.2 %tmp.35;
+        symbol [ e %e.2 110 16 17 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_19_114_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 111 12 ]
+        %tmp.36 = "SENSOR_ERR";
+        symbol [ status ? 111 12 18 ];
+        putv self :status %tmp.36;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 112 12 ]
+        %tmp.37 = "sensor setup failed";
+        symbol [ lastSendStatus ? 112 12 26 ];
+        putv self :lastSendStatus %tmp.37;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 113 12 ]
+        %tmp.38 = self;
+        symbol [ requestUpdate %tmp.39 113 12 25 ];
+        %tmp.39 = getv function %tmp.38 :requestUpdate;
+        invoke %tmp.38 %tmp.39();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_19_114_8_stop:
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally;
+        pop;
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_10_114_8_end:
+        try @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_catch @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_10_114_8_end @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_110_10_114_8_end @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally;
+        jsr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally;
+        throw %tmp.34;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_finally:
+        jsrret;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_106_8_114_8_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_97_42_115_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 117; @symbol_functiondef = [stopSensors,117,13,24]; ]
+    function stopSensors() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_117_27_124_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 118 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_8_120_8_if_stmt:
+        symbol [ sensorRunning %tmp.2 118 13 26 ];
+        %tmp.2 = getv ? :sensorRunning;
+        %tmp.3 = not %tmp.2;
+        bf %tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_8_120_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_8_120_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_28_120_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 119 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_28_120_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_8_120_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_118_8_120_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 121 8 ]
+        symbol [ Sensor %tmp.4 121 8 14 ];
+        %tmp.4 = getm $.Toybox.Sensor;
+        symbol [ unregisterSensorDataListener %tmp.5 121 15 43 ];
+        %tmp.5 = getv function %tmp.4 :unregisterSensorDataListener;
+        invoke %tmp.4 %tmp.5();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 122 8 ]
+        %tmp.6 = false;
+        symbol [ sensorRunning ? 122 8 21 ];
+        putv self :sensorRunning %tmp.6;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 123 8 ]
+        %tmp.7 = self;
+        symbol [ stopCountdown %tmp.8 123 8 21 ];
+        %tmp.8 = getv function %tmp.7 :stopCountdown;
+        invoke %tmp.7 %tmp.8();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_117_27_124_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 126; @symbol_functiondef = [onPhoneMessage,126,13,27]; @symbol_param<0> = [msg,126,28,31]; @symbol_param<0>_type<0> = [Communications,126,35,49]; @symbol_param<0>_type<1> = [PhoneAppMessage,126,50,65]; ]
+    function onPhoneMessage(msg as Communications.PhoneAppMessage) as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 127 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_stop" ]
+        %data.1 = local;
+        symbol [ data %data.1 127 12 16 ];
+        %tmp.1 = lgetv %msg;
+        symbol [ msg %tmp.1 127 19 22 ];
+        symbol [ data %tmp.2 127 23 27 ];
+        %tmp.2 = getv %tmp.1 :data;
+        lputv %data.1 %tmp.2;
+        symbol [ data %data.1 127 12 16 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 128 8 ]
+        %tmp.3 = "phone msg";
+        symbol [ lastSendStatus ? 128 8 22 ];
+        putv self :lastSendStatus %tmp.3;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 129 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_8_133_8_if_stmt:
+        %tmp.4 = lgetv %data.1;
+        symbol [ data %tmp.4 129 14 18 ];
+        symbol [ Dictionary %tmp.6 129 30 40 ];
+        %tmp.6 = getv ? :Dictionary;
+        %tmp.7 = isa %tmp.4 %tmp.6;
+        %tmp.8 = not %tmp.7;
+        bf %tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_8_133_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_8_133_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_43_133_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 130 12 ]
+        %tmp.9 = "PHONE_NOT_DICT";
+        symbol [ status ? 130 12 18 ];
+        putv self :status %tmp.9;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 131 12 ]
+        %tmp.10 = self;
+        symbol [ requestUpdate %tmp.11 131 12 25 ];
+        %tmp.11 = getv function %tmp.10 :requestUpdate;
+        invoke %tmp.10 %tmp.11();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 132 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_43_133_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_8_133_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_129_8_133_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 135 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_stop" ]
+        %type.2 = local;
+        symbol [ type %type.2 135 12 16 ];
+        %tmp.12 = lgetv %data.1;
+        symbol [ data %tmp.12 135 19 23 ];
+        %tmp.13 = "type";
+        %tmp.14 = agetv %tmp.12 %tmp.13;
+        lputv %type.2 %tmp.14;
+        symbol [ type %type.2 135 12 16 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 136 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_8_138_8_if_stmt:
+        %tmp.15 = lgetv %type.2;
+        symbol [ type %tmp.15 136 12 16 ];
+        %tmp.16 = null;
+        %tmp.17 = eq %tmp.15 %tmp.16;
+        bf %tmp.17 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_8_138_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_8_138_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_26_138_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 137 12 ]
+        %tmp.18 = lgetv %data.1;
+        symbol [ data %tmp.18 137 19 23 ];
+        %tmp.20 = const :type;
+        symbol [ type %tmp.20 137 25 29 const ];
+        %tmp.21 = agetv %tmp.18 %tmp.20;
+        lputv %type.2 %tmp.21;
+        symbol [ type %type.2 137 12 16 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_26_138_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_8_138_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_136_8_138_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 139 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_8_143_8_if_stmt:
+        %tmp.22 = lgetv %type.2;
+        symbol [ type %tmp.22 139 12 16 ];
+        %tmp.23 = null;
+        %tmp.24 = eq %tmp.22 %tmp.23;
+        bf %tmp.24 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_8_143_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_8_143_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_26_143_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 140 12 ]
+        %tmp.25 = "PHONE_NO_TYPE";
+        symbol [ status ? 140 12 18 ];
+        putv self :status %tmp.25;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 141 12 ]
+        %tmp.26 = self;
+        symbol [ requestUpdate %tmp.27 141 12 25 ];
+        %tmp.27 = getv function %tmp.26 :requestUpdate;
+        invoke %tmp.26 %tmp.27();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 142 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_26_143_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_8_143_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_139_8_143_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 145 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_stmt:
+        %tmp.28 = lgetv %type.2;
+        symbol [ type %tmp.28 145 12 16 ];
+        symbol [ equals %tmp.29 145 17 23 ];
+        %tmp.29 = getv function %tmp.28 :equals;
+        %tmp.30 = "PAIR_CONFIRMED";
+        %tmp.31 = invoke %tmp.28 %tmp.29(%tmp.30);
+        bf %tmp.31 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_43_155_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 146 12 ]
+        %tmp.32 = true;
+        symbol [ paired ? 146 12 18 ];
+        putv self :paired %tmp.32;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 147 12 ]
+        %tmp.33 = self;
+        symbol [ valueOf %tmp.34 147 23 30 ];
+        %tmp.34 = getv function %tmp.33 :valueOf;
+        %tmp.35 = lgetv %data.1;
+        symbol [ data %tmp.35 147 31 35 ];
+        %tmp.36 = "deviceId";
+        %tmp.37 = invoke %tmp.33 %tmp.34(%tmp.35, %tmp.36);
+        symbol [ deviceId ? 147 12 20 ];
+        putv self :deviceId %tmp.37;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 148 12 ]
+        %tmp.38 = self;
+        symbol [ valueOf %tmp.39 148 25 32 ];
+        %tmp.39 = getv function %tmp.38 :valueOf;
+        %tmp.40 = lgetv %data.1;
+        symbol [ data %tmp.40 148 33 37 ];
+        %tmp.41 = "memberName";
+        %tmp.42 = invoke %tmp.38 %tmp.39(%tmp.40, %tmp.41);
+        symbol [ memberName ? 148 12 22 ];
+        putv self :memberName %tmp.42;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 149 12 ]
+        symbol [ Application %tmp.43 149 12 23 ];
+        %tmp.43 = getm $.Toybox.Application;
+        symbol [ getApp %tmp.44 149 24 30 ];
+        %tmp.44 = getv function %tmp.43 :getApp;
+        %tmp.45 = invoke %tmp.43 %tmp.44();
+        symbol [ setProperty %tmp.46 149 33 44 ];
+        %tmp.46 = getv function %tmp.45 :setProperty;
+        symbol [ PROP_PAIRED %tmp.48 149 45 56 ];
+        %tmp.48 = getv ? :PROP_PAIRED;
+        %tmp.49 = true;
+        invoke %tmp.45 %tmp.46(%tmp.48, %tmp.49);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 150 12 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_12_152_12_if_stmt:
+        symbol [ deviceId %tmp.51 150 16 24 ];
+        %tmp.51 = getv ? :deviceId;
+        %tmp.52 = null;
+        %tmp.53 = ne %tmp.51 %tmp.52;
+        bf %tmp.53 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_12_152_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_12_152_12_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_34_152_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 151 16 ]
+        symbol [ Application %tmp.54 151 16 27 ];
+        %tmp.54 = getm $.Toybox.Application;
+        symbol [ getApp %tmp.55 151 28 34 ];
+        %tmp.55 = getv function %tmp.54 :getApp;
+        %tmp.56 = invoke %tmp.54 %tmp.55();
+        symbol [ setProperty %tmp.57 151 37 48 ];
+        %tmp.57 = getv function %tmp.56 :setProperty;
+        symbol [ PROP_DEVICE_ID %tmp.59 151 49 63 ];
+        %tmp.59 = getv ? :PROP_DEVICE_ID;
+        symbol [ deviceId %tmp.61 151 65 73 ];
+        %tmp.61 = getv ? :deviceId;
+        invoke %tmp.56 %tmp.57(%tmp.59, %tmp.61);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_34_152_12_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_12_152_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_150_12_152_12_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 153 12 ]
+        %tmp.62 = "ARMED";
+        symbol [ status ? 153 12 18 ];
+        putv self :status %tmp.62;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 154 12 ]
+        %tmp.63 = self;
+        symbol [ requestUpdate %tmp.64 154 12 25 ];
+        %tmp.64 = getv function %tmp.63 :requestUpdate;
+        invoke %tmp.63 %tmp.64();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_43_155_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_155_15_158_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 156 12 ]
+        %tmp.65 = "PHONE_OTHER";
+        symbol [ status ? 156 12 18 ];
+        putv self :status %tmp.65;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 157 12 ]
+        %tmp.66 = self;
+        symbol [ requestUpdate %tmp.67 157 12 25 ];
+        %tmp.67 = getv function %tmp.66 :requestUpdate;
+        invoke %tmp.66 %tmp.67();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_155_15_158_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_145_8_158_8_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_126_75_159_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 161; @symbol_functiondef = [onSensorData,161,13,25]; @symbol_param<0> = [sensorData,161,26,36]; @symbol_param<0>_type<0> = [Sensor,161,40,46]; @symbol_param<0>_type<1> = [SensorData,161,47,57]; ]
+    function onSensorData(sensorData as Sensor.SensorData) as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 162 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_12_162_66_begin:
+        %tmp.1 = lgetv %sensorData;
+        symbol [ sensorData %tmp.1 162 12 22 ];
+        %tmp.2 = null;
+        %tmp.3 = eq %tmp.1 %tmp.2;
+        bt %tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_34_162_66_false:
+        %tmp.4 = lgetv %sensorData;
+        symbol [ sensorData %tmp.4 162 34 44 ];
+        %tmp.5 = as %tmp.4 { (!Null) };
+        symbol [ accelerometerData %tmp.6 162 45 62 ];
+        %tmp.6 = getv %tmp.5 :accelerometerData;
+        %tmp.7 = null;
+        %tmp.8 = eq %tmp.6 %tmp.7;
+        push %tmp.8;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_34_162_66_end:
+        %tmp.9 = phi [%tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_12_162_66_begin] [%tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_34_162_66_false] [%tmp.9 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_34_162_66_end];
+        bf %tmp.9 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_72_164_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 163 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_72_164_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_162_8_164_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 166 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_stop" ]
+        %ax.1 = local;
+        symbol [ ax %ax.1 166 12 14 ];
+        %tmp.10 = lgetv %sensorData;
+        symbol [ sensorData %tmp.10 166 17 27 ];
+        symbol [ accelerometerData %tmp.11 166 28 45 ];
+        %tmp.11 = getv %tmp.10 :accelerometerData;
+        symbol [ x %tmp.12 166 46 47 ];
+        %tmp.12 = getv %tmp.11 :x;
+        lputv %ax.1 %tmp.12;
+        symbol [ ax %ax.1 166 12 14 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 167 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_stop" ]
+        %ay.2 = local;
+        symbol [ ay %ay.2 167 12 14 ];
+        %tmp.13 = lgetv %sensorData;
+        symbol [ sensorData %tmp.13 167 17 27 ];
+        symbol [ accelerometerData %tmp.14 167 28 45 ];
+        %tmp.14 = getv %tmp.13 :accelerometerData;
+        symbol [ y %tmp.15 167 46 47 ];
+        %tmp.15 = getv %tmp.14 :y;
+        lputv %ay.2 %tmp.15;
+        symbol [ ay %ay.2 167 12 14 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 168 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_stop" ]
+        %az.3 = local;
+        symbol [ az %az.3 168 12 14 ];
+        %tmp.16 = lgetv %sensorData;
+        symbol [ sensorData %tmp.16 168 17 27 ];
+        symbol [ accelerometerData %tmp.17 168 28 45 ];
+        %tmp.17 = getv %tmp.16 :accelerometerData;
+        symbol [ z %tmp.18 168 46 47 ];
+        %tmp.18 = getv %tmp.17 :z;
+        lputv %az.3 %tmp.18;
+        symbol [ az %az.3 168 12 14 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 169 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_67_begin:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_46_begin:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_32_begin:
+        %tmp.19 = lgetv %ax.1;
+        symbol [ ax %tmp.19 169 12 14 ];
+        %tmp.20 = null;
+        %tmp.21 = eq %tmp.19 %tmp.20;
+        bt %tmp.21 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_26_169_32_false:
+        %tmp.22 = lgetv %ay.2;
+        symbol [ ay %tmp.22 169 26 28 ];
+        %tmp.23 = null;
+        %tmp.24 = eq %tmp.22 %tmp.23;
+        push %tmp.24;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_26_169_32_end:
+        %tmp.25 = phi [%tmp.21 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_32_begin] [%tmp.24 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_26_169_32_false] [%tmp.25 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_26_169_32_end];
+        bt %tmp.25 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_40_169_46_false:
+        %tmp.26 = lgetv %az.3;
+        symbol [ az %tmp.26 169 40 42 ];
+        %tmp.27 = null;
+        %tmp.28 = eq %tmp.26 %tmp.27;
+        push %tmp.28;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_40_169_46_end:
+        %tmp.29 = phi [%tmp.25 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_46_begin] [%tmp.28 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_40_169_46_false] [%tmp.29 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_40_169_46_end];
+        bt %tmp.29 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_54_169_67_false:
+        %tmp.30 = lgetv %ax.1;
+        symbol [ ax %tmp.30 169 54 56 ];
+        %tmp.31 = as %tmp.30 { (!Null) };
+        symbol [ size %tmp.32 169 57 61 ];
+        %tmp.32 = getv function %tmp.31 :size;
+        %tmp.33 = invoke %tmp.31 %tmp.32();
+        %tmp.34 = 0;
+        %tmp.35 = eq %tmp.33 %tmp.34;
+        push %tmp.35;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_54_169_67_end:
+        %tmp.36 = phi [%tmp.29 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_12_169_67_begin] [%tmp.35 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_54_169_67_false] [%tmp.36 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_54_169_67_end];
+        bf %tmp.36 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_70_171_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 170 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_70_171_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_169_8_171_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 173 8 ]
+        for @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_test @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_incr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_init:
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_begin" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_end" ]
+        %i.4 = local;
+        symbol [ i %i.4 173 17 18 ];
+        %tmp.37 = 0;
+        lputv %i.4 %tmp.37;
+        symbol [ i %i.4 173 17 18 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_test:
+        %tmp.38 = lgetv %i.4;
+        symbol [ i %tmp.38 173 24 25 ];
+        %tmp.39 = lgetv %ax.1;
+        symbol [ ax %tmp.39 173 28 30 ];
+        symbol [ size %tmp.40 173 31 35 ];
+        %tmp.40 = getv function %tmp.39 :size;
+        %tmp.41 = invoke %tmp.39 %tmp.40();
+        %tmp.42 = lt %tmp.38 %tmp.41;
+        bf %tmp.42 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_begin:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 174 12 ]
+        %tmp.43 = lgetv %ax.1;
+        symbol [ ax %tmp.43 174 16 18 ];
+        %tmp.44 = lgetv %i.4;
+        symbol [ i %tmp.44 174 19 20 ];
+        %tmp.45 = agetv %tmp.43 %tmp.44;
+        symbol [ toFloat %tmp.46 174 22 29 ];
+        %tmp.46 = getv function %tmp.45 :toFloat;
+        %tmp.47 = invoke %tmp.45 %tmp.46();
+        symbol [ x ? 174 12 13 ];
+        putv self :x %tmp.47;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 175 12 ]
+        %tmp.48 = lgetv %ay.2;
+        symbol [ ay %tmp.48 175 16 18 ];
+        %tmp.49 = lgetv %i.4;
+        symbol [ i %tmp.49 175 19 20 ];
+        %tmp.50 = agetv %tmp.48 %tmp.49;
+        symbol [ toFloat %tmp.51 175 22 29 ];
+        %tmp.51 = getv function %tmp.50 :toFloat;
+        %tmp.52 = invoke %tmp.50 %tmp.51();
+        symbol [ y ? 175 12 13 ];
+        putv self :y %tmp.52;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 176 12 ]
+        %tmp.53 = lgetv %az.3;
+        symbol [ az %tmp.53 176 16 18 ];
+        %tmp.54 = lgetv %i.4;
+        symbol [ i %tmp.54 176 19 20 ];
+        %tmp.55 = agetv %tmp.53 %tmp.54;
+        symbol [ toFloat %tmp.56 176 22 29 ];
+        %tmp.56 = getv function %tmp.55 :toFloat;
+        %tmp.57 = invoke %tmp.55 %tmp.56();
+        symbol [ z ? 176 12 13 ];
+        putv self :z %tmp.57;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 177 12 ]
+        symbol [ Math %tmp.58 177 24 28 ];
+        %tmp.58 = getm $.Toybox.Math;
+        symbol [ sqrt %tmp.59 177 29 33 ];
+        %tmp.59 = getv function %tmp.58 :sqrt;
+        symbol [ x %tmp.61 177 35 36 ];
+        %tmp.61 = getv ? :x;
+        symbol [ x %tmp.63 177 39 40 ];
+        %tmp.63 = getv ? :x;
+        %tmp.64 = mul %tmp.61 %tmp.63;
+        symbol [ y %tmp.66 177 45 46 ];
+        %tmp.66 = getv ? :y;
+        symbol [ y %tmp.68 177 49 50 ];
+        %tmp.68 = getv ? :y;
+        %tmp.69 = mul %tmp.66 %tmp.68;
+        %tmp.70 = add %tmp.64 %tmp.69;
+        symbol [ z %tmp.72 177 55 56 ];
+        %tmp.72 = getv ? :z;
+        symbol [ z %tmp.74 177 59 60 ];
+        %tmp.74 = getv ? :z;
+        %tmp.75 = mul %tmp.72 %tmp.74;
+        %tmp.76 = add %tmp.70 %tmp.75;
+        %tmp.77 = invoke %tmp.58 %tmp.59(%tmp.76);
+        symbol [ magnitude ? 177 12 21 ];
+        putv self :magnitude %tmp.77;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 178 12 ]
+        symbol [ sampleCount %tmp.78 178 12 23 ];
+        %tmp.78 = getv self :sampleCount;
+        %tmp.79 = 1;
+        %tmp.80 = add %tmp.78 %tmp.79;
+        symbol [ sampleCount ? 178 12 23 ];
+        putv self :sampleCount dup %tmp.80;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 179 12 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_stop" ]
+        %sampleTimeMs.5 = local;
+        symbol [ sampleTimeMs %sampleTimeMs.5 179 16 28 ];
+        symbol [ sampleCount %tmp.82 179 31 42 ];
+        %tmp.82 = getv ? :sampleCount;
+        symbol [ SAMPLE_INTERVAL_MS %tmp.84 179 45 63 ];
+        %tmp.84 = getv ? :SAMPLE_INTERVAL_MS;
+        %tmp.85 = mul %tmp.82 %tmp.84;
+        lputv %sampleTimeMs.5 %tmp.85;
+        symbol [ sampleTimeMs %sampleTimeMs.5 179 16 28 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 180 12 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_stop" ]
+        %heartRateEvent.6 = local;
+        symbol [ heartRateEvent %heartRateEvent.6 180 16 30 ];
+        symbol [ _heartRateDemo %tmp.87 180 33 47 ];
+        %tmp.87 = getv ? :_heartRateDemo;
+        symbol [ addSample %tmp.88 180 48 57 ];
+        %tmp.88 = getv function %tmp.87 :addSample;
+        symbol [ magnitude %tmp.90 180 58 67 ];
+        %tmp.90 = getv ? :magnitude;
+        %tmp.91 = lgetv %sampleTimeMs.5;
+        symbol [ sampleTimeMs %tmp.91 180 69 81 ];
+        %tmp.92 = invoke %tmp.87 %tmp.88(%tmp.90, %tmp.91);
+        lputv %heartRateEvent.6 %tmp.92;
+        symbol [ heartRateEvent %heartRateEvent.6 180 16 30 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 181 12 ]
+        symbol [ _heartRateDemo %tmp.94 181 28 42 ];
+        %tmp.94 = getv ? :_heartRateDemo;
+        symbol [ heartRate %tmp.95 181 43 52 ];
+        %tmp.95 = getv %tmp.94 :heartRate;
+        symbol [ demoHeartRate ? 181 12 25 ];
+        putv self :demoHeartRate %tmp.95;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 182 12 ]
+        symbol [ _heartRateDemo %tmp.97 182 34 48 ];
+        %tmp.97 = getv ? :_heartRateDemo;
+        symbol [ status %tmp.98 182 49 55 ];
+        %tmp.98 = getv %tmp.97 :status;
+        symbol [ demoHeartRateStatus ? 182 12 31 ];
+        putv self :demoHeartRateStatus %tmp.98;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 184 12 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_16_184_39_begin:
+        symbol [ paired %tmp.100 184 16 22 ];
+        %tmp.100 = getv ? :paired;
+        bf %tmp.100 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_26_184_39_true:
+        symbol [ countdown %tmp.102 184 26 35 ];
+        %tmp.102 = getv ? :countdown;
+        %tmp.103 = 0;
+        %tmp.104 = eq %tmp.102 %tmp.103;
+        push %tmp.104;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_26_184_39_end:
+        %tmp.105 = phi [%tmp.100 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_16_184_39_begin] [%tmp.104 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_26_184_39_true] [%tmp.105 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_26_184_39_end];
+        bf %tmp.105 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_42_191_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 185 16 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_42_191_12_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_42_191_12_stop" ]
+        %fall.7 = local;
+        symbol [ fall %fall.7 185 20 24 ];
+        symbol [ _detector %tmp.107 185 27 36 ];
+        %tmp.107 = getv ? :_detector;
+        symbol [ addSample %tmp.108 185 37 46 ];
+        %tmp.108 = getv function %tmp.107 :addSample;
+        symbol [ magnitude %tmp.110 185 47 56 ];
+        %tmp.110 = getv ? :magnitude;
+        %tmp.111 = lgetv %sampleTimeMs.5;
+        symbol [ sampleTimeMs %tmp.111 185 58 70 ];
+        %tmp.112 = invoke %tmp.107 %tmp.108(%tmp.110, %tmp.111);
+        lputv %fall.7 %tmp.112;
+        symbol [ fall %fall.7 185 20 24 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 186 16 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_stmt:
+        %tmp.113 = lgetv %fall.7;
+        symbol [ fall %tmp.113 186 20 24 ];
+        %tmp.114 = null;
+        %tmp.115 = ne %tmp.113 %tmp.114;
+        bf %tmp.115 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_34_188_16_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 187 20 ]
+        %tmp.116 = self;
+        symbol [ beginCountdown %tmp.117 187 20 34 ];
+        %tmp.117 = getv function %tmp.116 :beginCountdown;
+        %tmp.118 = lgetv %fall.7;
+        symbol [ fall %tmp.118 187 35 39 ];
+        %tmp.119 = as %tmp.118 { (!Null) };
+        invoke %tmp.116 %tmp.117(%tmp.119);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_34_188_16_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_false:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 188 23 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_27_188_77_begin:
+        %tmp.120 = lgetv %heartRateEvent.6;
+        symbol [ heartRateEvent %tmp.120 188 27 41 ];
+        %tmp.121 = null;
+        %tmp.122 = ne %tmp.120 %tmp.121;
+        bf %tmp.122 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_53_188_77_true:
+        symbol [ status %tmp.124 188 54 60 ];
+        %tmp.124 = getv ? :status;
+        symbol [ equals %tmp.125 188 61 67 ];
+        %tmp.125 = getv function %tmp.124 :equals;
+        %tmp.126 = "SENDING";
+        %tmp.127 = invoke %tmp.124 %tmp.125(%tmp.126);
+        %tmp.128 = not %tmp.127;
+        push %tmp.128;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_53_188_77_end:
+        %tmp.129 = phi [%tmp.122 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_27_188_77_begin] [%tmp.128 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_53_188_77_true] [%tmp.129 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_53_188_77_end];
+        bf %tmp.129 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_80_190_16_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 189 20 ]
+        %tmp.130 = self;
+        symbol [ sendHeartRateAbnormal %tmp.131 189 20 41 ];
+        %tmp.131 = getv function %tmp.130 :sendHeartRateAbnormal;
+        %tmp.132 = lgetv %heartRateEvent.6;
+        symbol [ heartRateEvent %tmp.132 189 42 56 ];
+        %tmp.133 = as %tmp.132 { (!Null) };
+        invoke %tmp.130 %tmp.131(%tmp.133);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_80_190_16_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_188_23_190_16_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_186_16_190_16_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_42_191_12_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_184_12_191_12_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_47_192_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_incr:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 173 ]
+        %tmp.134 = lgetv %i.4;
+        symbol [ i %tmp.134 173 39 40 ];
+        %tmp.135 = 1;
+        %tmp.136 = add %tmp.134 %tmp.135;
+        lputv %i.4 %tmp.136;
+        symbol [ i %i.4 173 39 40 ];
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_test;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_173_8_192_8_for_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 194 8 ]
+        %tmp.137 = self;
+        symbol [ requestUpdate %tmp.138 194 8 21 ];
+        %tmp.138 = getv function %tmp.137 :requestUpdate;
+        invoke %tmp.137 %tmp.138();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_161_67_195_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 197; @symbol_functiondef = [beginCountdown,197,13,27]; @symbol_param<0> = [fall,197,28,32]; ]
+    function beginCountdown(fall) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_197_34_209_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 198 8 ]
+        %tmp.1 = lgetv %fall;
+        symbol [ fall %tmp.1 198 23 27 ];
+        symbol [ _pendingFall ? 198 8 20 ];
+        putv self :_pendingFall %tmp.1;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 199 8 ]
+        symbol [ COUNTDOWN_SEC %tmp.3 199 20 33 ];
+        %tmp.3 = getv ? :COUNTDOWN_SEC;
+        symbol [ countdown ? 199 8 17 ];
+        putv self :countdown %tmp.3;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 200 8 ]
+        %tmp.4 = "FALL?";
+        symbol [ status ? 200 8 14 ];
+        putv self :status %tmp.4;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 201 8 ]
+        %tmp.5 = self;
+        symbol [ requestUpdate %tmp.6 201 8 21 ];
+        %tmp.6 = getv function %tmp.5 :requestUpdate;
+        invoke %tmp.5 %tmp.6();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 203 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_8_205_8_if_stmt:
+        symbol [ _countdownTimer %tmp.8 203 12 27 ];
+        %tmp.8 = getv ? :_countdownTimer;
+        %tmp.9 = null;
+        %tmp.10 = ne %tmp.8 %tmp.9;
+        bf %tmp.10 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_8_205_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_8_205_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_37_205_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 204 12 ]
+        symbol [ _countdownTimer %tmp.12 204 12 27 ];
+        %tmp.12 = getv ? :_countdownTimer;
+        %tmp.13 = as %tmp.12 { (!Null) };
+        symbol [ stop %tmp.14 204 28 32 ];
+        %tmp.14 = getv function %tmp.13 :stop;
+        invoke %tmp.13 %tmp.14();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_37_205_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_8_205_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_203_8_205_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 207 8 ]
+        symbol [ Timer %tmp.17 207 30 35 ];
+        %tmp.17 = getm $.Toybox.Timer;
+        symbol [ Timer %tmp.18 207 36 41 ];
+        %tmp.18 = getv function ? %tmp.17 :Timer;
+        %tmp.15 = newc %tmp.18 ();
+        symbol [ _countdownTimer ? 207 8 23 ];
+        putv self :_countdownTimer %tmp.15;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 208 8 ]
+        symbol [ _countdownTimer %tmp.20 208 8 23 ];
+        %tmp.20 = getv ? :_countdownTimer;
+        symbol [ start %tmp.21 208 24 29 ];
+        %tmp.21 = getv function %tmp.20 :start;
+        %tmp.22 = self;
+        symbol [ method %tmp.23 208 30 36 ];
+        %tmp.23 = getv function %tmp.22 :method;
+        %tmp.25 = const :onCountdownTick;
+        symbol [ onCountdownTick %tmp.25 208 38 53 const ];
+        %tmp.26 = invoke %tmp.22 %tmp.23(%tmp.25);
+        %tmp.27 = 1000;
+        %tmp.28 = true;
+        invoke %tmp.20 %tmp.21(%tmp.26, %tmp.27, %tmp.28);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_197_34_209_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 211; @symbol_functiondef = [onCountdownTick,211,13,28]; ]
+    function onCountdownTick() as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_211_39_219_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 212 8 ]
+        symbol [ countdown %tmp.1 212 8 17 ];
+        %tmp.1 = getv self :countdown;
+        %tmp.2 = 1;
+        %tmp.3 = sub %tmp.1 %tmp.2;
+        symbol [ countdown ? 212 8 17 ];
+        putv self :countdown dup %tmp.3;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 213 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_stmt:
+        symbol [ countdown %tmp.5 213 12 21 ];
+        %tmp.5 = getv ? :countdown;
+        %tmp.6 = 0;
+        %tmp.7 = lte %tmp.5 %tmp.6;
+        bf %tmp.7 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_28_216_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 214 12 ]
+        %tmp.8 = self;
+        symbol [ stopCountdown %tmp.9 214 12 25 ];
+        %tmp.9 = getv function %tmp.8 :stopCountdown;
+        invoke %tmp.8 %tmp.9();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 215 12 ]
+        %tmp.10 = self;
+        symbol [ sendFallDetected %tmp.11 215 12 28 ];
+        %tmp.11 = getv function %tmp.10 :sendFallDetected;
+        invoke %tmp.10 %tmp.11();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_28_216_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_216_15_218_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 217 12 ]
+        %tmp.12 = self;
+        symbol [ requestUpdate %tmp.13 217 12 25 ];
+        %tmp.13 = getv function %tmp.12 :requestUpdate;
+        invoke %tmp.12 %tmp.13();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_216_15_218_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_213_8_218_8_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_211_39_219_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 221; @symbol_functiondef = [cancelCountdown,221,13,28]; ]
+    function cancelCountdown() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_221_31_231_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 222 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_8_224_8_if_stmt:
+        symbol [ countdown %tmp.2 222 12 21 ];
+        %tmp.2 = getv ? :countdown;
+        %tmp.3 = 0;
+        %tmp.4 = lte %tmp.2 %tmp.3;
+        bf %tmp.4 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_8_224_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_8_224_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_28_224_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 223 12 ]
+        %tmp.5 = false;
+        ret %tmp.5;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_28_224_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_8_224_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_222_8_224_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 225 8 ]
+        %tmp.6 = self;
+        symbol [ stopCountdown %tmp.7 225 8 21 ];
+        %tmp.7 = getv function %tmp.6 :stopCountdown;
+        invoke %tmp.6 %tmp.7();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 226 8 ]
+        %tmp.8 = "ARMED";
+        symbol [ status ? 226 8 14 ];
+        putv self :status %tmp.8;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 227 8 ]
+        %tmp.9 = null;
+        symbol [ _pendingFall ? 227 8 20 ];
+        putv self :_pendingFall %tmp.9;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 228 8 ]
+        symbol [ _detector %tmp.11 228 8 17 ];
+        %tmp.11 = getv ? :_detector;
+        symbol [ reset %tmp.12 228 18 23 ];
+        %tmp.12 = getv function %tmp.11 :reset;
+        invoke %tmp.11 %tmp.12();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 229 8 ]
+        %tmp.13 = self;
+        symbol [ requestUpdate %tmp.14 229 8 21 ];
+        %tmp.14 = getv function %tmp.13 :requestUpdate;
+        invoke %tmp.13 %tmp.14();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 230 8 ]
+        %tmp.15 = true;
+        ret %tmp.15;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_221_31_231_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 233; @symbol_functiondef = [stopCountdown,233,13,26]; ]
+    function stopCountdown() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_233_29_239_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 234 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_8_237_8_if_stmt:
+        symbol [ _countdownTimer %tmp.2 234 12 27 ];
+        %tmp.2 = getv ? :_countdownTimer;
+        %tmp.3 = null;
+        %tmp.4 = ne %tmp.2 %tmp.3;
+        bf %tmp.4 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_8_237_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_8_237_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_37_237_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 235 12 ]
+        symbol [ _countdownTimer %tmp.6 235 12 27 ];
+        %tmp.6 = getv ? :_countdownTimer;
+        %tmp.7 = as %tmp.6 { (!Null) };
+        symbol [ stop %tmp.8 235 28 32 ];
+        %tmp.8 = getv function %tmp.7 :stop;
+        invoke %tmp.7 %tmp.8();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 236 12 ]
+        %tmp.9 = null;
+        symbol [ _countdownTimer ? 236 12 27 ];
+        putv self :_countdownTimer %tmp.9;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_37_237_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_8_237_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_234_8_237_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 238 8 ]
+        %tmp.10 = 0;
+        symbol [ countdown ? 238 8 17 ];
+        putv self :countdown %tmp.10;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_233_29_239_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 241; @symbol_functiondef = [sendFallDetected,241,13,29]; ]
+    function sendFallDetected() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_241_32_271_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 242 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_12_242_39_begin:
+        symbol [ paired %tmp.2 242 13 19 ];
+        %tmp.2 = getv ? :paired;
+        %tmp.3 = not %tmp.2;
+        bt %tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_23_242_39_false:
+        symbol [ _pendingFall %tmp.5 242 23 35 ];
+        %tmp.5 = getv ? :_pendingFall;
+        %tmp.6 = null;
+        %tmp.7 = eq %tmp.5 %tmp.6;
+        push %tmp.7;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_23_242_39_end:
+        %tmp.8 = phi [%tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_12_242_39_begin] [%tmp.7 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_23_242_39_false] [%tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_23_242_39_end];
+        bf %tmp.8 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_45_249_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 243 12 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_stmt:
+        symbol [ paired %tmp.10 243 16 22 ];
+        %tmp.10 = getv ? :paired;
+        bf %tmp.10 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_else_false;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_24_245_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 244 16 ]
+        %tmp.11 = "ARMED";
+        symbol [ status ? 244 16 22 ];
+        putv self :status %tmp.11;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_24_245_12_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_else_false:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_245_19_247_12_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 246 16 ]
+        %tmp.12 = "WAIT_PAIR";
+        symbol [ status ? 246 16 22 ];
+        putv self :status %tmp.12;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_245_19_247_12_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_243_12_247_12_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 248 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_45_249_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_242_8_249_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 251 8 ]
+        %tmp.13 = "SENDING";
+        symbol [ status ? 251 8 14 ];
+        putv self :status %tmp.13;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 252 8 ]
+        %tmp.14 = self;
+        symbol [ requestUpdate %tmp.15 252 8 21 ];
+        %tmp.15 = getv function %tmp.14 :requestUpdate;
+        invoke %tmp.14 %tmp.15();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 254 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_241_32_271_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_241_32_271_4_stop" ]
+        %payload.1 = local;
+        symbol [ payload %payload.1 254 12 19 ];
+        %tmp.16 = newd 12;
+        %tmp.17 = "type";
+        %tmp.18 = "FALL_DETECTED";
+        %tmp.19 = dup %tmp.16;
+        %tmp.20 = aputv %tmp.19 %tmp.17 %tmp.18;
+        %tmp.21 = "source";
+        %tmp.22 = "garmin_fr735xt";
+        %tmp.23 = dup %tmp.20;
+        %tmp.24 = aputv %tmp.23 %tmp.21 %tmp.22;
+        %tmp.25 = "deviceIdentifier";
+        symbol [ pairCode %tmp.27 257 34 42 ];
+        %tmp.27 = getv ? :pairCode;
+        %tmp.28 = dup %tmp.24;
+        %tmp.29 = aputv %tmp.28 %tmp.25 %tmp.27;
+        %tmp.30 = "deviceId";
+        symbol [ deviceId %tmp.32 258 26 34 ];
+        %tmp.32 = getv ? :deviceId;
+        %tmp.33 = dup %tmp.29;
+        %tmp.34 = aputv %tmp.33 %tmp.30 %tmp.32;
+        %tmp.35 = "magnitude";
+        symbol [ magnitude %tmp.37 259 27 36 ];
+        %tmp.37 = getv ? :magnitude;
+        %tmp.38 = dup %tmp.34;
+        %tmp.39 = aputv %tmp.38 %tmp.35 %tmp.37;
+        %tmp.40 = "x";
+        symbol [ x %tmp.42 260 19 20 ];
+        %tmp.42 = getv ? :x;
+        %tmp.43 = dup %tmp.39;
+        %tmp.44 = aputv %tmp.43 %tmp.40 %tmp.42;
+        %tmp.45 = "y";
+        symbol [ y %tmp.47 261 19 20 ];
+        %tmp.47 = getv ? :y;
+        %tmp.48 = dup %tmp.44;
+        %tmp.49 = aputv %tmp.48 %tmp.45 %tmp.47;
+        %tmp.50 = "z";
+        symbol [ z %tmp.52 262 19 20 ];
+        %tmp.52 = getv ? :z;
+        %tmp.53 = dup %tmp.49;
+        %tmp.54 = aputv %tmp.53 %tmp.50 %tmp.52;
+        %tmp.55 = "freeFallMs";
+        symbol [ _pendingFall %tmp.57 263 28 40 ];
+        %tmp.57 = getv ? :_pendingFall;
+        %tmp.58 = "freeFallMs";
+        %tmp.59 = agetv %tmp.57 %tmp.58;
+        %tmp.60 = dup %tmp.54;
+        %tmp.61 = aputv %tmp.60 %tmp.55 %tmp.59;
+        %tmp.62 = "impactMagnitude";
+        symbol [ _pendingFall %tmp.64 264 33 45 ];
+        %tmp.64 = getv ? :_pendingFall;
+        %tmp.65 = "impactMagnitude";
+        %tmp.66 = agetv %tmp.64 %tmp.65;
+        %tmp.67 = dup %tmp.61;
+        %tmp.68 = aputv %tmp.67 %tmp.62 %tmp.66;
+        %tmp.69 = "stillSeconds";
+        symbol [ _pendingFall %tmp.71 265 30 42 ];
+        %tmp.71 = getv ? :_pendingFall;
+        %tmp.72 = "stillSeconds";
+        %tmp.73 = agetv %tmp.71 %tmp.72;
+        %tmp.74 = dup %tmp.68;
+        %tmp.75 = aputv %tmp.74 %tmp.69 %tmp.73;
+        %tmp.76 = "detectedAt";
+        symbol [ Time %tmp.77 266 28 32 ];
+        %tmp.77 = getm $.Toybox.Time;
+        symbol [ now %tmp.78 266 33 36 ];
+        %tmp.78 = getv function %tmp.77 :now;
+        %tmp.79 = invoke %tmp.77 %tmp.78();
+        symbol [ value %tmp.80 266 39 44 ];
+        %tmp.80 = getv function %tmp.79 :value;
+        %tmp.81 = invoke %tmp.79 %tmp.80();
+        %tmp.82 = dup %tmp.75;
+        %tmp.83 = aputv %tmp.82 %tmp.76 %tmp.81;
+        lputv %payload.1 %tmp.83;
+        symbol [ payload %payload.1 254 12 19 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 269 8 ]
+        symbol [ Communications %tmp.84 269 8 22 ];
+        %tmp.84 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.85 269 23 31 ];
+        %tmp.85 = getv function %tmp.84 :transmit;
+        %tmp.86 = lgetv %payload.1;
+        symbol [ payload %tmp.86 269 32 39 ];
+        %tmp.87 = newd 0;
+        symbol [ _transmitListener %tmp.89 269 45 62 ];
+        %tmp.89 = getv ? :_transmitListener;
+        invoke %tmp.84 %tmp.85(%tmp.86, %tmp.87, %tmp.89);
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 270 8 ]
+        %tmp.90 = null;
+        symbol [ _pendingFall ? 270 8 20 ];
+        putv self :_pendingFall %tmp.90;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_241_32_271_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 273; @symbol_functiondef = [sendHeartRateAbnormal,273,13,34]; @symbol_param<0> = [heartRateEvent,273,35,49]; ]
+    function sendHeartRateAbnormal(heartRateEvent) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_273_51_300_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 274 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_stmt:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_12_274_41_begin:
+        symbol [ paired %tmp.2 274 13 19 ];
+        %tmp.2 = getv ? :paired;
+        %tmp.3 = not %tmp.2;
+        bt %tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_true;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_23_274_41_false:
+        %tmp.4 = lgetv %heartRateEvent;
+        symbol [ heartRateEvent %tmp.4 274 23 37 ];
+        %tmp.5 = null;
+        %tmp.6 = eq %tmp.4 %tmp.5;
+        push %tmp.6;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_23_274_41_end:
+        %tmp.7 = phi [%tmp.3 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_12_274_41_begin] [%tmp.6 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_23_274_41_false] [%tmp.7 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_23_274_41_end];
+        bf %tmp.7 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_47_276_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 275 12 ]
+        ret ?;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_47_276_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_274_8_276_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 278 8 ]
+        %tmp.8 = "SENDING";
+        symbol [ status ? 278 8 14 ];
+        putv self :status %tmp.8;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 279 8 ]
+        %tmp.9 = self;
+        symbol [ requestUpdate %tmp.10 279 8 21 ];
+        %tmp.10 = getv function %tmp.9 :requestUpdate;
+        invoke %tmp.9 %tmp.10();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 281 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_273_51_300_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_273_51_300_4_stop" ]
+        %payload.1 = local;
+        symbol [ payload %payload.1 281 12 19 ];
+        %tmp.11 = newd 15;
+        %tmp.12 = "type";
+        %tmp.13 = "HEART_RATE_ABNORMAL";
+        %tmp.14 = dup %tmp.11;
+        %tmp.15 = aputv %tmp.14 %tmp.12 %tmp.13;
+        %tmp.16 = "source";
+        %tmp.17 = "garmin_fr735xt";
+        %tmp.18 = dup %tmp.15;
+        %tmp.19 = aputv %tmp.18 %tmp.16 %tmp.17;
+        %tmp.20 = "simulated";
+        %tmp.21 = true;
+        %tmp.22 = dup %tmp.19;
+        %tmp.23 = aputv %tmp.22 %tmp.20 %tmp.21;
+        %tmp.24 = "simulationReason";
+        %tmp.25 = "demo_motion_to_heart_rate_curve";
+        %tmp.26 = dup %tmp.23;
+        %tmp.27 = aputv %tmp.26 %tmp.24 %tmp.25;
+        %tmp.28 = "deviceIdentifier";
+        symbol [ pairCode %tmp.30 286 34 42 ];
+        %tmp.30 = getv ? :pairCode;
+        %tmp.31 = dup %tmp.27;
+        %tmp.32 = aputv %tmp.31 %tmp.28 %tmp.30;
+        %tmp.33 = "deviceId";
+        symbol [ deviceId %tmp.35 287 26 34 ];
+        %tmp.35 = getv ? :deviceId;
+        %tmp.36 = dup %tmp.32;
+        %tmp.37 = aputv %tmp.36 %tmp.33 %tmp.35;
+        %tmp.38 = "heartRate";
+        %tmp.39 = lgetv %heartRateEvent;
+        symbol [ heartRateEvent %tmp.39 288 27 41 ];
+        %tmp.40 = "heartRate";
+        %tmp.41 = agetv %tmp.39 %tmp.40;
+        %tmp.42 = dup %tmp.37;
+        %tmp.43 = aputv %tmp.42 %tmp.38 %tmp.41;
+        %tmp.44 = "thresholdHigh";
+        %tmp.45 = lgetv %heartRateEvent;
+        symbol [ heartRateEvent %tmp.45 289 31 45 ];
+        %tmp.46 = "thresholdHigh";
+        %tmp.47 = agetv %tmp.45 %tmp.46;
+        %tmp.48 = dup %tmp.43;
+        %tmp.49 = aputv %tmp.48 %tmp.44 %tmp.47;
+        %tmp.50 = "thresholdLow";
+        %tmp.51 = lgetv %heartRateEvent;
+        symbol [ heartRateEvent %tmp.51 290 30 44 ];
+        %tmp.52 = "thresholdLow";
+        %tmp.53 = agetv %tmp.51 %tmp.52;
+        %tmp.54 = dup %tmp.49;
+        %tmp.55 = aputv %tmp.54 %tmp.50 %tmp.53;
+        %tmp.56 = "durationSeconds";
+        %tmp.57 = lgetv %heartRateEvent;
+        symbol [ heartRateEvent %tmp.57 291 33 47 ];
+        %tmp.58 = "durationSeconds";
+        %tmp.59 = agetv %tmp.57 %tmp.58;
+        %tmp.60 = dup %tmp.55;
+        %tmp.61 = aputv %tmp.60 %tmp.56 %tmp.59;
+        %tmp.62 = "magnitude";
+        symbol [ magnitude %tmp.64 292 27 36 ];
+        %tmp.64 = getv ? :magnitude;
+        %tmp.65 = dup %tmp.61;
+        %tmp.66 = aputv %tmp.65 %tmp.62 %tmp.64;
+        %tmp.67 = "x";
+        symbol [ x %tmp.69 293 19 20 ];
+        %tmp.69 = getv ? :x;
+        %tmp.70 = dup %tmp.66;
+        %tmp.71 = aputv %tmp.70 %tmp.67 %tmp.69;
+        %tmp.72 = "y";
+        symbol [ y %tmp.74 294 19 20 ];
+        %tmp.74 = getv ? :y;
+        %tmp.75 = dup %tmp.71;
+        %tmp.76 = aputv %tmp.75 %tmp.72 %tmp.74;
+        %tmp.77 = "z";
+        symbol [ z %tmp.79 295 19 20 ];
+        %tmp.79 = getv ? :z;
+        %tmp.80 = dup %tmp.76;
+        %tmp.81 = aputv %tmp.80 %tmp.77 %tmp.79;
+        %tmp.82 = "detectedAt";
+        symbol [ Time %tmp.83 296 28 32 ];
+        %tmp.83 = getm $.Toybox.Time;
+        symbol [ now %tmp.84 296 33 36 ];
+        %tmp.84 = getv function %tmp.83 :now;
+        %tmp.85 = invoke %tmp.83 %tmp.84();
+        symbol [ value %tmp.86 296 39 44 ];
+        %tmp.86 = getv function %tmp.85 :value;
+        %tmp.87 = invoke %tmp.85 %tmp.86();
+        %tmp.88 = dup %tmp.81;
+        %tmp.89 = aputv %tmp.88 %tmp.82 %tmp.87;
+        lputv %payload.1 %tmp.89;
+        symbol [ payload %payload.1 281 12 19 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 299 8 ]
+        symbol [ Communications %tmp.90 299 8 22 ];
+        %tmp.90 = getm $.Toybox.Communications;
+        symbol [ transmit %tmp.91 299 23 31 ];
+        %tmp.91 = getv function %tmp.90 :transmit;
+        %tmp.92 = lgetv %payload.1;
+        symbol [ payload %tmp.92 299 32 39 ];
+        %tmp.93 = newd 0;
+        symbol [ _transmitListener %tmp.95 299 45 62 ];
+        %tmp.95 = getv ? :_transmitListener;
+        invoke %tmp.90 %tmp.91(%tmp.92, %tmp.93, %tmp.95);
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_273_51_300_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 302; @symbol_functiondef = [onTransmitComplete,302,13,31]; ]
+    function onTransmitComplete() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_302_34_306_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 303 8 ]
+        %tmp.1 = "SENT";
+        symbol [ status ? 303 8 14 ];
+        putv self :status %tmp.1;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 304 8 ]
+        %tmp.2 = "phone ok";
+        symbol [ lastSendStatus ? 304 8 22 ];
+        putv self :lastSendStatus %tmp.2;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 305 8 ]
+        %tmp.3 = self;
+        symbol [ requestUpdate %tmp.4 305 8 21 ];
+        %tmp.4 = getv function %tmp.3 :requestUpdate;
+        invoke %tmp.3 %tmp.4();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_302_34_306_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 308; @symbol_functiondef = [onTransmitError,308,13,28]; ]
+    function onTransmitError() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_308_31_312_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 309 8 ]
+        %tmp.1 = "SEND_ERR";
+        symbol [ status ? 309 8 14 ];
+        putv self :status %tmp.1;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 310 8 ]
+        %tmp.2 = "phone error";
+        symbol [ lastSendStatus ? 310 8 22 ];
+        putv self :lastSendStatus %tmp.2;
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 311 8 ]
+        %tmp.3 = self;
+        symbol [ requestUpdate %tmp.4 311 8 21 ];
+        %tmp.4 = getv function %tmp.3 :requestUpdate;
+        invoke %tmp.3 %tmp.4();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_308_31_312_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 314; @symbol_functiondef = [requestUpdate,314,21,34]; ]
+    private
+    function requestUpdate() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_314_37_318_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 315 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_8_317_8_if_stmt:
+        symbol [ _view %tmp.2 315 12 17 ];
+        %tmp.2 = getv ? :_view;
+        %tmp.3 = null;
+        %tmp.4 = ne %tmp.2 %tmp.3;
+        bf %tmp.4 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_8_317_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_8_317_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_27_317_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 316 12 ]
+        symbol [ WatchUi %tmp.5 316 12 19 ];
+        %tmp.5 = getm $.Toybox.WatchUi;
+        symbol [ requestUpdate %tmp.6 316 20 33 ];
+        %tmp.6 = getv function %tmp.5 :requestUpdate;
+        invoke %tmp.5 %tmp.6();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_27_317_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_8_317_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_315_8_317_8_if_end:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_314_37_318_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 320; @symbol_functiondef = [makePairCode,320,21,33]; ]
+    private
+    function makePairCode() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 321 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_stop" ]
+        %alphabet.1 = local;
+        symbol [ alphabet %alphabet.1 321 12 20 ];
+        %tmp.1 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        lputv %alphabet.1 %tmp.1;
+        symbol [ alphabet %alphabet.1 321 12 20 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 322 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_stop" ]
+        %seed.2 = local;
+        symbol [ seed %seed.2 322 12 16 ];
+        symbol [ Time %tmp.2 322 19 23 ];
+        %tmp.2 = getm $.Toybox.Time;
+        symbol [ now %tmp.3 322 24 27 ];
+        %tmp.3 = getv function %tmp.2 :now;
+        %tmp.4 = invoke %tmp.2 %tmp.3();
+        symbol [ value %tmp.5 322 30 35 ];
+        %tmp.5 = getv function %tmp.4 :value;
+        %tmp.6 = invoke %tmp.4 %tmp.5();
+        lputv %seed.2 %tmp.6;
+        symbol [ seed %seed.2 322 12 16 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 323 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_stop" ]
+        %suffix.3 = local;
+        symbol [ suffix %suffix.3 323 12 18 ];
+        %tmp.7 = "";
+        lputv %suffix.3 %tmp.7;
+        symbol [ suffix %suffix.3 323 12 18 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 324 8 ]
+        for @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_test @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_incr @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_init:
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_begin" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_end" ]
+        %i.4 = local;
+        symbol [ i %i.4 324 17 18 ];
+        %tmp.8 = 0;
+        lputv %i.4 %tmp.8;
+        symbol [ i %i.4 324 17 18 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_test:
+        %tmp.9 = lgetv %i.4;
+        symbol [ i %tmp.9 324 24 25 ];
+        %tmp.10 = 6;
+        %tmp.11 = lt %tmp.9 %tmp.10;
+        bf %tmp.11 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_begin:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_39_328_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 325 12 ]
+        %tmp.12 = lgetv %seed.2;
+        symbol [ seed %tmp.12 325 21 25 ];
+        %tmp.13 = 1103515245;
+        %tmp.14 = mul %tmp.12 %tmp.13;
+        %tmp.15 = 12345;
+        %tmp.16 = add %tmp.14 %tmp.15;
+        %tmp.17 = 2147483647;
+        %tmp.18 = mod %tmp.16 %tmp.17;
+        lputv %seed.2 %tmp.18;
+        symbol [ seed %seed.2 325 12 16 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 326 12 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_39_328_8_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_39_328_8_stop" ]
+        %idx.5 = local;
+        symbol [ idx %idx.5 326 16 19 ];
+        %tmp.19 = lgetv %seed.2;
+        symbol [ seed %tmp.19 326 22 26 ];
+        %tmp.20 = lgetv %alphabet.1;
+        symbol [ alphabet %tmp.20 326 29 37 ];
+        symbol [ length %tmp.21 326 38 44 ];
+        %tmp.21 = getv function %tmp.20 :length;
+        %tmp.22 = invoke %tmp.20 %tmp.21();
+        %tmp.23 = mod %tmp.19 %tmp.22;
+        lputv %idx.5 %tmp.23;
+        symbol [ idx %idx.5 326 16 19 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 327 12 ]
+        %tmp.24 = lgetv %suffix.3;
+        symbol [ suffix %tmp.24 327 12 18 ];
+        %tmp.25 = lgetv %alphabet.1;
+        symbol [ alphabet %tmp.25 327 22 30 ];
+        symbol [ substring %tmp.26 327 31 40 ];
+        %tmp.26 = getv function %tmp.25 :substring;
+        %tmp.27 = lgetv %idx.5;
+        symbol [ idx %tmp.27 327 41 44 ];
+        %tmp.28 = lgetv %idx.5;
+        symbol [ idx %tmp.28 327 46 49 ];
+        %tmp.29 = 1;
+        %tmp.30 = add %tmp.28 %tmp.29;
+        %tmp.31 = invoke %tmp.25 %tmp.26(%tmp.27, %tmp.30);
+        %tmp.32 = add %tmp.24 %tmp.31;
+        lputv %suffix.3 %tmp.32;
+        symbol [ suffix %suffix.3 327 12 18 ];
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_39_328_8_stop:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_incr:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 324 ]
+        %tmp.33 = lgetv %i.4;
+        symbol [ i %tmp.33 324 31 32 ];
+        %tmp.34 = 1;
+        %tmp.35 = add %tmp.33 %tmp.34;
+        lputv %i.4 %tmp.35;
+        symbol [ i %i.4 324 31 32 ];
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_test;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_324_8_328_8_for_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 329 8 ]
+        %tmp.36 = "FCG-735XT-";
+        %tmp.37 = lgetv %suffix.3;
+        symbol [ suffix %tmp.37 329 30 36 ];
+        %tmp.38 = add %tmp.36 %tmp.37;
+        ret %tmp.38;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_320_36_330_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 332; @symbol_functiondef = [valueOf,332,21,28]; @symbol_param<0> = [data,332,29,33]; @symbol_param<1> = [key,332,35,38]; ]
+    private
+    function valueOf(data, key) {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_332_40_344_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 333 8 ]
+        [ "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_332_40_344_4_start" "D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_332_40_344_4_stop" ]
+        %value.1 = local;
+        symbol [ value %value.1 333 12 17 ];
+        %tmp.1 = lgetv %data;
+        symbol [ data %tmp.1 333 20 24 ];
+        %tmp.2 = lgetv %key;
+        symbol [ key %tmp.2 333 25 28 ];
+        %tmp.3 = agetv %tmp.1 %tmp.2;
+        lputv %value.1 %tmp.3;
+        symbol [ value %value.1 333 12 17 ];
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 334 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_8_336_8_if_stmt:
+        %tmp.4 = lgetv %value.1;
+        symbol [ value %tmp.4 334 12 17 ];
+        %tmp.5 = null;
+        %tmp.6 = ne %tmp.4 %tmp.5;
+        bf %tmp.6 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_8_336_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_8_336_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_27_336_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 335 12 ]
+        %tmp.7 = lgetv %value.1;
+        symbol [ value %tmp.7 335 19 24 ];
+        %tmp.8 = as %tmp.7 { (!Null) };
+        ret %tmp.8;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_27_336_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_8_336_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_334_8_336_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 337 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_8_339_8_if_stmt:
+        %tmp.9 = lgetv %key;
+        symbol [ key %tmp.9 337 12 15 ];
+        symbol [ equals %tmp.10 337 16 22 ];
+        %tmp.10 = getv function %tmp.9 :equals;
+        %tmp.11 = "deviceId";
+        %tmp.12 = invoke %tmp.9 %tmp.10(%tmp.11);
+        bf %tmp.12 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_8_339_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_8_339_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_36_339_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 338 12 ]
+        %tmp.13 = lgetv %data;
+        symbol [ data %tmp.13 338 19 23 ];
+        %tmp.15 = const :deviceId;
+        symbol [ deviceId %tmp.15 338 25 33 const ];
+        %tmp.16 = agetv %tmp.13 %tmp.15;
+        ret %tmp.16;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_36_339_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_8_339_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_337_8_339_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 340 8 ]
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_8_342_8_if_stmt:
+        %tmp.17 = lgetv %key;
+        symbol [ key %tmp.17 340 12 15 ];
+        symbol [ equals %tmp.18 340 16 22 ];
+        %tmp.18 = getv function %tmp.17 :equals;
+        %tmp.19 = "memberName";
+        %tmp.20 = invoke %tmp.17 %tmp.18(%tmp.19);
+        bf %tmp.20 @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_8_342_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_8_342_8_if_true:
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_38_342_8_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 341 12 ]
+        %tmp.21 = lgetv %data;
+        symbol [ data %tmp.21 341 19 23 ];
+        %tmp.23 = const :memberName;
+        symbol [ memberName %tmp.23 341 25 35 const ];
+        %tmp.24 = agetv %tmp.21 %tmp.23;
+        ret %tmp.24;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_38_342_8_stop:
+        goto @D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_8_342_8_if_end;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_340_8_342_8_if_end:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 343 8 ]
+        %tmp.25 = null;
+        ret %tmp.25;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_332_40_344_4_stop:
+    }
+}
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 347; @symbol_classdef = [FamilyCareTransmitListener,347,6,32]; @symbol_extends<0> = [Communications,347,41,55]; @symbol_extends<1> = [ConnectionListener,347,56,74]; ]
+class FamilyCareTransmitListener extends Communications.ConnectionListener {
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 347; ]
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 347; ]
+    static
+    <init> {
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 348; @position = 16; @symbol_vardef = [_model,348,16,22]; ]
+    private
+    var _model;
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 350; @symbol_functiondef = [initialize,350,13,23]; @symbol_param<0> = [model,350,24,29]; ]
+    function initialize(model) as Void {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_350_31_353_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 351 8 ]
+        symbol [ ConnectionListener %tmp.2 351 8 26 ];
+        %tmp.2 = getv ? :ConnectionListener;
+        symbol [ initialize %tmp.3 351 27 37 ];
+        %tmp.3 = getv function %tmp.2 :initialize;
+        invoke %tmp.2 %tmp.3();
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 352 8 ]
+        %tmp.4 = lgetv %model;
+        symbol [ model %tmp.4 352 17 22 ];
+        symbol [ _model ? 352 8 14 ];
+        putv self :_model %tmp.4;
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_350_31_353_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 355; @symbol_functiondef = [onComplete,355,13,23]; ]
+    function onComplete() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_355_26_357_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 356 8 ]
+        symbol [ _model %tmp.2 356 8 14 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ onTransmitComplete %tmp.3 356 15 33 ];
+        %tmp.3 = getv function %tmp.2 :onTransmitComplete;
+        invoke %tmp.2 %tmp.3();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_355_26_357_4_stop:
+    }
+    [ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 359; @symbol_functiondef = [onError,359,13,20]; ]
+    function onError() {
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_359_23_361_4_start:
+[ "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc" 360 8 ]
+        symbol [ _model %tmp.2 360 8 14 ];
+        %tmp.2 = getv ? :_model;
+        symbol [ onTransmitError %tmp.3 360 15 30 ];
+        %tmp.3 = getv function %tmp.2 :onTransmitError;
+        invoke %tmp.2 %tmp.3();
+D__Code_SEP490_FAMILY_CARE_DIGITAL_MANAGEMENT_garmin_watch_app_source_FamilyCareModel_mc_359_23_361_4_stop:
+    }
+}
+[ @file = "D:\Code\SEP490\FAMILY_CARE_DIGITAL_MANAGEMENT\garmin\watch-app\source\FamilyCareModel.mc"; @line = 1; ]
+<init> {
+}

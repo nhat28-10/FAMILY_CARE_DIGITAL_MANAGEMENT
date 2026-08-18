@@ -125,7 +125,10 @@ class FamilyCareModel {
 
     function onPhoneMessage(msg as Communications.PhoneAppMessage) as Void {
         var data = msg.data;
+        lastSendStatus = "phone msg";
         if (!(data instanceof Dictionary)) {
+            status = "PHONE_NOT_DICT";
+            requestUpdate();
             return;
         }
 
@@ -133,8 +136,13 @@ class FamilyCareModel {
         if (type == null) {
             type = data[:type];
         }
+        if (type == null) {
+            status = "PHONE_NO_TYPE";
+            requestUpdate();
+            return;
+        }
 
-        if (type != null && type.equals("PAIR_CONFIRMED")) {
+        if (type.equals("PAIR_CONFIRMED")) {
             paired = true;
             deviceId = valueOf(data, "deviceId");
             memberName = valueOf(data, "memberName");
@@ -143,6 +151,9 @@ class FamilyCareModel {
                 Application.getApp().setProperty(PROP_DEVICE_ID, deviceId);
             }
             status = "ARMED";
+            requestUpdate();
+        } else {
+            status = "PHONE_OTHER";
             requestUpdate();
         }
     }
@@ -319,7 +330,17 @@ class FamilyCareModel {
     }
 
     private function valueOf(data, key) {
-        return data[key];
+        var value = data[key];
+        if (value != null) {
+            return value;
+        }
+        if (key.equals("deviceId")) {
+            return data[:deviceId];
+        }
+        if (key.equals("memberName")) {
+            return data[:memberName];
+        }
+        return null;
     }
 }
 
