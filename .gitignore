@@ -66,3 +66,6 @@ scripts/render-unit-test-preview.ps1
 scripts/render-unit-test-preview-png.ps1
 scripts/rebuild_backend_unit_test_like_sample.ps1
 scripts/rebuild_backend_unit_test_workbook.ps1
+
+
+bin/

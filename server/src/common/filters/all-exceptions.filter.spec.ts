@@ -2,6 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 
 import { AllExceptionsFilter } from './all-exceptions.filter';
+import { FeatureNotAvailableException } from '../../modules/subscriptions/feature-not-available.exception';
 
 function hostWith() {
   const json = jest.fn();
@@ -36,6 +37,21 @@ describe('AllExceptionsFilter', () => {
       success: false,
       statusCode: 409,
       message: 'Email đã được sử dụng',
+    });
+  });
+
+  it('tra ve dung contract feature locked cho FE', () => {
+    const { host, json } = hostWith();
+    filter.catch(
+      new FeatureNotAvailableException('calendar.recurringEvents'),
+      host,
+    );
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      statusCode: HttpStatus.FORBIDDEN,
+      message: 'Tính năng yêu cầu nâng cấp gói.',
+      code: 'FEATURE_LOCKED',
+      featureKey: 'calendar.recurringEvents',
     });
   });
 
