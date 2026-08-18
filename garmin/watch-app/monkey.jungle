@@ -1,0 +1,8 @@
+project.manifest = manifest.xml
+
+base.sourcePath = source
+base.resourcePath = resources
+base.excludeAnnotations = debug
+
+fr735xt.sourcePath = source
+fr735xt.resourcePath = resources
