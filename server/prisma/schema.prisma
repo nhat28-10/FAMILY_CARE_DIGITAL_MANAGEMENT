@@ -1277,6 +1277,12 @@ enum SosSourceType {
   SIMULATED_DEVICE
 }
 
+/// Why a SOS alert was triggered.
+enum SosTriggerReason {
+  MANUAL
+  FALL_DETECTION
+}
+
 /// Lifecycle of a SOS alert.
 enum SosAlertStatus {
   ACTIVE
@@ -1464,22 +1470,23 @@ model WearableActivationSession {
 
 /// Central SOS alert record. Resolved/canceled only by FAMILY_MANAGER/DEPUTY.
 model SosAlert {
-  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
-  workspaceId         String         @map("workspace_id")
-  triggeredByMemberId String         @map("triggered_by_member_id")
-  deviceId            String?        @map("device_id") @db.Uuid
-  sourceType          SosSourceType  @map("source_type")
-  status              SosAlertStatus @default(ACTIVE) @map("status")
-  severity            SosSeverity?   @map("severity")
-  initialLatitude     Decimal?       @map("initial_latitude") @db.Decimal(10, 7)
-  initialLongitude    Decimal?       @map("initial_longitude") @db.Decimal(10, 7)
-  message             String?        @map("message")
-  triggeredAt         DateTime       @default(now()) @map("triggered_at") @db.Timestamptz
-  resolvedByMemberId  String?        @map("resolved_by_member_id")
-  resolvedAt          DateTime?      @map("resolved_at") @db.Timestamptz
-  resolutionNote      String?        @map("resolution_note")
-  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @map("sos_alert_id") @db.Uuid
+  workspaceId         String           @map("workspace_id")
+  triggeredByMemberId String           @map("triggered_by_member_id")
+  deviceId            String?          @map("device_id") @db.Uuid
+  sourceType          SosSourceType    @map("source_type")
+  triggerReason       SosTriggerReason @default(MANUAL) @map("trigger_reason")
+  status              SosAlertStatus   @default(ACTIVE) @map("status")
+  severity            SosSeverity?     @map("severity")
+  initialLatitude     Decimal?         @map("initial_latitude") @db.Decimal(10, 7)
+  initialLongitude    Decimal?         @map("initial_longitude") @db.Decimal(10, 7)
+  message             String?          @map("message")
+  triggeredAt         DateTime         @default(now()) @map("triggered_at") @db.Timestamptz
+  resolvedByMemberId  String?          @map("resolved_by_member_id")
+  resolvedAt          DateTime?        @map("resolved_at") @db.Timestamptz
+  resolutionNote      String?          @map("resolution_note")
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   workspace         Family          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   triggeredByMember FamilyMember    @relation("TriggeredSosAlerts", fields: [triggeredByMemberId], references: [id], onDelete: Cascade)
@@ -1904,10 +1911,10 @@ model Call {
   /// 'hangup' | 'timeout' | 'all_left'.
   endedReason         String?    @map("ended_reason")
 
-  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  initiatedByMember  FamilyMember @relation("InitiatedCalls", fields: [initiatedByMemberId], references: [id], onDelete: Restrict)
-  participants       CallParticipant[]
-  relatedMessages    Message[]
+  conversation      Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiatedByMember FamilyMember      @relation("InitiatedCalls", fields: [initiatedByMemberId], references: [id], onDelete: Restrict)
+  participants      CallParticipant[]
+  relatedMessages   Message[]
 
   @@index([conversationId, startedAt])
   @@map("calls")
@@ -2078,11 +2085,11 @@ model AlbumMedia {
   latestModerationJobId  String?               @map("latest_moderation_job_id") @db.Uuid
   moderationQueuedAt     DateTime?             @map("moderation_queued_at") @db.Timestamptz
 
-  workspace        Family        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace          Family            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   collection         AlbumCollection?  @relation("AlbumCollectionMedia", fields: [collectionId], references: [id], onDelete: SetNull)
   coveredCollections AlbumCollection[] @relation("AlbumCollectionCover")
-  uploadedByMember FamilyMember  @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
-  deletedByMember  FamilyMember? @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
+  uploadedByMember   FamilyMember      @relation("UploadedAlbumMedia", fields: [uploadedByMemberId], references: [id], onDelete: Cascade)
+  deletedByMember    FamilyMember?     @relation("DeletedAlbumMedia", fields: [deletedByMemberId], references: [id], onDelete: SetNull)
 
   tags             AlbumMediaTag[]
   moderationChecks MediaModerationCheck[]

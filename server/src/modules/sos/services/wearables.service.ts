@@ -14,6 +14,7 @@ import {
   SosAlertStatus,
   SosSeverity,
   SosSourceType,
+  SosTriggerReason,
   WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
@@ -305,6 +306,10 @@ export class WearablesService {
           device.deviceType === WearableDeviceType.SIMULATED_DEVICE
             ? SosSourceType.SIMULATED_DEVICE
             : SosSourceType.WEARABLE,
+        triggerReason:
+          dto.eventType === SensorEventType.FALL_DETECTED
+            ? SosTriggerReason.FALL_DETECTION
+            : SosTriggerReason.MANUAL,
         severity: dto.severity ?? this.defaultSeverityForEvent(dto.eventType),
         message:
           dto.eventType === SensorEventType.HEART_RATE_ABNORMAL

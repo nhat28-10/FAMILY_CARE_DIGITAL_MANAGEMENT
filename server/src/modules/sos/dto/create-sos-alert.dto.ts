@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { SosSeverity, SosSourceType } from '@prisma/client';
+import { SosSeverity, SosSourceType, SosTriggerReason } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -20,6 +20,15 @@ export class CreateSosAlertDto {
   @IsOptional()
   @IsEnum(SosSourceType)
   sourceType?: SosSourceType;
+
+  @ApiPropertyOptional({
+    enum: SosTriggerReason,
+    default: SosTriggerReason.MANUAL,
+    description: 'Lý do kích hoạt SOS',
+  })
+  @IsOptional()
+  @IsEnum(SosTriggerReason)
+  triggerReason?: SosTriggerReason;
 
   @ApiPropertyOptional({ enum: SosSeverity })
   @IsOptional()

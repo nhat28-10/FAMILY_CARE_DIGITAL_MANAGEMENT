@@ -9,6 +9,7 @@ import {
   SensorEventType,
   SosSeverity,
   SosSourceType,
+  SosTriggerReason,
   WearableActivationStatus,
   WearableDeviceType,
 } from '@prisma/client';
@@ -348,7 +349,10 @@ describe('WearablesService', () => {
       expect(sosService.trigger).toHaveBeenCalledWith(
         workspaceId,
         owner.id,
-        expect.objectContaining({ sourceType: SosSourceType.WEARABLE }),
+        expect.objectContaining({
+          sourceType: SosSourceType.WEARABLE,
+          triggerReason: SosTriggerReason.MANUAL,
+        }),
         pairedDevice.id,
       );
       expect(prisma.sensorEvent.update).toHaveBeenCalledWith(
@@ -390,7 +394,15 @@ describe('WearablesService', () => {
         },
       );
 
-      expect(sosService.trigger).toHaveBeenCalled();
+      expect(sosService.trigger).toHaveBeenCalledWith(
+        workspaceId,
+        owner.id,
+        expect.objectContaining({
+          sourceType: SosSourceType.WEARABLE,
+          triggerReason: SosTriggerReason.FALL_DETECTION,
+        }),
+        pairedDevice.id,
+      );
       expect(result.alertCreated).toBe(true);
     });
 

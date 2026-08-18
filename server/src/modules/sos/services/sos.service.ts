@@ -15,6 +15,7 @@ import {
   SosAlertStatus,
   SosResponseType,
   SosSourceType,
+  SosTriggerReason,
 } from '@prisma/client';
 
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -130,10 +131,13 @@ export class SosService {
     }
 
     const sourceType = dto.sourceType ?? SosSourceType.MOBILE_APP;
-    // Wearable/simulated triggers are exempt: the device may have no GPS fix.
+    const triggerReason = dto.triggerReason ?? SosTriggerReason.MANUAL;
+    // Wearable/simulated/fall-detection triggers are exempt: the device may
+    // have no GPS fix, but the emergency alert should still be created.
     if (
       settings.locationRequired &&
       sourceType === SosSourceType.MOBILE_APP &&
+      triggerReason === SosTriggerReason.MANUAL &&
       (dto.initialLatitude == null || dto.initialLongitude == null)
     ) {
       throw new BadRequestException(
@@ -147,6 +151,7 @@ export class SosService {
         triggeredByMemberId: memberId,
         deviceId: deviceId ?? null,
         sourceType,
+        triggerReason,
         severity: dto.severity ?? null,
         initialLatitude: dto.initialLatitude ?? null,
         initialLongitude: dto.initialLongitude ?? null,

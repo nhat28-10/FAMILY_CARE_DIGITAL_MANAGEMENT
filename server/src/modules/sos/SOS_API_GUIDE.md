@@ -51,9 +51,10 @@ resolve/cancel.
 
 ### 2.1 Kích hoạt SOS
 `POST /alerts` — mọi field đều optional, **trừ khi** cài đặt gia đình bật
-`locationRequired` (mặc định **bật**): khi đó kích hoạt từ app (`sourceType`
-`MOBILE_APP`) bắt buộc gửi `initialLatitude` + `initialLongitude` (400 nếu thiếu).
-Nguồn `WEARABLE`/`SIMULATED_DEVICE` được miễn (thiết bị có thể chưa có GPS fix).
+`locationRequired` (mặc định **bật**): khi đó kích hoạt thủ công từ app (`sourceType`
+`MOBILE_APP`, `triggerReason` mặc định `MANUAL`) bắt buộc gửi `initialLatitude` +
+`initialLongitude` (400 nếu thiếu). Nguồn `WEARABLE`/`SIMULATED_DEVICE`, hoặc
+`triggerReason = FALL_DETECTION`, được miễn vì thiết bị có thể chưa có GPS fix.
 Nếu gia đình tắt SOS (`isEnabled=false`) → 400 `"Tính năng SOS của gia đình đang bị tắt"`.
 
 **Bấm lặp là idempotent**: nếu bạn đang có cảnh báo ACTIVE, `POST /alerts` trả về
@@ -64,12 +65,18 @@ không cần phân biệt mới/cũ.
 ```json
 {
   "sourceType": "MOBILE_APP",        // MOBILE_APP | WEARABLE | SIMULATED_DEVICE (default MOBILE_APP)
+  "triggerReason": "MANUAL",         // MANUAL | FALL_DETECTION (default MANUAL)
   "severity": "HIGH",                // LOW | MEDIUM | HIGH | CRITICAL
   "initialLatitude": 10.762622,      // [-90, 90]
   "initialLongitude": 106.660172,    // [-180, 180]
   "message": "Tôi cần giúp đỡ khẩn cấp"
 }
 ```
+
+Mobile native fall detection dùng cùng endpoint, nhưng gửi `triggerReason:
+FALL_DETECTION`. Khi `triggerReason = FALL_DETECTION`, backend vẫn tạo SOS nếu
+chưa có GPS fix ban đầu; FE nên gửi `initialLatitude` + `initialLongitude` nếu
+lấy được, còn nếu không thì có thể để trống và ghi rõ trong `message`.
 
 `data` trả về: alert đầy đủ — `id`, `status: "ACTIVE"`, `triggeredByMember`
 (kèm `user.fullName/avatarUrl`), `responses[]`, `locationPoints[]`, `triggeredAt`.

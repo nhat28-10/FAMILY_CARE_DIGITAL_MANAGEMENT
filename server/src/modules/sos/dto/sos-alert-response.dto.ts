@@ -6,6 +6,7 @@ import {
   SosResponseType,
   SosSeverity,
   SosSourceType,
+  SosTriggerReason,
   WearableDeviceType,
 } from '@prisma/client';
 
@@ -147,6 +148,9 @@ export class SosAlertResponseDto {
   @ApiProperty({ enum: SosSourceType })
   sourceType!: SosSourceType;
 
+  @ApiProperty({ enum: SosTriggerReason })
+  triggerReason!: SosTriggerReason;
+
   @ApiProperty({ enum: SosAlertStatus })
   status!: SosAlertStatus;
 
@@ -219,6 +223,9 @@ export class SosAlertListItemResponseDto {
 
   @ApiProperty({ enum: SosSourceType })
   sourceType!: SosSourceType;
+
+  @ApiProperty({ enum: SosTriggerReason })
+  triggerReason!: SosTriggerReason;
 
   @ApiProperty({ enum: SosAlertStatus })
   status!: SosAlertStatus;
