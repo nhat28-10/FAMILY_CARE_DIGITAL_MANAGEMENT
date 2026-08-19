@@ -558,6 +558,7 @@ describe('AiActionsService', () => {
       'task-1',
       member.id,
       { assignedToMemberId: 'member-2' },
+      member.familyRole,
     );
   });
 

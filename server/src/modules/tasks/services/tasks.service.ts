@@ -78,6 +78,7 @@ import { TaskProofDto } from '../dto/task-proof.dto';
 import { TaskQueryDto } from '../dto/task-query.dto';
 import { TaskSubmissionQueryDto } from '../dto/task-submission-query.dto';
 import { UploadTaskProofQueryDto } from '../dto/upload-task-proof-query.dto';
+import { UpdateTaskAssignmentDto } from '../dto/update-task-assignment.dto';
 import { UpdateTaskProofDto } from '../dto/update-task-proof.dto';
 import { UpdateRewardSettingDto } from '../dto/update-reward-setting.dto';
 import { UpdateTaskScheduleDto } from '../dto/update-task-schedule.dto';
@@ -1106,13 +1107,24 @@ export class TasksService {
     return this.mapTaskResponse(updatedTask);
   }
 
-  async cancelTask(familyId: string, taskId: string) {
+  async cancelTask(
+    familyId: string,
+    taskId: string,
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, familyId },
     });
     if (!task) {
       throw new NotFoundException('Không tìm thấy công việc');
     }
+
+    await this.assertDeputyNotAssignedToTask(
+      taskId,
+      currentMemberId,
+      familyRole,
+    );
 
     const updatedTask = await this.prisma.task.update({
       where: { id: taskId },
@@ -1127,6 +1139,7 @@ export class TasksService {
     taskId: string,
     assignedByMemberId: string,
     dto: CreateTaskAssignmentDto,
+    familyRole?: FamilyRole,
   ) {
     this.assertValidTimeRange(dto.startAt, dto.dueAt);
 
@@ -1135,6 +1148,11 @@ export class TasksService {
     await this.assertAssignableFamilyMemberInFamily(
       familyId,
       dto.assignedToMemberId,
+    );
+    this.assertDeputyNotSelfAssignedMember(
+      dto.assignedToMemberId,
+      assignedByMemberId,
+      familyRole,
     );
     await this.assertNoActiveDuplicateAssignment(task, dto.assignedToMemberId);
 
@@ -1268,6 +1286,72 @@ export class TasksService {
     return this.mapAssignmentResponse(assignment, { includeTask: true });
   }
 
+  async updateTaskAssignment(
+    familyId: string,
+    assignmentId: string,
+    currentMemberId: string,
+    familyRole: FamilyRole,
+    dto: UpdateTaskAssignmentDto,
+  ) {
+    if (dto.startAt === undefined && dto.dueAt === undefined) {
+      throw new BadRequestException(
+        'Can cap nhat it nhat mot trong hai truong startAt hoac dueAt',
+      );
+    }
+
+    const assignment = await this.findAssignmentInFamily(
+      familyId,
+      assignmentId,
+    );
+    if (!assignment) {
+      throw new NotFoundException(
+        'KhÃ´ng tÃ¬m tháº¥y phÃ¢n cÃ´ng cÃ´ng viá»‡c',
+      );
+    }
+
+    this.assertDeputyNotSelfAssignedAssignment(
+      assignment,
+      currentMemberId,
+      familyRole,
+    );
+
+    const updatableStatuses: TaskAssignmentStatus[] = [
+      TaskAssignmentStatus.ASSIGNED,
+      TaskAssignmentStatus.IN_PROGRESS,
+      TaskAssignmentStatus.REJECTED,
+    ];
+    if (!updatableStatuses.includes(assignment.status)) {
+      throw new BadRequestException(
+        'Chi co the cap nhat thoi han khi phan cong dang duoc giao, dang thuc hien hoac bi tu choi',
+      );
+    }
+
+    const nextStartAt =
+      dto.startAt === undefined
+        ? assignment.startAt
+        : dto.startAt
+          ? new Date(dto.startAt)
+          : null;
+    const nextDueAt =
+      dto.dueAt === undefined
+        ? assignment.dueAt
+        : dto.dueAt
+          ? new Date(dto.dueAt)
+          : null;
+    this.assertValidAssignmentTimeRange(nextStartAt, nextDueAt);
+
+    const updatedAssignment = await this.prisma.taskAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        startAt: dto.startAt === undefined ? undefined : nextStartAt,
+        dueAt: dto.dueAt === undefined ? undefined : nextDueAt,
+      },
+      select: assignmentWithTaskResponseSelect,
+    });
+
+    return this.mapAssignmentResponse(updatedAssignment, { includeTask: true });
+  }
+
   async startTaskAssignment(
     familyId: string,
     assignmentId: string,
@@ -1299,7 +1383,12 @@ export class TasksService {
     return this.mapAssignmentResponse(updatedAssignment);
   }
 
-  async cancelTaskAssignment(familyId: string, assignmentId: string) {
+  async cancelTaskAssignment(
+    familyId: string,
+    assignmentId: string,
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
     const assignment = await this.findAssignmentInFamily(
       familyId,
       assignmentId,
@@ -1307,6 +1396,11 @@ export class TasksService {
     if (!assignment) {
       throw new NotFoundException('Không tìm thấy phân công công việc');
     }
+    this.assertDeputyNotSelfAssignedAssignment(
+      assignment,
+      currentMemberId,
+      familyRole,
+    );
     if (assignment.status === TaskAssignmentStatus.APPROVED) {
       throw new BadRequestException(
         'Không thể hủy phân công đã được duyệt hoàn thành',
@@ -1326,6 +1420,7 @@ export class TasksService {
     assignmentId: string,
     assignedByMemberId: string,
     dto: ReassignTaskDto,
+    familyRole?: FamilyRole,
   ) {
     this.assertValidTimeRange(dto.startAt, dto.dueAt);
 
@@ -1346,6 +1441,17 @@ export class TasksService {
       familyId,
       dto.assignedToMemberId,
     );
+    this.assertDeputyNotSelfAssignedAssignment(
+      assignment,
+      assignedByMemberId,
+      familyRole,
+    );
+    this.assertDeputyNotSelfAssignedMember(
+      dto.assignedToMemberId,
+      assignedByMemberId,
+      familyRole,
+    );
+
     await this.assertNoActiveDuplicateAssignment(
       assignment.task,
       dto.assignedToMemberId,
@@ -1664,6 +1770,7 @@ export class TasksService {
     taskId: string,
     _currentMemberId: string,
     dto: CreateRewardSettingDto,
+    familyRole?: FamilyRole,
   ) {
     this.assertValidRewardSettingPayload(dto);
 
@@ -1687,15 +1794,31 @@ export class TasksService {
       throw new ConflictException('Công việc đã có cấu hình thưởng');
     }
 
-    const rewardSetting = await this.prisma.rewardSetting.create({
-      data: {
-        taskId,
-        rewardType: dto.rewardType,
-        rewardAmount: dto.rewardAmount ?? null,
-        rewardDescription: dto.rewardDescription,
-        autoCreateSettlement: dto.autoCreateSettlement ?? true,
-      },
-      select: rewardSettingResponseSelect,
+    await this.assertDeputyNotAssignedToTask(
+      taskId,
+      _currentMemberId,
+      familyRole,
+    );
+
+    const rewardSetting = await this.prisma.$transaction(async (tx) => {
+      const createdRewardSetting = await tx.rewardSetting.create({
+        data: {
+          taskId,
+          rewardType: dto.rewardType,
+          rewardAmount: dto.rewardAmount ?? null,
+          rewardDescription: dto.rewardDescription,
+          autoCreateSettlement: dto.autoCreateSettlement ?? true,
+        },
+        select: rewardSettingResponseSelect,
+      });
+
+      await this.backfillRewardSettlementsForTask(tx, taskId, {
+        id: createdRewardSetting.id,
+        rewardAmount: createdRewardSetting.rewardAmount,
+        autoCreateSettlement: createdRewardSetting.autoCreateSettlement,
+      });
+
+      return createdRewardSetting;
     });
 
     return this.mapRewardSettingResponse(rewardSetting);
@@ -1722,6 +1845,7 @@ export class TasksService {
     taskId: string,
     _currentMemberId: string,
     dto: UpdateRewardSettingDto,
+    familyRole?: FamilyRole,
   ) {
     await this.findTaskInFamilyOrThrow(familyId, taskId);
     const rewardSetting = await this.prisma.rewardSetting.findUnique({
@@ -1731,6 +1855,12 @@ export class TasksService {
     if (!rewardSetting) {
       throw new NotFoundException('Công việc chưa có cấu hình thưởng');
     }
+
+    await this.assertDeputyNotAssignedToTask(
+      taskId,
+      _currentMemberId,
+      familyRole,
+    );
 
     const merged = {
       rewardType: dto.rewardType ?? rewardSetting.rewardType,
@@ -1749,16 +1879,26 @@ export class TasksService {
     };
     this.assertValidRewardSettingPayload(merged);
 
-    const updatedRewardSetting = await this.prisma.rewardSetting.update({
-      where: { taskId },
-      data: {
-        rewardType: dto.rewardType,
-        rewardAmount:
-          dto.rewardAmount === undefined ? undefined : dto.rewardAmount,
-        rewardDescription: dto.rewardDescription,
-        autoCreateSettlement: dto.autoCreateSettlement,
-      },
-      select: rewardSettingResponseSelect,
+    const updatedRewardSetting = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.rewardSetting.update({
+        where: { taskId },
+        data: {
+          rewardType: dto.rewardType,
+          rewardAmount:
+            dto.rewardAmount === undefined ? undefined : dto.rewardAmount,
+          rewardDescription: dto.rewardDescription,
+          autoCreateSettlement: dto.autoCreateSettlement,
+        },
+        select: rewardSettingResponseSelect,
+      });
+
+      await this.backfillRewardSettlementsForTask(tx, taskId, {
+        id: updated.id,
+        rewardAmount: updated.rewardAmount,
+        autoCreateSettlement: updated.autoCreateSettlement,
+      });
+
+      return updated;
     });
 
     return this.mapRewardSettingResponse(updatedRewardSetting);
@@ -1768,6 +1908,7 @@ export class TasksService {
     familyId: string,
     taskId: string,
     _currentMemberId: string,
+    familyRole?: FamilyRole,
   ) {
     await this.findTaskInFamilyOrThrow(familyId, taskId);
     const rewardSetting = await this.prisma.rewardSetting.findUnique({
@@ -1785,6 +1926,12 @@ export class TasksService {
         'Không thể xóa cấu hình thưởng đã phát sinh ghi nhận thưởng',
       );
     }
+
+    await this.assertDeputyNotAssignedToTask(
+      taskId,
+      _currentMemberId,
+      familyRole,
+    );
 
     const deletedRewardSetting = await this.prisma.rewardSetting.delete({
       where: { taskId },
@@ -2966,6 +3113,25 @@ export class TasksService {
     }
   }
 
+  private assertValidAssignmentTimeRange(
+    startAt: Date | null,
+    dueAt: Date | null,
+  ) {
+    if (!startAt || !dueAt) {
+      return;
+    }
+
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(dueAt.getTime())) {
+      throw new BadRequestException('Thoi gian phan cong khong hop le');
+    }
+
+    if (dueAt.getTime() <= startAt.getTime()) {
+      throw new BadRequestException(
+        'Thoi gian ket thuc phai sau thoi gian bat dau',
+      );
+    }
+  }
+
   private assertValidTaskSchedule(schedule: TaskScheduleValidationInput) {
     if (schedule.repeatInterval <= 0) {
       throw new BadRequestException('Khoảng lặp phải lớn hơn 0');
@@ -3148,6 +3314,54 @@ export class TasksService {
         amount: rewardSetting.rewardAmount ?? new Prisma.Decimal(0),
       },
     });
+  }
+
+  private async backfillRewardSettlementsForTask(
+    tx: Prisma.TransactionClient,
+    taskId: string,
+    rewardSetting: {
+      id: string;
+      rewardAmount: Prisma.Decimal | null;
+      autoCreateSettlement: boolean;
+    },
+  ) {
+    if (!rewardSetting.autoCreateSettlement) {
+      return 0;
+    }
+
+    const approvedSubmissions = await tx.taskSubmission.findMany({
+      where: {
+        status: TaskSubmissionStatus.APPROVED,
+        rewardSettlement: { is: null },
+        assignment: { taskId },
+      },
+      select: {
+        id: true,
+        submittedByMemberId: true,
+        assignment: {
+          select: {
+            assignedToMemberId: true,
+          },
+        },
+      },
+    });
+    if (approvedSubmissions.length === 0) {
+      return 0;
+    }
+
+    const result = await tx.rewardSettlement.createMany({
+      data: approvedSubmissions.map((submission) => ({
+        taskSubmissionId: submission.id,
+        rewardSettingId: rewardSetting.id,
+        receiverMemberId:
+          submission.submittedByMemberId ??
+          submission.assignment.assignedToMemberId,
+        amount: rewardSetting.rewardAmount ?? new Prisma.Decimal(0),
+      })),
+      skipDuplicates: true,
+    });
+
+    return result.count;
   }
 
   private buildTaskScheduleCreateInput(
@@ -3939,6 +4153,58 @@ export class TasksService {
       FamilyRole.DEPUTY_MEMBER,
     ];
     return managerRoles.includes(familyRole);
+  }
+
+  private isDeputyMember(familyRole?: FamilyRole) {
+    return familyRole === FamilyRole.DEPUTY_MEMBER;
+  }
+
+  private assertDeputyNotSelfAssignedMember(
+    targetMemberId: string,
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
+    if (this.isDeputyMember(familyRole) && targetMemberId === currentMemberId) {
+      throw new ForbiddenException(
+        'Deputy member cannot perform this action for their own assignment',
+      );
+    }
+  }
+
+  private assertDeputyNotSelfAssignedAssignment(
+    assignment: { assignedToMemberId: string },
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
+    this.assertDeputyNotSelfAssignedMember(
+      assignment.assignedToMemberId,
+      currentMemberId,
+      familyRole,
+    );
+  }
+
+  private async assertDeputyNotAssignedToTask(
+    taskId: string,
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
+    if (!this.isDeputyMember(familyRole) || !currentMemberId) {
+      return;
+    }
+
+    const selfAssignment = await this.prisma.taskAssignment.findFirst({
+      where: {
+        taskId,
+        assignedToMemberId: currentMemberId,
+        status: { not: TaskAssignmentStatus.CANCELED },
+      },
+      select: { id: true },
+    });
+    if (selfAssignment) {
+      throw new ForbiddenException(
+        'Deputy member cannot manage a task assigned to themselves',
+      );
+    }
   }
 
   private isUniqueConstraintError(error: unknown): boolean {

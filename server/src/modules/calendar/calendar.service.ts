@@ -50,7 +50,8 @@ type CalendarEventPayload = Prisma.CalendarEventGetPayload<{
   include: typeof calendarEventInclude;
 }>;
 
-type CalendarEventParticipantPayload = CalendarEventPayload['participants'][number];
+type CalendarEventParticipantPayload =
+  CalendarEventPayload['participants'][number];
 
 type CalendarEventResponse = CalendarEventPayload & {
   myParticipant: CalendarEventParticipantPayload | null;
@@ -285,7 +286,7 @@ export class CalendarService {
     await this.findEventOrThrow(familyId, eventId);
     await this.findParticipantOrThrow(eventId, memberId);
 
-    return this.prisma.calendarEventParticipant.update({
+    const participant = await this.prisma.calendarEventParticipant.update({
       where: { eventId_memberId: { eventId, memberId } },
       data: {
         reminderEnabled: dto.reminderEnabled,
@@ -293,6 +294,8 @@ export class CalendarService {
       },
       include: { event: { include: calendarEventInclude } },
     });
+
+    return this.withMyParticipation(participant.event, memberId);
   }
 
   private async findEventOrThrow(familyId: string, eventId: string) {

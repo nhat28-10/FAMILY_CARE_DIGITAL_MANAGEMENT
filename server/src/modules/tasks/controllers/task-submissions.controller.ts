@@ -13,6 +13,7 @@ import {
 import { FamilyRole, TaskSubmissionStatus } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -29,7 +30,11 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { CreateTaskSubmissionDto } from '../dto/create-task-submission.dto';
 import { ReviewTaskSubmissionDto } from '../dto/review-task-submission.dto';
 import { TaskSubmissionQueryDto } from '../dto/task-submission-query.dto';
-import { TaskSubmissionListApiResponseDto } from '../dto/task-submission-response.dto';
+import {
+  TaskSubmissionApiResponseDto,
+  TaskSubmissionBadRequestApiResponseDto,
+  TaskSubmissionListApiResponseDto,
+} from '../dto/task-submission-response.dto';
 import { TasksService } from '../services/tasks.service';
 
 const TASK_MANAGER_ROLES = [
@@ -57,6 +62,7 @@ export class TaskSubmissionsController {
     description:
       'Chỉ thành viên được giao phân công mới được nộp minh chứng hoàn thành công việc. Với IMAGE, VIDEO hoặc FILE, hãy upload file bằng API proofs/upload trước rồi dùng fileUrl trả về trong body JSON này.',
   })
+  @ApiCreatedResponse({ type: TaskSubmissionApiResponseDto })
   @ApiParam({
     name: 'assignmentId',
     description: 'ID phân công công việc cần nộp minh chứng',
@@ -64,7 +70,9 @@ export class TaskSubmissionsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Trạng thái phân công hiện tại không cho phép nộp minh chứng',
+    type: TaskSubmissionBadRequestApiResponseDto,
+    description:
+      'Trạng thái phân công hiện tại không cho phép nộp minh chứng. Khi quá hạn sẽ trả code/errorCode SUBMISSION_OVERDUE.',
   })
   createTaskSubmission(
     @Param('familyId') familyId: string,
@@ -89,7 +97,7 @@ export class TaskSubmissionsController {
   })
   @ApiOkResponse({
     description:
-      'Danh sách submission theo trang, mỗi item giữ proofCount và có mảng proofs',
+      'Danh sách submission theo trang, mỗi item giữ proofCount và có mảng proofs. Sắp xếp theo submittedAt giảm dần.',
     type: TaskSubmissionListApiResponseDto,
   })
   @ApiParam({
@@ -120,6 +128,7 @@ export class TaskSubmissionsController {
   }
 
   @Get('submissions/:submissionId')
+  @ApiOkResponse({ type: TaskSubmissionApiResponseDto })
   @ResponseMessage('Lấy chi tiết minh chứng hoàn thành công việc thành công')
   @ApiOperation({
     summary: 'Lấy chi tiết minh chứng hoàn thành công việc',
@@ -150,6 +159,7 @@ export class TaskSubmissionsController {
   }
 
   @Patch('submissions/:submissionId/review')
+  @ApiOkResponse({ type: TaskSubmissionApiResponseDto })
   @FamilyRoles(...TASK_MANAGER_ROLES)
   @ResponseMessage('Duyệt hoặc từ chối hoàn thành công việc thành công')
   @ApiOperation({

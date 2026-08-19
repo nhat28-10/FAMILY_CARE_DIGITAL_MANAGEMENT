@@ -13,6 +13,8 @@ import {
 import { FamilyRole } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -28,6 +30,10 @@ import { RequireFeature } from '../subscriptions/decorators/require-feature.deco
 import { FEATURE_ACCESS_KEYS } from '../subscriptions/feature-access.constants';
 import { FeatureAccessGuard } from '../subscriptions/guards/feature-access.guard';
 import { CalendarService } from './calendar.service';
+import {
+  CalendarEventApiResponseDto,
+  CalendarEventListApiResponseDto,
+} from './dto/calendar-event-response.dto';
 import { CalendarEventQueryDto } from './dto/calendar-event-query.dto';
 import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
 import { RespondCalendarEventDto } from './dto/respond-calendar-event.dto';
@@ -62,6 +68,7 @@ export class CalendarController {
     status: 403,
     description: 'Không có quyền hoặc gói không hỗ trợ',
   })
+  @ApiCreatedResponse({ type: CalendarEventApiResponseDto })
   createEvent(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -77,6 +84,7 @@ export class CalendarController {
     description:
       'Active member được xem sự kiện lịch trong family. API view không bị khóa để dữ liệu cũ vẫn đọc được khi gói hết hạn.',
   })
+  @ApiOkResponse({ type: CalendarEventListApiResponseDto })
   listEvents(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -89,6 +97,7 @@ export class CalendarController {
   @ResponseMessage('Lấy chi tiết sự kiện lịch thành công')
   @ApiOperation({ summary: 'Xem chi tiết sự kiện lịch gia đình' })
   @ApiParam({ name: 'eventId', description: 'ID sự kiện lịch', format: 'uuid' })
+  @ApiOkResponse({ type: CalendarEventApiResponseDto })
   getEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
@@ -104,6 +113,7 @@ export class CalendarController {
   @ResponseMessage('Cập nhật sự kiện lịch thành công')
   @ApiOperation({ summary: 'Cập nhật sự kiện lịch gia đình' })
   @ApiParam({ name: 'eventId', description: 'ID sự kiện lịch', format: 'uuid' })
+  @ApiOkResponse({ type: CalendarEventApiResponseDto })
   updateEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
@@ -123,6 +133,7 @@ export class CalendarController {
     description: 'Không xóa cứng sự kiện; chỉ chuyển trạng thái sang CANCELED.',
   })
   @ApiParam({ name: 'eventId', description: 'ID sự kiện lịch', format: 'uuid' })
+  @ApiOkResponse({ type: CalendarEventApiResponseDto })
   cancelEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
@@ -136,6 +147,7 @@ export class CalendarController {
   @ResponseMessage('Phản hồi sự kiện lịch thành công')
   @ApiOperation({ summary: 'Phản hồi tham gia sự kiện lịch' })
   @ApiParam({ name: 'eventId', description: 'ID sự kiện lịch', format: 'uuid' })
+  @ApiOkResponse({ type: CalendarEventApiResponseDto })
   respondToEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
@@ -156,6 +168,7 @@ export class CalendarController {
   @ResponseMessage('Cập nhật reminder sự kiện lịch thành công')
   @ApiOperation({ summary: 'Bật hoặc tắt reminder cá nhân cho sự kiện lịch' })
   @ApiParam({ name: 'eventId', description: 'ID sự kiện lịch', format: 'uuid' })
+  @ApiOkResponse({ type: CalendarEventApiResponseDto })
   updateReminder(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,

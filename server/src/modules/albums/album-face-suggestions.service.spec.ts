@@ -159,7 +159,11 @@ describe('AlbumFaceSuggestionsService', () => {
       updateMany: jest.Mock;
     };
     memberFaceProfile: { findMany: jest.Mock };
-    albumMediaTag: { findUnique: jest.Mock; create: jest.Mock };
+    albumMediaTag: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
   let queue: { pushFaceScanJob: jest.Mock };
@@ -195,6 +199,7 @@ describe('AlbumFaceSuggestionsService', () => {
       },
       memberFaceProfile: { findMany: jest.fn().mockResolvedValue([]) },
       albumMediaTag: {
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ tagId: 'tag-1' }),
       },
@@ -549,6 +554,55 @@ describe('AlbumFaceSuggestionsService', () => {
         data: expect.objectContaining({ status: FaceScanJobStatus.COMPLETED }),
       }),
     );
+  });
+
+  it('does not suggest members who are already tagged on the media', async () => {
+    const encrypted = crypto.encryptEmbedding([1, 0, 0]);
+    prisma.faceScanJob.findFirst.mockResolvedValue({
+      ...scanJob(),
+      media: media(),
+    });
+    prisma.albumMediaTag.findMany.mockResolvedValue([
+      { taggedMemberId: 'target' },
+    ]);
+    prisma.memberFaceProfile.findMany.mockResolvedValue([
+      {
+        profileId: 'profile-1',
+        workspaceId: 'family-1',
+        memberId: 'target',
+        status: FaceProfileStatus.ACTIVE,
+        deletedAt: null,
+        member: selectedMember('target'),
+        embeddings: [encrypted, encrypted, encrypted].map((item) => ({
+          ...item,
+          embeddingDimension: 3,
+        })),
+      },
+    ]);
+
+    const result = await service.processJob({
+      version: 1,
+      type: FACE_SCAN_JOB_TYPE,
+      scanJobId: '11111111-1111-4111-8111-111111111111',
+      mediaId: 'media-1',
+      workspaceId: 'family-1',
+      requestedAt: now.toISOString(),
+    });
+
+    expect(result.action).toBe('ACK');
+    expect(prisma.albumMediaTag.findMany).toHaveBeenCalledWith({
+      where: { mediaId: 'media-1' },
+      select: { taggedMemberId: true },
+    });
+    expect(prisma.albumFaceDetection.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          faceIndex: 0,
+          status: AlbumFaceDetectionStatus.UNMATCHED,
+        }),
+      }),
+    );
+    expect(prisma.albumTagSuggestion.create).not.toHaveBeenCalled();
   });
 
   it('uses a stricter threshold for the only active face profile candidate', async () => {

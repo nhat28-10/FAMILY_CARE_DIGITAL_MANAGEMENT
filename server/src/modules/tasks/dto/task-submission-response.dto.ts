@@ -128,6 +128,73 @@ export class TaskSubmissionListItemResponseDto {
   reviewedByMember!: TaskSubmissionMemberSummaryResponseDto | null;
 }
 
+export class TaskSubmissionResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  assignmentId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  submittedByMemberId!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  submissionNote!: string | null;
+
+  @ApiProperty({ enum: TaskSubmissionStatus })
+  status!: TaskSubmissionStatus;
+
+  @ApiProperty({ format: 'uuid', nullable: true })
+  reviewedByMemberId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  reviewNote!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  submittedAt!: string;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  reviewedAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  updatedAt!: string;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'True when the submission was created after the assignment dueAt.',
+  })
+  isLate!: boolean;
+
+  @ApiProperty({ type: () => [TaskProofResponseDto] })
+  proofs!: TaskProofResponseDto[];
+
+  @ApiProperty({ type: () => TaskSubmissionMemberSummaryResponseDto })
+  submittedByMember!: TaskSubmissionMemberSummaryResponseDto;
+
+  @ApiProperty({
+    type: () => TaskSubmissionMemberSummaryResponseDto,
+    nullable: true,
+  })
+  reviewedByMember!: TaskSubmissionMemberSummaryResponseDto | null;
+}
+
+export class TaskSubmissionApiResponseDto {
+  @ApiProperty({ example: true })
+  success!: true;
+
+  @ApiProperty({
+    example: 'Nộp minh chứng hoàn thành công việc thành công',
+  })
+  message!: string;
+
+  @ApiProperty({ type: () => TaskSubmissionResponseDto })
+  data!: TaskSubmissionResponseDto;
+}
+
 export class TaskSubmissionPaginatedResponseDto {
   @ApiProperty({ type: () => [TaskSubmissionListItemResponseDto] })
   items!: TaskSubmissionListItemResponseDto[];
@@ -156,4 +223,28 @@ export class TaskSubmissionListApiResponseDto {
 
   @ApiProperty({ type: () => TaskSubmissionPaginatedResponseDto })
   data!: TaskSubmissionPaginatedResponseDto;
+}
+
+export class TaskSubmissionBadRequestApiResponseDto {
+  @ApiProperty({ example: false })
+  success!: false;
+
+  @ApiProperty({
+    example: 'Assignment is overdue and cannot accept submissions',
+  })
+  message!: string;
+
+  @ApiProperty({
+    example: 'SUBMISSION_OVERDUE',
+    enum: ['SUBMISSION_OVERDUE'],
+    required: false,
+  })
+  code?: 'SUBMISSION_OVERDUE';
+
+  @ApiProperty({
+    example: 'SUBMISSION_OVERDUE',
+    enum: ['SUBMISSION_OVERDUE'],
+    required: false,
+  })
+  errorCode?: 'SUBMISSION_OVERDUE';
 }

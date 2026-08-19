@@ -109,7 +109,12 @@ export class AiActionsService {
     let summary: string;
     let relatedModule: AiRelatedModule;
     try {
-      const executed = await this.executeAction(familyId, member.id, action);
+      const executed = await this.executeAction(
+        familyId,
+        member.id,
+        member.familyRole,
+        action,
+      );
       result = executed.result;
       summary = executed.summary;
       relatedModule = executed.relatedModule;
@@ -329,6 +334,7 @@ export class AiActionsService {
   private async executeAction(
     familyId: string,
     memberId: string,
+    familyRole: FamilyMember['familyRole'],
     action: AiPendingAction,
   ): Promise<{
     result: { id: string };
@@ -467,6 +473,7 @@ export class AiActionsService {
               task.id,
               memberId,
               payload.assignment,
+              familyRole,
             );
             summary = `Đã tạo và giao công việc "${payload.task.title}" thành công.`;
           } catch (error) {
