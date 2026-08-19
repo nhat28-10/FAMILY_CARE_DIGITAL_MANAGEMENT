@@ -87,14 +87,15 @@ services:
       context: ../face-ai-service
       dockerfile: Dockerfile
     container_name: familycare_face_ai
+    env_file: .env.production
     cpus: '2.0'
     mem_limit: 2g
     mem_reservation: 1g
     environment:
       FACE_AI_MODEL_NAME: ${FACE_AI_MODEL_NAME:-buffalo_l}
-      FACE_AI_DETECTION_SIZE: ${FACE_AI_DETECTION_SIZE:-640}
+      FACE_AI_DETECTION_SIZE: ${FACE_AI_DETECTION_SIZE:-960}
       FACE_AI_DEVICE: ${FACE_AI_DEVICE:-cpu}
-      FACE_SCAN_MAX_FACES: ${FACE_SCAN_MAX_FACES:-5}
+      FACE_SCAN_MAX_FACES: ${FACE_SCAN_MAX_FACES:-10}
     expose:
       - '8000'
     healthcheck:
