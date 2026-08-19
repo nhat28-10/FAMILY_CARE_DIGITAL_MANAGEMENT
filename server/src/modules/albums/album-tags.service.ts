@@ -192,6 +192,8 @@ export class AlbumTagsService {
   ) {
     return {
       id: tag.id,
+      taggedMemberId: tag.taggedMemberId,
+      taggedByMemberId: tag.taggedByMemberId,
       tagNote: tag.tagNote,
       createdAt: tag.createdAt,
       taggedMember: {

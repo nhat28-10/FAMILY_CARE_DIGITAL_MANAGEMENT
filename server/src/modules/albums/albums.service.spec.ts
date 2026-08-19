@@ -69,7 +69,32 @@ function media(overrides: Record<string, unknown> = {}) {
       familyRole: FamilyRole.FAMILY_MEMBER,
       user: { fullName: 'Uploader', avatarUrl: null },
     },
+    tags: [],
     _count: { tags: 2 },
+    ...overrides,
+  };
+}
+
+function albumTag(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'tag-1',
+    mediaId: 'media-1',
+    taggedMemberId: 'tagged',
+    taggedByMemberId: 'uploader',
+    tagNote: null,
+    createdAt: now,
+    taggedMember: {
+      id: 'tagged',
+      displayName: 'Tagged',
+      familyRole: FamilyRole.FAMILY_MEMBER,
+      status: MemberStatus.ACTIVE,
+      user: { fullName: 'Tagged User', avatarUrl: null },
+    },
+    taggedByMember: {
+      id: 'uploader',
+      displayName: 'Uploader',
+      user: { fullName: 'Uploader User' },
+    },
     ...overrides,
   };
 }
@@ -149,6 +174,7 @@ describe('AlbumsService permissions and deletion flow', () => {
 
     expect(prisma.albumMedia.update).toHaveBeenCalled();
     expect(result.tagCount).toBe(2);
+    expect(result.tags).toEqual([]);
     expect(result.caption).toBe('Mới');
   });
 
@@ -355,7 +381,21 @@ describe('AlbumsService permissions and deletion flow', () => {
     prisma.familyMember.findFirst.mockResolvedValue({ id: taggedMemberId });
     prisma.albumMedia.count.mockResolvedValue(1);
     prisma.albumMedia.findMany.mockResolvedValue([
-      media({ moderationStatus: MediaModerationStatus.SAFE }),
+      media({
+        moderationStatus: MediaModerationStatus.SAFE,
+        tags: [
+          albumTag({
+            taggedMemberId,
+            taggedMember: {
+              id: taggedMemberId,
+              displayName: 'Tagged',
+              familyRole: FamilyRole.FAMILY_MEMBER,
+              status: MemberStatus.ACTIVE,
+              user: { fullName: 'Tagged User', avatarUrl: null },
+            },
+          }),
+        ],
+      }),
     ]);
 
     const result = await service.list(
@@ -380,6 +420,12 @@ describe('AlbumsService permissions and deletion flow', () => {
       tags: { some: { taggedMemberId } },
     });
     expect(result.items[0].tagCount).toBe(2);
+    expect(result.items[0].tags[0]).toMatchObject({
+      id: 'tag-1',
+      taggedMemberId,
+      taggedByMemberId: 'uploader',
+      taggedMember: { memberId: taggedMemberId },
+    });
   });
 
   it('allows a draft image when context matches the collection topic', async () => {

@@ -175,6 +175,8 @@ describe('AlbumTagsService', () => {
       { tx: prisma },
     );
     expect(notifications.dispatch).toHaveBeenCalledWith(['notif-1']);
+    expect(result.taggedMemberId).toBe('tagged');
+    expect(result.taggedByMemberId).toBe('requester');
     expect(result.taggedMember.memberStatus).toBe(MemberStatus.ACTIVE);
   });
 
@@ -333,6 +335,8 @@ describe('AlbumTagsService', () => {
     );
     expect(result.total).toBe(1);
     expect(result.items[0]).toMatchObject({
+      taggedMemberId: 'tagged',
+      taggedByMemberId: 'requester',
       taggedMember: { memberStatus: MemberStatus.REMOVED },
       permissions: { canRemove: true },
     });

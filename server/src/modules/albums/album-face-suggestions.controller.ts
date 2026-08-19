@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -28,6 +30,7 @@ import { AlbumFaceSuggestionsService } from './album-face-suggestions.service';
 import {
   FACE_SUGGESTIONS_RESPONSE_EXAMPLE,
   FaceSuggestionsApiResponseDto,
+  FaceScanJobSummaryApiResponseDto,
   RequestFaceScanDto,
 } from './dto/album-face-suggestions.dto';
 
@@ -51,6 +54,7 @@ export class AlbumFaceSuggestionsController {
     description:
       'Force rescan rate limit. Body includes errorCode/code=FACE_SCAN_FORCE_RESCAN_RATE_LIMITED, retryAfterSeconds, cooldownSeconds; header Retry-After mirrors retryAfterSeconds.',
   })
+  @ApiAcceptedResponse({ type: FaceScanJobSummaryApiResponseDto })
   @ResponseMessage('Đã tạo hoặc trả về face scan job hiện có')
   requestScan(
     @Param('familyId') familyId: string,
@@ -71,6 +75,7 @@ export class AlbumFaceSuggestionsController {
     description:
       'Dùng khi GET face-scan trả retryAllowed=true. Job PROCESSING/PENDING chỉ được retry sau maxProcessingSeconds.',
   })
+  @ApiAcceptedResponse({ type: FaceScanJobSummaryApiResponseDto })
   @ResponseMessage('Đã retry face scan job')
   retryScan(
     @Param('familyId') familyId: string,
@@ -82,6 +87,7 @@ export class AlbumFaceSuggestionsController {
 
   @Get('face-scan')
   @ApiOperation({ summary: 'Xem trạng thái face scan của media' })
+  @ApiOkResponse({ type: FaceScanJobSummaryApiResponseDto })
   @ResponseMessage('Lấy trạng thái face scan thành công')
   getScanStatus(
     @Param('familyId') familyId: string,

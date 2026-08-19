@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   CalendarEventStatus,
+  EventResponseStatus,
   MemberStatus,
   NotificationPriority,
   NotificationType,
@@ -44,6 +45,17 @@ const calendarEventInclude = {
     orderBy: { id: 'asc' as const },
   },
 } satisfies Prisma.CalendarEventInclude;
+
+type CalendarEventPayload = Prisma.CalendarEventGetPayload<{
+  include: typeof calendarEventInclude;
+}>;
+
+type CalendarEventParticipantPayload = CalendarEventPayload['participants'][number];
+
+type CalendarEventResponse = CalendarEventPayload & {
+  myParticipant: CalendarEventParticipantPayload | null;
+  myResponseStatus: EventResponseStatus | null;
+};
 
 @Injectable()
 export class CalendarService {
@@ -107,10 +119,14 @@ export class CalendarService {
       referenceId: event.id,
     });
 
-    return event;
+    return this.withMyParticipation(event, createdByMemberId);
   }
 
-  async listEvents(familyId: string, query: CalendarEventQueryDto) {
+  async listEvents(
+    familyId: string,
+    currentMemberId: string,
+    query: CalendarEventQueryDto,
+  ) {
     const from = query.from ? new Date(query.from) : undefined;
     const to = query.to ? new Date(query.to) : undefined;
     if (from && to && to <= from) {
@@ -132,20 +148,26 @@ export class CalendarService {
         : {}),
     };
 
-    return this.prisma.calendarEvent.findMany({
+    const events = await this.prisma.calendarEvent.findMany({
       where,
       include: calendarEventInclude,
       orderBy: { startTime: 'asc' },
     });
+
+    return events.map((event) =>
+      this.withMyParticipation(event, currentMemberId),
+    );
   }
 
-  async getEvent(familyId: string, eventId: string) {
-    return this.findEventOrThrow(familyId, eventId);
+  async getEvent(familyId: string, eventId: string, currentMemberId: string) {
+    const event = await this.findEventOrThrow(familyId, eventId);
+    return this.withMyParticipation(event, currentMemberId);
   }
 
   async updateEvent(
     familyId: string,
     eventId: string,
+    currentMemberId: string,
     dto: UpdateCalendarEventDto,
   ) {
     await this.findEventOrThrow(familyId, eventId);
@@ -174,7 +196,7 @@ export class CalendarService {
         ? await this.resolveParticipantIds(familyId, dto.participantMemberIds)
         : undefined;
 
-    return this.prisma.$transaction(async (tx) => {
+    const event = await this.prisma.$transaction(async (tx) => {
       await tx.calendarEvent.update({
         where: { id: eventId },
         data: {
@@ -203,15 +225,23 @@ export class CalendarService {
         include: calendarEventInclude,
       });
     });
+
+    return this.withMyParticipation(event, currentMemberId);
   }
 
-  async cancelEvent(familyId: string, eventId: string) {
+  async cancelEvent(
+    familyId: string,
+    eventId: string,
+    currentMemberId: string,
+  ) {
     await this.findEventOrThrow(familyId, eventId);
-    return this.prisma.calendarEvent.update({
+    const event = await this.prisma.calendarEvent.update({
       where: { id: eventId },
       data: { status: CalendarEventStatus.CANCELED },
       include: calendarEventInclude,
     });
+
+    return this.withMyParticipation(event, currentMemberId);
   }
 
   async respondToEvent(
@@ -223,7 +253,7 @@ export class CalendarService {
     await this.findEventOrThrow(familyId, eventId);
     await this.findParticipantOrThrow(eventId, memberId);
 
-    return this.prisma.calendarEventParticipant.update({
+    const participant = await this.prisma.calendarEventParticipant.update({
       where: { eventId_memberId: { eventId, memberId } },
       data: { responseStatus: dto.responseStatus },
       include: {
@@ -242,6 +272,8 @@ export class CalendarService {
         },
       },
     });
+
+    return this.withMyParticipation(participant.event, memberId);
   }
 
   async updateReminder(
@@ -282,6 +314,22 @@ export class CalendarService {
       throw new ForbiddenException('Bạn không phải người tham gia sự kiện này');
     }
     return participant;
+  }
+
+  private withMyParticipation(
+    event: CalendarEventPayload,
+    currentMemberId: string,
+  ): CalendarEventResponse {
+    const myParticipant =
+      event.participants.find(
+        (participant) => participant.memberId === currentMemberId,
+      ) ?? null;
+
+    return {
+      ...event,
+      myParticipant,
+      myResponseStatus: myParticipant?.responseStatus ?? null,
+    };
   }
 
   private async resolveParticipantIds(

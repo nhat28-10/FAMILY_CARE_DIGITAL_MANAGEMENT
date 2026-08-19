@@ -20,6 +20,8 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
+  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -35,6 +37,8 @@ import { ALBUM_MAX_FILE_SIZE } from './album-media.validator';
 import { AlbumsService } from './albums.service';
 import { albumMemberTracker } from './album-throttle';
 import {
+  AlbumMediaApiResponseDto,
+  AlbumMediaListApiResponseDto,
   AnalyzeAlbumDraftDto,
   ListAlbumMediaQueryDto,
   PermanentDeleteAlbumMediaDto,
@@ -120,6 +124,7 @@ export class AlbumsController {
       },
     },
   })
+  @ApiCreatedResponse({ type: AlbumMediaApiResponseDto })
   @ResponseMessage('Tải media lên album thành công')
   upload(
     @Param('familyId') familyId: string,
@@ -136,6 +141,7 @@ export class AlbumsController {
     description:
       'Filter chạy tại database. Tag thủ công không cấp thêm quyền xem. List không ký URL original cho từng item; dùng detail để nhận signed URL có thời hạn.',
   })
+  @ApiOkResponse({ type: AlbumMediaListApiResponseDto })
   @ResponseMessage('Lấy danh sách media album thành công')
   list(
     @Param('familyId') familyId: string,
@@ -152,6 +158,7 @@ export class AlbumsController {
     description:
       'fileAccess chỉ xuất hiện khi policy cho phép và signed URL có thời hạn.',
   })
+  @ApiOkResponse({ type: AlbumMediaApiResponseDto })
   @ResponseMessage('Lấy chi tiết media thành công')
   detail(
     @Param('familyId') familyId: string,
@@ -164,6 +171,7 @@ export class AlbumsController {
   @Patch(':mediaId')
   @ApiParam({ name: 'mediaId', description: 'ID media', format: 'uuid' })
   @ApiOperation({ summary: 'Cập nhật caption hoặc visibility (chỉ uploader)' })
+  @ApiOkResponse({ type: AlbumMediaApiResponseDto })
   @ResponseMessage('Cập nhật media thành công')
   update(
     @Param('familyId') familyId: string,
@@ -180,6 +188,7 @@ export class AlbumsController {
     summary: 'Xóa mềm media',
     description: 'Không xóa object R2, tag hoặc lịch sử moderation.',
   })
+  @ApiOkResponse({ type: AlbumMediaApiResponseDto })
   @ResponseMessage('Xóa media thành công')
   softDelete(
     @Param('familyId') familyId: string,
@@ -194,6 +203,7 @@ export class AlbumsController {
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'mediaId', description: 'ID media', format: 'uuid' })
   @ApiOperation({ summary: 'Khôi phục media đã xóa mềm' })
+  @ApiOkResponse({ type: AlbumMediaApiResponseDto })
   @ResponseMessage('Khôi phục media thành công')
   restore(
     @Param('familyId') familyId: string,

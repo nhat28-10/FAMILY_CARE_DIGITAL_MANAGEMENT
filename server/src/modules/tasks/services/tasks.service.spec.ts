@@ -446,6 +446,80 @@ describe('TasksService createTaskAssignment', () => {
   });
 });
 
+describe('TasksService createTaskSubmission', () => {
+  const familyId = 'family-id';
+  const assignmentId = 'assignment-id';
+  const memberId = 'member-id';
+
+  let tx: {
+    taskAssignment: {
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    taskSubmission: {
+      create: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+    };
+  };
+  let prisma: {
+    $transaction: jest.Mock;
+  };
+  let service: TasksService;
+
+  beforeEach(() => {
+    tx = {
+      taskAssignment: {
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      taskSubmission: {
+        create: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+    };
+    prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+  });
+
+  it('rejects submission when the assignment is past due', async () => {
+    tx.taskAssignment.findFirst.mockResolvedValue({
+      assignedToMemberId: memberId,
+      status: TaskAssignmentStatus.IN_PROGRESS,
+      dueAt: new Date(Date.now() - 60_000),
+    });
+
+    await expect(
+      service.createTaskSubmission(familyId, assignmentId, memberId, {
+        proofs: [
+          {
+            proofType: TaskProofType.NOTE,
+            note: 'Da hoan thanh',
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'SUBMISSION_OVERDUE',
+        errorCode: 'SUBMISSION_OVERDUE',
+      },
+    });
+
+    expect(tx.taskSubmission.create).not.toHaveBeenCalled();
+    expect(tx.taskAssignment.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('TasksService createTaskAssignment', () => {
   const familyId = 'family-id';
   const taskId = 'task-id';
