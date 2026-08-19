@@ -140,6 +140,10 @@ const SAFE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   'application/pdf': '.pdf',
 };
 
+const TASK_SUBMISSION_ERROR_CODES = {
+  SUBMISSION_OVERDUE: 'SUBMISSION_OVERDUE',
+} as const;
+
 export interface UploadedTaskProofFile {
   originalname: string;
   mimetype: string;
@@ -2388,6 +2392,7 @@ export class TasksService {
         select: {
           assignedToMemberId: true,
           status: true,
+          dueAt: true,
         },
       });
       if (!assignment) {
@@ -2402,6 +2407,14 @@ export class TasksService {
         throw new BadRequestException(
           'Trạng thái phân công hiện tại không cho phép nộp minh chứng',
         );
+      }
+
+      if (assignment.dueAt && Date.now() > assignment.dueAt.getTime()) {
+        throw new BadRequestException({
+          message: 'Assignment is overdue and cannot accept submissions',
+          code: TASK_SUBMISSION_ERROR_CODES.SUBMISSION_OVERDUE,
+          errorCode: TASK_SUBMISSION_ERROR_CODES.SUBMISSION_OVERDUE,
+        });
       }
 
       const createdSubmission = await tx.taskSubmission.create({

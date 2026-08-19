@@ -64,6 +64,7 @@ export class CalendarAiTools implements AiToolProvider {
         execute: (args, ctx) =>
           this.calendarService.listEvents(
             ctx.familyId,
+            ctx.memberId,
             validateActionArgs(CalendarEventQueryDto, args),
           ),
       },

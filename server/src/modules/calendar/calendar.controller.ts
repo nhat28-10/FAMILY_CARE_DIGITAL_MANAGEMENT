@@ -79,9 +79,10 @@ export class CalendarController {
   })
   listEvents(
     @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
     @Query() query: CalendarEventQueryDto,
   ) {
-    return this.calendarService.listEvents(familyId, query);
+    return this.calendarService.listEvents(familyId, memberId, query);
   }
 
   @Get(':eventId')
@@ -91,8 +92,9 @@ export class CalendarController {
   getEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
+    @CurrentFamilyMember('id') memberId: string,
   ) {
-    return this.calendarService.getEvent(familyId, eventId);
+    return this.calendarService.getEvent(familyId, eventId, memberId);
   }
 
   @Patch(':eventId')
@@ -105,9 +107,10 @@ export class CalendarController {
   updateEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
+    @CurrentFamilyMember('id') memberId: string,
     @Body() dto: UpdateCalendarEventDto,
   ) {
-    return this.calendarService.updateEvent(familyId, eventId, dto);
+    return this.calendarService.updateEvent(familyId, eventId, memberId, dto);
   }
 
   @Patch(':eventId/cancel')
@@ -123,8 +126,9 @@ export class CalendarController {
   cancelEvent(
     @Param('familyId') familyId: string,
     @Param('eventId') eventId: string,
+    @CurrentFamilyMember('id') memberId: string,
   ) {
-    return this.calendarService.cancelEvent(familyId, eventId);
+    return this.calendarService.cancelEvent(familyId, eventId, memberId);
   }
 
   @Post(':eventId/respond')
