@@ -13,6 +13,8 @@ import {
 import { FamilyRole, TaskAssignmentStatus, TaskPriority } from '@prisma/client';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -28,7 +30,12 @@ import { FamilyPermissionGuard } from '../../family-members/guards/family-permis
 import { CreateTaskAssignmentDto } from '../dto/create-task-assignment.dto';
 import { MyTaskAssignmentQueryDto } from '../dto/my-task-assignment-query.dto';
 import { ReassignTaskDto } from '../dto/reassign-task.dto';
+import {
+  TaskAssignmentApiResponseDto,
+  TaskAssignmentListApiResponseDto,
+} from '../dto/task-assignment-response.dto';
 import { TaskAssignmentQueryDto } from '../dto/task-assignment-query.dto';
+import { UpdateTaskAssignmentDto } from '../dto/update-task-assignment.dto';
 import { TasksService } from '../services/tasks.service';
 
 const TASK_MANAGER_ROLES = [
@@ -66,10 +73,12 @@ export class TaskAssignmentsController {
     status: 409,
     description: 'Thành viên này đã được giao công việc này',
   })
+  @ApiCreatedResponse({ type: TaskAssignmentApiResponseDto })
   createTaskAssignment(
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: CreateTaskAssignmentDto,
   ) {
     return this.tasksService.createTaskAssignment(
@@ -77,6 +86,7 @@ export class TaskAssignmentsController {
       taskId,
       memberId,
       dto,
+      familyRole,
     );
   }
 
@@ -98,6 +108,7 @@ export class TaskAssignmentsController {
     enum: TaskAssignmentStatus,
     description: 'Lọc phân công công việc theo trạng thái',
   })
+  @ApiOkResponse({ type: TaskAssignmentListApiResponseDto })
   listTaskAssignments(
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
@@ -153,6 +164,7 @@ export class TaskAssignmentsController {
     required: false,
     description: 'Lọc đến thời gian kết thúc hoặc hạn hoàn thành',
   })
+  @ApiOkResponse({ type: TaskAssignmentListApiResponseDto })
   listMyTaskAssignments(
     @Param('familyId') familyId: string,
     @CurrentFamilyMember('id') memberId: string,
@@ -177,6 +189,7 @@ export class TaskAssignmentsController {
     status: 404,
     description: 'Không tìm thấy phân công công việc',
   })
+  @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
   getTaskAssignment(
     @Param('familyId') familyId: string,
     @Param('assignmentId') assignmentId: string,
@@ -188,6 +201,36 @@ export class TaskAssignmentsController {
       assignmentId,
       memberId,
       familyRole,
+    );
+  }
+
+  @Patch('assignments/:assignmentId')
+  @FamilyRoles(...TASK_MANAGER_ROLES)
+  @ResponseMessage('Cap nhat thoi han phan cong cong viec thanh cong')
+  @ApiOperation({
+    summary: 'Gia han hoac cap nhat thoi gian phan cong cong viec',
+    description:
+      'Manager/deputy cap nhat startAt/dueAt cho phan cong hien tai ma khong doi nguoi duoc giao.',
+  })
+  @ApiParam({
+    name: 'assignmentId',
+    description: 'ID phan cong cong viec can cap nhat thoi han',
+    format: 'uuid',
+  })
+  @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
+  updateTaskAssignment(
+    @Param('familyId') familyId: string,
+    @Param('assignmentId') assignmentId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
+    @Body() dto: UpdateTaskAssignmentDto,
+  ) {
+    return this.tasksService.updateTaskAssignment(
+      familyId,
+      assignmentId,
+      memberId,
+      familyRole,
+      dto,
     );
   }
 
@@ -207,6 +250,7 @@ export class TaskAssignmentsController {
     status: 400,
     description: 'Chỉ có thể bắt đầu công việc đang ở trạng thái được giao',
   })
+  @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
   startTaskAssignment(
     @Param('familyId') familyId: string,
     @Param('assignmentId') assignmentId: string,
@@ -236,11 +280,19 @@ export class TaskAssignmentsController {
     status: 400,
     description: 'Không thể hủy phân công đã được duyệt hoàn thành',
   })
+  @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
   cancelTaskAssignment(
     @Param('familyId') familyId: string,
     @Param('assignmentId') assignmentId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
-    return this.tasksService.cancelTaskAssignment(familyId, assignmentId);
+    return this.tasksService.cancelTaskAssignment(
+      familyId,
+      assignmentId,
+      memberId,
+      familyRole,
+    );
   }
 
   @Patch('assignments/:assignmentId/reassign')
@@ -260,10 +312,12 @@ export class TaskAssignmentsController {
     status: 400,
     description: 'Không thể giao lại công việc đã được duyệt hoàn thành',
   })
+  @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
   reassignTaskAssignment(
     @Param('familyId') familyId: string,
     @Param('assignmentId') assignmentId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: ReassignTaskDto,
   ) {
     return this.tasksService.reassignTaskAssignment(
@@ -271,6 +325,7 @@ export class TaskAssignmentsController {
       assignmentId,
       memberId,
       dto,
+      familyRole,
     );
   }
 }

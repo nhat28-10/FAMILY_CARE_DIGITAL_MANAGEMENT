@@ -576,9 +576,17 @@ export class AlbumFaceSuggestionsService {
       this.assertScannableMedia(scanJob.media);
       const detections = await this.detectStoredMedia(scanJob.media);
       const candidates = await this.loadMatchCandidates(job.workspaceId);
+      const alreadyTaggedMemberIds = await this.loadAlreadyTaggedMemberIds(
+        job.mediaId,
+      );
       const prepared = detections.map((face) => ({
         face,
-        match: this.matchFace(face, candidates, scanJob.media),
+        match: this.matchFace(
+          face,
+          candidates,
+          scanJob.media,
+          alreadyTaggedMemberIds,
+        ),
       }));
       await this.persistScanResults(scanJob, prepared);
       return { action: 'ACK' };
@@ -694,14 +702,24 @@ export class AlbumFaceSuggestionsService {
     return candidates;
   }
 
+  private async loadAlreadyTaggedMemberIds(mediaId: string) {
+    const tags = await this.prisma.albumMediaTag.findMany({
+      where: { mediaId },
+      select: { taggedMemberId: true },
+    });
+    return new Set(tags.map((tag) => tag.taggedMemberId));
+  }
+
   private matchFace(
     face: FaceDetectionResult,
     candidates: MatchCandidate[],
     media: ScannableMedia,
+    alreadyTaggedMemberIds: Set<string>,
   ): FaceMatch | null {
     const vector = this.normalize(face.embedding);
     if (!vector) return null;
     const scores = candidates
+      .filter((candidate) => !alreadyTaggedMemberIds.has(candidate.member.id))
       .map((candidate) => ({
         member: candidate.member,
         score: this.cosine(vector, candidate.centroid),

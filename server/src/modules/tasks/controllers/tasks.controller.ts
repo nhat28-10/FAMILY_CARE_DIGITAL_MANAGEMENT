@@ -169,7 +169,9 @@ export class TasksController {
   cancelTask(
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
-    return this.tasksService.cancelTask(familyId, taskId);
+    return this.tasksService.cancelTask(familyId, taskId, memberId, familyRole);
   }
 }

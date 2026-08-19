@@ -77,6 +77,7 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: CreateRewardSettingDto,
   ) {
     return this.tasksService.createRewardSetting(
@@ -84,6 +85,7 @@ export class TaskRewardsController {
       taskId,
       memberId,
       dto,
+      familyRole,
     );
   }
 
@@ -128,6 +130,7 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: UpdateRewardSettingDto,
   ) {
     return this.tasksService.updateRewardSetting(
@@ -135,6 +138,7 @@ export class TaskRewardsController {
       taskId,
       memberId,
       dto,
+      familyRole,
     );
   }
 
@@ -154,8 +158,14 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
-    return this.tasksService.deleteRewardSetting(familyId, taskId, memberId);
+    return this.tasksService.deleteRewardSetting(
+      familyId,
+      taskId,
+      memberId,
+      familyRole,
+    );
   }
 
   @Post('submissions/:submissionId/reward-settlement')

@@ -3,6 +3,7 @@ import {
   FamilyRole,
   MemberStatus,
   NotificationType,
+  RewardType,
   TaskAssignmentStatus,
   TaskPriority,
   TaskProofType,
@@ -517,6 +518,233 @@ describe('TasksService createTaskSubmission', () => {
 
     expect(tx.taskSubmission.create).not.toHaveBeenCalled();
     expect(tx.taskAssignment.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('TasksService updateTaskAssignment', () => {
+  const familyId = 'family-id';
+  const assignmentId = 'assignment-id';
+  const taskId = 'task-id';
+  const startAt = new Date('2026-08-20T08:00:00.000Z');
+  const dueAt = new Date('2026-08-20T10:00:00.000Z');
+  const extendedDueAt = new Date('2026-08-21T10:00:00.000Z');
+
+  let prisma: {
+    taskAssignment: {
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+  };
+  let service: TasksService;
+
+  const assignment = (overrides: Record<string, unknown> = {}) => ({
+    id: assignmentId,
+    taskId,
+    assignedToMemberId: 'member-id',
+    assignedByMemberId: 'manager-id',
+    status: TaskAssignmentStatus.IN_PROGRESS,
+    assignedAt: new Date('2026-08-20T07:00:00.000Z'),
+    startAt,
+    dueAt,
+    createdAt: new Date('2026-08-20T07:00:00.000Z'),
+    updatedAt: new Date('2026-08-20T07:00:00.000Z'),
+    assignedToMember: null,
+    assignedByMember: null,
+    task: {
+      id: taskId,
+      familyId,
+      taskCategoryId: null,
+      title: 'Wash dishes',
+      taskType: TaskType.AD_HOC,
+      priority: TaskPriority.MEDIUM,
+      status: TaskStatus.ACTIVE,
+      dueAt: null,
+      category: null,
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    prisma = {
+      taskAssignment: {
+        findFirst: jest.fn().mockResolvedValue(assignment()),
+        update: jest.fn().mockResolvedValue(
+          assignment({
+            dueAt: extendedDueAt,
+            updatedAt: new Date('2026-08-20T08:30:00.000Z'),
+          }),
+        ),
+      },
+    };
+    service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+  });
+
+  it('extends the current assignment without changing assignee or status', async () => {
+    const result = await service.updateTaskAssignment(
+      familyId,
+      assignmentId,
+      'manager-id',
+      FamilyRole.FAMILY_MANAGER,
+      {
+        dueAt: extendedDueAt.toISOString(),
+      },
+    );
+
+    expect(prisma.taskAssignment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: assignmentId },
+        data: {
+          startAt: undefined,
+          dueAt: extendedDueAt,
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      id: assignmentId,
+      assignedToMemberId: 'member-id',
+      status: TaskAssignmentStatus.IN_PROGRESS,
+      dueAt: extendedDueAt,
+    });
+  });
+
+  it('rejects deputy self extension for their own assignment', async () => {
+    prisma.taskAssignment.findFirst.mockResolvedValue(
+      assignment({
+        assignedToMemberId: 'deputy-id',
+      }),
+    );
+
+    await expect(
+      service.updateTaskAssignment(
+        familyId,
+        assignmentId,
+        'deputy-id',
+        FamilyRole.DEPUTY_MEMBER,
+        {
+          dueAt: extendedDueAt.toISOString(),
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.taskAssignment.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('TasksService reward setting settlement backfill', () => {
+  const familyId = 'family-id';
+  const taskId = 'task-id';
+
+  let tx: {
+    rewardSetting: {
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    taskSubmission: {
+      findMany: jest.Mock;
+    };
+    rewardSettlement: {
+      createMany: jest.Mock;
+    };
+  };
+  let prisma: {
+    $transaction: jest.Mock;
+    task: { findFirst: jest.Mock };
+  };
+  let service: TasksService;
+
+  beforeEach(() => {
+    tx = {
+      rewardSetting: {
+        create: jest.fn().mockResolvedValue({
+          id: 'reward-setting-id',
+          taskId,
+          rewardType: RewardType.MONEY_RECORD,
+          rewardAmount: 50000,
+          rewardDescription: null,
+          autoCreateSettlement: true,
+          createdAt: new Date('2026-08-20T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-20T00:00:00.000Z'),
+        }),
+        update: jest.fn(),
+      },
+      taskSubmission: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'submission-id',
+            submittedByMemberId: 'member-id',
+            assignment: { assignedToMemberId: 'member-id' },
+          },
+        ]),
+      },
+      rewardSettlement: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+      task: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: taskId,
+          status: TaskStatus.COMPLETED,
+          rewardSetting: null,
+        }),
+      },
+    };
+    service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+  });
+
+  it('backfills settlements for already-approved submissions when auto create is enabled', async () => {
+    await service.createRewardSetting(familyId, taskId, 'manager-id', {
+      rewardType: RewardType.MONEY_RECORD,
+      rewardAmount: 50000,
+      autoCreateSettlement: true,
+    });
+
+    expect(tx.taskSubmission.findMany).toHaveBeenCalledWith({
+      where: {
+        status: TaskSubmissionStatus.APPROVED,
+        rewardSettlement: { is: null },
+        assignment: { taskId },
+      },
+      select: {
+        id: true,
+        submittedByMemberId: true,
+        assignment: {
+          select: {
+            assignedToMemberId: true,
+          },
+        },
+      },
+    });
+    expect(tx.rewardSettlement.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            taskSubmissionId: 'submission-id',
+            rewardSettingId: 'reward-setting-id',
+            receiverMemberId: 'member-id',
+            amount: 50000,
+          }),
+        ],
+        skipDuplicates: true,
+      }),
+    );
   });
 });
 
