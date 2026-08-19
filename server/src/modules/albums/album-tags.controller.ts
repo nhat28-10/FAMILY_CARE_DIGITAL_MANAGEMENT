@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiCreatedResponse,
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -23,7 +25,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentFamilyMember } from '../family-members/decorators/current-family-member.decorator';
 import { FamilyPermissionGuard } from '../family-members/guards/family-permission.guard';
 import { AlbumTagsService } from './album-tags.service';
-import { AddAlbumMediaTagDto } from './dto/album-tags.dto';
+import {
+  AddAlbumMediaTagDto,
+  AlbumTagApiResponseDto,
+  AlbumTagListApiResponseDto,
+  AlbumTagRemoveApiResponseDto,
+} from './dto/album-tags.dto';
 
 @ApiTags('Album Tags')
 @ApiBearerAuth()
@@ -41,6 +48,7 @@ export class AlbumTagsController {
     description:
       'Chỉ media SAFE. Thành viên được tag phải có sẵn quyền xem; tag không cấp thêm quyền truy cập.',
   })
+  @ApiCreatedResponse({ type: AlbumTagApiResponseDto })
   @ResponseMessage('Gắn thẻ thành viên thành công')
   add(
     @Param('familyId') familyId: string,
@@ -53,6 +61,7 @@ export class AlbumTagsController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách tag của media' })
+  @ApiOkResponse({ type: AlbumTagListApiResponseDto })
   @ResponseMessage('Lấy danh sách tag thành công')
   list(
     @Param('familyId') familyId: string,
@@ -65,6 +74,7 @@ export class AlbumTagsController {
   @Delete(':tagId')
   @ApiParam({ name: 'tagId', description: 'ID tag', format: 'uuid' })
   @ApiOperation({ summary: 'Gỡ tag khỏi media' })
+  @ApiOkResponse({ type: AlbumTagRemoveApiResponseDto })
   @ResponseMessage('Gỡ tag thành công')
   remove(
     @Param('familyId') familyId: string,

@@ -55,12 +55,37 @@ const albumMediaInclude = {
       user: { select: { fullName: true, avatarUrl: true } },
     },
   },
+  tags: {
+    include: {
+      taggedMember: {
+        select: {
+          id: true,
+          displayName: true,
+          familyRole: true,
+          status: true,
+          user: { select: { fullName: true, avatarUrl: true } },
+        },
+      },
+      taggedByMember: {
+        select: {
+          id: true,
+          displayName: true,
+          user: { select: { fullName: true } },
+        },
+      },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
   _count: { select: { tags: true } },
 } satisfies Prisma.AlbumMediaInclude;
 
 type AlbumMediaWithUploader = Prisma.AlbumMediaGetPayload<{
   include: typeof albumMediaInclude;
 }>;
+
+type AlbumMediaTagForResponse = NonNullable<
+  AlbumMediaWithUploader['tags']
+>[number];
 
 @Injectable()
 export class AlbumsService {
@@ -584,6 +609,9 @@ export class AlbumsService {
         familyRole: media.uploadedByMember.familyRole,
         avatarUrl: media.uploadedByMember.user.avatarUrl,
       },
+      tags: (media.tags ?? []).map((tag) =>
+        this.mapTagSummary(tag, media, member),
+      ),
       fileAccess,
       permissions: {
         canEdit,
@@ -596,6 +624,40 @@ export class AlbumsService {
           this.policy.isManager(member) &&
           (media.moderationStatus === MediaModerationStatus.NEED_REVIEW ||
             media.moderationStatus === MediaModerationStatus.FLAGGED),
+      },
+    };
+  }
+
+  private mapTagSummary(
+    tag: AlbumMediaTagForResponse,
+    media: AlbumMediaWithUploader,
+    requester: FamilyMember,
+  ) {
+    return {
+      id: tag.id,
+      taggedMemberId: tag.taggedMemberId,
+      taggedByMemberId: tag.taggedByMemberId,
+      tagNote: tag.tagNote,
+      createdAt: tag.createdAt,
+      taggedMember: {
+        memberId: tag.taggedMember.id,
+        displayName:
+          tag.taggedMember.displayName ??
+          tag.taggedMember.user.fullName ??
+          'ThÃ nh viÃªn',
+        avatarUrl: tag.taggedMember.user.avatarUrl,
+        familyRole: tag.taggedMember.familyRole,
+        memberStatus: tag.taggedMember.status,
+      },
+      taggedBy: {
+        memberId: tag.taggedByMember.id,
+        displayName:
+          tag.taggedByMember.displayName ??
+          tag.taggedByMember.user.fullName ??
+          'ThÃ nh viÃªn',
+      },
+      permissions: {
+        canRemove: this.policy.canRemoveTag(media, tag, requester),
       },
     };
   }

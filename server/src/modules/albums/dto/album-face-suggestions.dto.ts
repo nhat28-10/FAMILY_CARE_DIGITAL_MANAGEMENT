@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   AlbumFaceDetectionStatus,
   AlbumTagSuggestionStatus,
+  FaceScanJobStatus,
 } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional } from 'class-validator';
@@ -16,6 +17,67 @@ export class RequestFaceScanDto {
   })
   @IsBoolean()
   force?: boolean;
+}
+
+export class FaceScanJobSummaryResponseDto {
+  @ApiProperty({ format: 'uuid', nullable: true })
+  scanJobId!: string | null;
+
+  @ApiProperty({ enum: FaceScanJobStatus, nullable: true })
+  status!: FaceScanJobStatus | null;
+
+  @ApiProperty({ enum: FaceScanJobStatus, isArray: true })
+  statuses!: FaceScanJobStatus[];
+
+  @ApiProperty({ example: 2 })
+  detectedFaceCount!: number;
+
+  @ApiProperty({ example: 1 })
+  suggestionCount!: number;
+
+  @ApiProperty({ format: 'date-time', nullable: true })
+  startedAt!: Date | null;
+
+  @ApiProperty({ format: 'date-time', nullable: true })
+  completedAt!: Date | null;
+
+  @ApiProperty({ example: 'Face AI service timeout', nullable: true })
+  error!: string | null;
+
+  @ApiProperty({ example: 600 })
+  maxProcessingSeconds!: number;
+
+  @ApiProperty({ example: 60 })
+  retryDelaySeconds!: number;
+
+  @ApiProperty({ example: 2 })
+  forceRescanLimit!: number;
+
+  @ApiProperty({ example: 600 })
+  forceRescanCooldownSeconds!: number;
+
+  @ApiProperty({ format: 'date-time', nullable: true })
+  staleAt!: Date | null;
+
+  @ApiProperty({ example: false })
+  retryAllowed!: boolean;
+
+  @ApiProperty({
+    example:
+      '/families/11111111-1111-4111-8111-111111111111/albums/media/22222222-2222-4222-8222-222222222222/face-scan/retry',
+  })
+  retryEndpoint!: string;
+}
+
+export class FaceScanJobSummaryApiResponseDto {
+  @ApiProperty({ example: true })
+  success!: boolean;
+
+  @ApiProperty({ example: 'Đã tạo hoặc trả về face scan job hiện có' })
+  message!: string;
+
+  @ApiProperty({ type: () => FaceScanJobSummaryResponseDto })
+  data!: FaceScanJobSummaryResponseDto;
 }
 
 class FaceSuggestionPermissionsResponseDto {
