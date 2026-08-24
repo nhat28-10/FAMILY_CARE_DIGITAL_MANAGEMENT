@@ -2118,6 +2118,7 @@ model AlbumMediaTag {
   taggedMemberId   String   @map("tagged_member_id")
   taggedByMemberId String   @map("tagged_by_member_id")
   tagNote          String?  @map("tag_note")
+  boundingBox      Json?    @map("bounding_box")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   media          AlbumMedia   @relation(fields: [mediaId], references: [id], onDelete: Cascade)

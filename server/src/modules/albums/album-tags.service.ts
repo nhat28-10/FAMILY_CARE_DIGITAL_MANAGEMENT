@@ -195,6 +195,7 @@ export class AlbumTagsService {
       taggedMemberId: tag.taggedMemberId,
       taggedByMemberId: tag.taggedByMemberId,
       tagNote: tag.tagNote,
+      boundingBox: tag.boundingBox ?? null,
       createdAt: tag.createdAt,
       taggedMember: {
         memberId: tag.taggedMember.id,

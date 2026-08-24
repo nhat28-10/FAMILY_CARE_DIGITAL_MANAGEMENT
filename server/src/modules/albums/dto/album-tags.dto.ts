@@ -48,6 +48,20 @@ export class AlbumTagPermissionsResponseDto {
   canRemove!: boolean;
 }
 
+class AlbumTagBoundingBoxResponseDto {
+  @ApiProperty({ example: 0.1 })
+  x!: number;
+
+  @ApiProperty({ example: 0.2 })
+  y!: number;
+
+  @ApiProperty({ example: 0.3 })
+  width!: number;
+
+  @ApiProperty({ example: 0.4 })
+  height!: number;
+}
+
 export class AlbumTagResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -64,6 +78,14 @@ export class AlbumTagResponseDto {
 
   @ApiProperty({ example: 'Confirmed from face suggestion', nullable: true })
   tagNote!: string | null;
+
+  @ApiProperty({
+    type: () => AlbumTagBoundingBoxResponseDto,
+    nullable: true,
+    description:
+      'Normalized face bounding box for AI-confirmed tags. Null for manual tags and old tags without coordinates.',
+  })
+  boundingBox!: AlbumTagBoundingBoxResponseDto | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: Date;
