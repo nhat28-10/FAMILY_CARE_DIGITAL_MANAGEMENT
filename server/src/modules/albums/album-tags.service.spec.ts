@@ -97,6 +97,7 @@ function tag(overrides: Record<string, unknown> = {}) {
     taggedMemberId: 'tagged',
     taggedByMemberId: 'requester',
     tagNote: null,
+    boundingBox: null,
     createdAt: now,
     taggedMember: selectedMember('tagged'),
     taggedByMember: selectedMember('requester'),
@@ -177,6 +178,7 @@ describe('AlbumTagsService', () => {
     expect(notifications.dispatch).toHaveBeenCalledWith(['notif-1']);
     expect(result.taggedMemberId).toBe('tagged');
     expect(result.taggedByMemberId).toBe('requester');
+    expect(result.boundingBox).toBeNull();
     expect(result.taggedMember.memberStatus).toBe(MemberStatus.ACTIVE);
   });
 

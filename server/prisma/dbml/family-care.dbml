@@ -1228,6 +1228,7 @@ Table album_media_tags {
   taggedMemberId String [not null]
   taggedByMemberId String [not null]
   tagNote String
+  boundingBox Json
   createdAt DateTime [default: `now()`, not null]
   media album_media [not null]
   taggedMember family_members [not null]

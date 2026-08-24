@@ -163,6 +163,7 @@ describe('AlbumFaceSuggestionsService', () => {
       create: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      update: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -202,6 +203,7 @@ describe('AlbumFaceSuggestionsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ tagId: 'tag-1' }),
+        update: jest.fn().mockResolvedValue({ id: 'tag-1' }),
       },
       $transaction: jest.fn((input: unknown) => {
         if (Array.isArray(input)) return Promise.all(input);
@@ -730,7 +732,10 @@ describe('AlbumFaceSuggestionsService', () => {
     expect(result.status).toBe(AlbumTagSuggestionStatus.CONFIRMED);
     expect(prisma.albumMediaTag.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ taggedMemberId: 'target' }),
+        data: expect.objectContaining({
+          taggedMemberId: 'target',
+          boundingBox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+        }),
       }),
     );
     expect(notifications.notify).toHaveBeenCalledWith(
@@ -742,8 +747,12 @@ describe('AlbumFaceSuggestionsService', () => {
     expect(notifications.dispatch).toHaveBeenCalledWith(['notif-1']);
 
     prisma.albumMediaTag.create.mockClear();
+    prisma.albumMediaTag.update.mockClear();
     notifications.notify.mockClear();
-    prisma.albumMediaTag.findUnique.mockResolvedValue({ tagId: 'tag-1' });
+    prisma.albumMediaTag.findUnique.mockResolvedValue({
+      id: 'tag-1',
+      boundingBox: null,
+    });
     await service.confirmSuggestion(
       'family-1',
       'media-1',
@@ -751,6 +760,12 @@ describe('AlbumFaceSuggestionsService', () => {
       member('requester'),
     );
     expect(prisma.albumMediaTag.create).not.toHaveBeenCalled();
+    expect(prisma.albumMediaTag.update).toHaveBeenCalledWith({
+      where: { id: 'tag-1' },
+      data: {
+        boundingBox: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+      },
+    });
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 

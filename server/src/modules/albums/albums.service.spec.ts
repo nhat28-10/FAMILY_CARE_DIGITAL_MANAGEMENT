@@ -82,6 +82,7 @@ function albumTag(overrides: Record<string, unknown> = {}) {
     taggedMemberId: 'tagged',
     taggedByMemberId: 'uploader',
     tagNote: null,
+    boundingBox: null,
     createdAt: now,
     taggedMember: {
       id: 'tagged',
@@ -424,6 +425,7 @@ describe('AlbumsService permissions and deletion flow', () => {
       id: 'tag-1',
       taggedMemberId,
       taggedByMemberId: 'uploader',
+      boundingBox: null,
       taggedMember: { memberId: taggedMemberId },
     });
   });

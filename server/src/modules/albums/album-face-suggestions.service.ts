@@ -433,9 +433,19 @@ export class AlbumFaceSuggestionsService {
             taggedMemberId: suggestion.suggestedMemberId,
             taggedByMemberId: requester.id,
             tagNote: 'Confirmed from face suggestion',
+            boundingBox:
+              suggestion.detection.boundingBox as Prisma.InputJsonValue,
           },
         });
         createdTag = true;
+      } else if (!existingTag.boundingBox) {
+        await tx.albumMediaTag.update({
+          where: { id: existingTag.id },
+          data: {
+            boundingBox:
+              suggestion.detection.boundingBox as Prisma.InputJsonValue,
+          },
+        });
       }
       const saved = await tx.albumTagSuggestion.update({
         where: { suggestionId },
