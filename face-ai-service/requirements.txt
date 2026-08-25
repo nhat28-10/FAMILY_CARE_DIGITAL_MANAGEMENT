@@ -3,6 +3,7 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 numpy==2.2.1
 opencv-python-headless==4.10.0.84
+Pillow==11.1.0
 onnxruntime==1.20.1
 insightface==0.7.3
 pytest==8.3.4
