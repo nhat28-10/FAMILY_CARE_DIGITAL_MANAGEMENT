@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Any, Protocol
 
 import numpy as np
@@ -104,12 +105,16 @@ class InsightFaceModel:
 
     def _decode(self, image_bytes: bytes) -> Any:
         import cv2
+        from PIL import Image, ImageOps, UnidentifiedImageError
 
-        data = np.frombuffer(image_bytes, dtype=np.uint8)
-        image = cv2.imdecode(data, cv2.IMREAD_COLOR)
-        if image is None:
+        try:
+            with Image.open(BytesIO(image_bytes)) as source:
+                image = ImageOps.exif_transpose(source)
+                rgb = np.array(image.convert("RGB"))
+        except (UnidentifiedImageError, OSError, ValueError):
             raise HTTPException(status_code=422, detail="Invalid image")
-        return image
+
+        return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
     def _normalized_embedding(self, face: Any) -> np.ndarray:
         embedding = np.asarray(face.normed_embedding, dtype=np.float32)

@@ -1,7 +1,10 @@
+from io import BytesIO
+
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from PIL import Image
 
-from app.main import MAX_FACES, app
+from app.main import MAX_FACES, InsightFaceModel, app
 
 
 class FakeFaceModel:
@@ -135,3 +138,16 @@ def test_detect_truncates_to_max_faces() -> None:
     )
     assert response.status_code == 200
     assert len(response.json()["faces"]) == MAX_FACES
+
+
+def test_decode_applies_exif_orientation() -> None:
+    model = object.__new__(InsightFaceModel)
+    image = Image.new("RGB", (20, 10), (255, 0, 0))
+    exif = Image.Exif()
+    exif[274] = 6
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", exif=exif)
+
+    decoded = model._decode(buffer.getvalue())
+
+    assert decoded.shape[:2] == (20, 10)
