@@ -223,6 +223,17 @@ const taskScheduleResponseSelect = {
   updatedAt: true,
 } satisfies Prisma.TaskScheduleSelect;
 
+const rewardSettingResponseSelect = {
+  id: true,
+  taskId: true,
+  rewardType: true,
+  rewardAmount: true,
+  rewardDescription: true,
+  autoCreateSettlement: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.RewardSettingSelect;
+
 const taskResponseSelect = {
   id: true,
   familyId: true,
@@ -265,6 +276,9 @@ const taskListItemSelect = {
   },
   createdByMember: {
     select: memberCompactSummarySelect,
+  },
+  rewardSetting: {
+    select: rewardSettingResponseSelect,
   },
 } satisfies Prisma.TaskSelect;
 
@@ -345,17 +359,6 @@ const taskUnavailabilityResponseSelect = {
     },
   },
 } satisfies Prisma.TaskUnavailabilitySelect;
-
-const rewardSettingResponseSelect = {
-  id: true,
-  taskId: true,
-  rewardType: true,
-  rewardAmount: true,
-  rewardDescription: true,
-  autoCreateSettlement: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.RewardSettingSelect;
 
 const rewardSettlementResponseSelect = {
   id: true,
@@ -3986,6 +3989,9 @@ export class TasksService {
       updatedAt: task.updatedAt,
       category: this.mapCategorySummary(task.category),
       createdByMember: this.mapMemberCompactSummary(task.createdByMember),
+      rewardSetting: task.rewardSetting
+        ? this.mapRewardSettingResponse(task.rewardSetting)
+        : null,
     };
   }
 

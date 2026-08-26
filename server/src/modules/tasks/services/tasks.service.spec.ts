@@ -336,6 +336,122 @@ describe('TasksService listTaskSubmissions', () => {
   });
 });
 
+describe('TasksService listTasks', () => {
+  const familyId = 'family-id';
+  const createdAt = new Date('2026-08-26T01:00:00.000Z');
+  const updatedAt = new Date('2026-08-26T01:05:00.000Z');
+
+  const compactMember = {
+    id: 'manager-member-id',
+    userId: 'manager-user-id',
+    user: {
+      id: 'manager-user-id',
+      fullName: 'Manager',
+      avatarUrl: null,
+    },
+  };
+
+  it('includes rewardSetting for each task list item', async () => {
+    const rewardAmount = new Prisma.Decimal(33000);
+    const tasks = [
+      {
+        id: 'task-with-reward-id',
+        familyId,
+        taskCategoryId: 'category-id',
+        title: 'Clean room',
+        description: null,
+        taskType: TaskType.AD_HOC,
+        priority: TaskPriority.MEDIUM,
+        status: TaskStatus.ACTIVE,
+        createdByMemberId: compactMember.id,
+        dueAt: null,
+        createdAt,
+        updatedAt,
+        category: {
+          id: 'category-id',
+          name: 'Housework',
+          status: TaskStatus.ACTIVE,
+        },
+        createdByMember: compactMember,
+        rewardSetting: {
+          id: 'reward-setting-id',
+          taskId: 'task-with-reward-id',
+          rewardType: RewardType.MONEY_RECORD,
+          rewardAmount,
+          rewardDescription: null,
+          autoCreateSettlement: true,
+          createdAt,
+          updatedAt,
+        },
+      },
+      {
+        id: 'task-without-reward-id',
+        familyId,
+        taskCategoryId: null,
+        title: 'Read book',
+        description: null,
+        taskType: TaskType.AD_HOC,
+        priority: TaskPriority.LOW,
+        status: TaskStatus.ACTIVE,
+        createdByMemberId: compactMember.id,
+        dueAt: null,
+        createdAt,
+        updatedAt,
+        category: null,
+        createdByMember: compactMember,
+        rewardSetting: null,
+      },
+    ];
+    const prisma = {
+      $transaction: jest.fn((operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+      task: {
+        findMany: jest.fn().mockResolvedValue(tasks),
+        count: jest.fn().mockResolvedValue(tasks.length),
+      },
+    };
+    const notifications = {
+      notify: jest.fn(),
+      notifyUsersEphemeral: jest.fn(),
+      dispatch: jest.fn(),
+    };
+    const service = new TasksService(
+      prisma as unknown as PrismaService,
+      notifications as unknown as NotificationsService,
+    );
+
+    const result = await service.listTasks(familyId, {
+      page: 1,
+      limit: 100,
+    });
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          rewardSetting: expect.any(Object),
+        }),
+      }),
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toMatchObject({
+      id: 'task-with-reward-id',
+      rewardSetting: {
+        id: 'reward-setting-id',
+        taskId: 'task-with-reward-id',
+        rewardType: RewardType.MONEY_RECORD,
+        rewardAmount,
+        rewardDescription: null,
+        autoCreateSettlement: true,
+      },
+    });
+    expect(result.items[1]).toMatchObject({
+      id: 'task-without-reward-id',
+      rewardSetting: null,
+    });
+  });
+});
+
 describe('TasksService createTaskAssignment', () => {
   const familyId = 'family-id';
   const taskId = 'task-id';
