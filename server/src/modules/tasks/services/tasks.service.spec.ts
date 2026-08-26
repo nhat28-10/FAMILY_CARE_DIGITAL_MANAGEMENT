@@ -1,8 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
+  FinanceLedgerStatus,
+  LedgerEntryStatus,
+  LedgerEntryType,
   MemberStatus,
   NotificationType,
+  Prisma,
   RewardDisputeStatus,
   RewardExternalMethod,
   RewardSettlementStatus,
@@ -633,6 +637,194 @@ describe('TasksService deputy self-benefit guards', () => {
 
     expect(tx.rewardDispute.update).not.toHaveBeenCalled();
     expect(tx.rewardSettlement.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('TasksService reward settlement ledger entries', () => {
+  const familyId = 'family-id';
+  const settlementId = 'settlement-id';
+  const memberId = 'member-id';
+  const taskId = 'task-id';
+  const now = new Date('2026-08-26T08:00:00.000Z');
+
+  const serviceWithPrisma = (prisma: unknown) =>
+    new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+
+  const settlementResponse = () => ({
+    id: settlementId,
+    taskSubmissionId: 'submission-id',
+    rewardSettingId: 'reward-setting-id',
+    receiverMemberId: memberId,
+    settledByMemberId: 'manager-id',
+    amount: new Prisma.Decimal(50000),
+    status: RewardSettlementStatus.SETTLED,
+    externalMethod: RewardExternalMethod.CASH,
+    externalNote: null,
+    settledAt: now,
+    confirmedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    receiverMember: null,
+    settledByMember: null,
+    taskSubmission: {
+      id: 'submission-id',
+      status: TaskSubmissionStatus.APPROVED,
+      submittedAt: now,
+      reviewedAt: now,
+      assignment: {
+        task: {
+          id: taskId,
+          title: 'Clean room',
+          taskType: TaskType.AD_HOC,
+          priority: TaskPriority.MEDIUM,
+          status: TaskStatus.COMPLETED,
+        },
+      },
+    },
+  });
+
+  it('creates one reward ledger entry when money reward is confirmed received', async () => {
+    const tx = {
+      rewardSettlement: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: settlementId,
+          receiverMemberId: memberId,
+          amount: new Prisma.Decimal(50000),
+          status: RewardSettlementStatus.WAITING_CONFIRMATION,
+          rewardSetting: { rewardType: RewardType.MONEY_RECORD },
+          taskSubmission: {
+            assignment: {
+              task: {
+                id: taskId,
+                title: 'Clean room',
+              },
+            },
+          },
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(settlementResponse()),
+      },
+      ledgerEntry: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'ledger-entry-id' }),
+      },
+      financeLedger: {
+        upsert: jest.fn().mockResolvedValue({ id: 'ledger-id' }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await service.confirmRewardReceived(familyId, settlementId, memberId);
+
+    expect(tx.rewardSettlement.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: settlementId,
+          status: RewardSettlementStatus.WAITING_CONFIRMATION,
+        },
+      }),
+    );
+    expect(tx.ledgerEntry.findFirst).toHaveBeenCalledWith({
+      where: {
+        sourceType: 'TASK_REWARD_SETTLEMENT',
+        sourceId: settlementId,
+        status: LedgerEntryStatus.ACTIVE,
+        ledger: { familyId },
+      },
+      select: { id: true },
+    });
+    expect(tx.ledgerEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ledgerId: 'ledger-id',
+          createdByMemberId: memberId,
+          entryType: LedgerEntryType.REWARD,
+          amount: new Prisma.Decimal(50000),
+          description: 'Thuong nhiem vu: Clean room',
+          status: LedgerEntryStatus.ACTIVE,
+          sourceType: 'TASK_REWARD_SETTLEMENT',
+          sourceId: settlementId,
+        }),
+      }),
+    );
+  });
+
+  it('links allocations to the settlement ledger entry without creating a second reward entry', async () => {
+    const tx = {
+      rewardSettlement: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: settlementId,
+          receiverMemberId: memberId,
+          amount: new Prisma.Decimal(50000),
+          status: RewardSettlementStatus.SETTLED,
+          rewardSetting: { rewardType: RewardType.MONEY_RECORD },
+        }),
+      },
+      financeJar: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'jar-id' }]),
+      },
+      rewardAllocation: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
+        create: jest.fn().mockResolvedValue({
+          id: 'allocation-id',
+          rewardSettlementId: settlementId,
+          jarId: 'jar-id',
+          goalId: null,
+          ledgerEntryId: 'settlement-ledger-id',
+          amount: new Prisma.Decimal(10000),
+          allocatedByMemberId: memberId,
+          allocatedAt: now,
+          jar: { id: 'jar-id', name: 'Savings' },
+          goal: null,
+          allocatedByMember: null,
+        }),
+      },
+      financeLedger: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'ledger-id',
+          status: FinanceLedgerStatus.ACTIVE,
+        }),
+      },
+      ledgerEntry: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'settlement-ledger-id',
+        }),
+        create: jest.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await service.createRewardAllocations(familyId, settlementId, memberId, {
+      allocations: [{ jarId: 'jar-id', amount: 10000 }],
+    });
+
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.rewardAllocation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          rewardSettlementId: settlementId,
+          jarId: 'jar-id',
+          ledgerEntryId: 'settlement-ledger-id',
+        }),
+      }),
+    );
   });
 });
 
