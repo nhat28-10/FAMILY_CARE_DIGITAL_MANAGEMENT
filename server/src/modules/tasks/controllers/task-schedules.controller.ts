@@ -136,6 +136,7 @@ export class TaskSchedulesController {
     @Param('familyId') familyId: string,
     @Param('taskId') taskId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: GenerateTaskAssignmentsDto,
   ) {
     return this.tasksService.generateRecurringTaskAssignments(
@@ -143,6 +144,7 @@ export class TaskSchedulesController {
       taskId,
       memberId,
       dto,
+      familyRole,
     );
   }
 }

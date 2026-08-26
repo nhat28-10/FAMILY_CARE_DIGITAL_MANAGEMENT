@@ -3,10 +3,15 @@ import {
   FamilyRole,
   MemberStatus,
   NotificationType,
+  RewardDisputeStatus,
+  RewardExternalMethod,
+  RewardSettlementStatus,
   RewardType,
   TaskAssignmentStatus,
   TaskPriority,
   TaskProofType,
+  TaskRepeatType,
+  TaskScheduleStatus,
   TaskStatus,
   TaskSubmissionStatus,
   TaskType,
@@ -14,6 +19,8 @@ import {
 
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { ResolveRewardDisputeAction } from '../dto/resolve-reward-dispute.dto';
+import { ReviewTaskSubmissionDecision } from '../dto/review-task-submission.dto';
 import { TasksService } from './tasks.service';
 
 describe('TasksService listTaskSubmissions', () => {
@@ -444,6 +451,188 @@ describe('TasksService createTaskAssignment', () => {
     });
     expect(result.assignedToMemberId).toBe(assignedToMemberId);
     expect(result.assignedToMember?.familyRole).toBe(FamilyRole.FAMILY_MANAGER);
+  });
+});
+
+describe('TasksService deputy self-benefit guards', () => {
+  const familyId = 'family-id';
+  const taskId = 'task-id';
+  const deputyMemberId = 'deputy-id';
+
+  const serviceWithPrisma = (prisma: unknown) =>
+    new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+
+  it('rejects deputy self generation for recurring assignments', async () => {
+    const prisma = {
+      task: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: taskId,
+          title: 'Clean room',
+          taskType: TaskType.RECURRING,
+          status: TaskStatus.ACTIVE,
+          priority: TaskPriority.MEDIUM,
+          schedule: {
+            id: 'schedule-id',
+            taskId,
+            repeatType: TaskRepeatType.DAILY,
+            repeatInterval: 1,
+            startDate: new Date('2026-08-20T00:00:00.000Z'),
+            endDate: null,
+            dayOfWeek: null,
+            status: TaskScheduleStatus.ACTIVE,
+            createdAt: new Date('2026-08-20T00:00:00.000Z'),
+            updatedAt: new Date('2026-08-20T00:00:00.000Z'),
+          },
+        }),
+      },
+      familyMember: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: deputyMemberId,
+          familyId,
+          status: MemberStatus.ACTIVE,
+        }),
+      },
+      taskAssignment: {
+        findMany: jest.fn(),
+      },
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.generateRecurringTaskAssignments(
+        familyId,
+        taskId,
+        deputyMemberId,
+        {
+          assignedToMemberId: deputyMemberId,
+          fromDate: '2026-08-20',
+          toDate: '2026-08-20',
+        },
+        FamilyRole.DEPUTY_MEMBER,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.taskAssignment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects review when the reviewer is the assignment assignee', async () => {
+    const tx = {
+      taskSubmission: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'submission-id',
+          assignmentId: 'assignment-id',
+          submittedByMemberId: deputyMemberId,
+          status: TaskSubmissionStatus.WAITING_REVIEW,
+          rewardSettlement: null,
+          assignment: {
+            taskId,
+            assignedToMemberId: deputyMemberId,
+            task: {
+              title: 'Clean room',
+              taskType: TaskType.AD_HOC,
+              rewardSetting: null,
+            },
+          },
+        }),
+        update: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+      taskAssignment: {
+        update: jest.fn(),
+      },
+      task: {
+        update: jest.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.reviewTaskSubmission(familyId, 'submission-id', deputyMemberId, {
+        decision: ReviewTaskSubmissionDecision.APPROVED,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(tx.taskSubmission.update).not.toHaveBeenCalled();
+    expect(tx.taskAssignment.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects deputy mark-paid for their own reward settlement', async () => {
+    const prisma = {
+      rewardSettlement: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'settlement-id',
+          receiverMemberId: deputyMemberId,
+          status: RewardSettlementStatus.PENDING_SETTLEMENT,
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.markRewardPaid(
+        familyId,
+        'settlement-id',
+        deputyMemberId,
+        {
+          externalMethod: RewardExternalMethod.CASH,
+        },
+        FamilyRole.DEPUTY_MEMBER,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.rewardSettlement.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects deputy resolving a dispute for their own reward settlement', async () => {
+    const tx = {
+      rewardDispute: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'dispute-id',
+          rewardSettlementId: 'settlement-id',
+          status: RewardDisputeStatus.OPEN,
+          rewardSettlement: {
+            receiverMemberId: deputyMemberId,
+          },
+        }),
+        update: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+      rewardSettlement: {
+        update: jest.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((callback: (txArg: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.resolveRewardDispute(
+        familyId,
+        'dispute-id',
+        deputyMemberId,
+        { action: ResolveRewardDisputeAction.REJECT_DISPUTE },
+        FamilyRole.DEPUTY_MEMBER,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(tx.rewardDispute.update).not.toHaveBeenCalled();
+    expect(tx.rewardSettlement.update).not.toHaveBeenCalled();
   });
 });
 

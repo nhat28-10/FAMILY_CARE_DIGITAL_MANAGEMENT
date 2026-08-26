@@ -950,6 +950,7 @@ export class TasksService {
     taskId: string,
     assignedByMemberId: string,
     dto: GenerateTaskAssignmentsDto,
+    familyRole?: FamilyRole,
   ) {
     const fromDate = this.toDateOnly(dto.fromDate);
     const toDate = this.toDateOnly(dto.toDate);
@@ -978,6 +979,11 @@ export class TasksService {
     await this.assertAssignableFamilyMemberInFamily(
       familyId,
       dto.assignedToMemberId,
+    );
+    this.assertDeputyNotSelfAssignedMember(
+      dto.assignedToMemberId,
+      assignedByMemberId,
+      familyRole,
     );
 
     const occurrenceDates = this.buildOccurrenceDates(schedule, {
@@ -1943,7 +1949,8 @@ export class TasksService {
   async createRewardSettlementForSubmission(
     familyId: string,
     submissionId: string,
-    _currentMemberId: string,
+    currentMemberId: string,
+    familyRole?: FamilyRole,
   ) {
     const rewardSettlement = await this.prisma.$transaction(async (tx) => {
       const submission = await tx.taskSubmission.findFirst({
@@ -1991,6 +1998,11 @@ export class TasksService {
       const receiverMemberId =
         submission.submittedByMemberId ??
         submission.assignment.assignedToMemberId;
+      this.assertDeputyNotSelfAssignedMember(
+        receiverMemberId,
+        currentMemberId,
+        familyRole,
+      );
 
       const settlement = await tx.rewardSettlement.create({
         data: {
@@ -2075,6 +2087,7 @@ export class TasksService {
     settlementId: string,
     currentMemberId: string,
     dto: MarkRewardPaidDto,
+    familyRole?: FamilyRole,
   ) {
     const settlement = await this.findRewardSettlementInFamily(
       familyId,
@@ -2083,6 +2096,11 @@ export class TasksService {
     if (!settlement) {
       throw new NotFoundException('Không tìm thấy ghi nhận thưởng');
     }
+    this.assertDeputyNotSelfRewardSettlement(
+      settlement,
+      currentMemberId,
+      familyRole,
+    );
     if (settlement.status !== RewardSettlementStatus.PENDING_SETTLEMENT) {
       throw new BadRequestException(
         'Chỉ ghi nhận thưởng đang chờ trả mới được ghi nhận đã trả',
@@ -2142,7 +2160,8 @@ export class TasksService {
   async cancelRewardSettlement(
     familyId: string,
     settlementId: string,
-    _currentMemberId: string,
+    currentMemberId: string,
+    familyRole?: FamilyRole,
   ) {
     const settlement = await this.findRewardSettlementInFamily(
       familyId,
@@ -2151,6 +2170,12 @@ export class TasksService {
     if (!settlement) {
       throw new NotFoundException('Không tìm thấy ghi nhận thưởng');
     }
+
+    this.assertDeputyNotSelfRewardSettlement(
+      settlement,
+      currentMemberId,
+      familyRole,
+    );
 
     const cancelableStatuses: RewardSettlementStatus[] = [
       RewardSettlementStatus.PENDING_SETTLEMENT,
@@ -2463,6 +2488,7 @@ export class TasksService {
     disputeId: string,
     currentMemberId: string,
     dto: ResolveRewardDisputeDto,
+    familyRole?: FamilyRole,
   ) {
     const dispute = await this.prisma.$transaction(async (tx) => {
       const existingDispute = await tx.rewardDispute.findFirst({
@@ -2476,6 +2502,11 @@ export class TasksService {
           id: true,
           rewardSettlementId: true,
           status: true,
+          rewardSettlement: {
+            select: {
+              receiverMemberId: true,
+            },
+          },
         },
       });
       if (!existingDispute) {
@@ -2484,6 +2515,12 @@ export class TasksService {
       if (existingDispute.status !== RewardDisputeStatus.OPEN) {
         throw new BadRequestException('Chỉ có thể xử lý tranh chấp đang mở');
       }
+
+      this.assertDeputyNotSelfRewardSettlement(
+        existingDispute.rewardSettlement,
+        currentMemberId,
+        familyRole,
+      );
 
       const resolvedAt = new Date();
       let disputeStatus: RewardDisputeStatus;
@@ -2768,6 +2805,8 @@ export class TasksService {
           'Chỉ có thể duyệt minh chứng đang chờ xem xét',
         );
       }
+
+      this.assertReviewerNotSubmissionActor(submission, reviewerMemberId);
 
       const nextSubmissionStatus =
         dto.decision === ReviewTaskSubmissionDecision.APPROVED
@@ -4181,6 +4220,38 @@ export class TasksService {
       currentMemberId,
       familyRole,
     );
+  }
+
+  private assertDeputyNotSelfRewardSettlement(
+    settlement: { receiverMemberId: string },
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
+    if (
+      this.isDeputyMember(familyRole) &&
+      settlement.receiverMemberId === currentMemberId
+    ) {
+      throw new ForbiddenException(
+        'Deputy member cannot manage their own reward settlement',
+      );
+    }
+  }
+
+  private assertReviewerNotSubmissionActor(
+    submission: {
+      submittedByMemberId: string;
+      assignment: { assignedToMemberId: string };
+    },
+    reviewerMemberId: string,
+  ) {
+    if (
+      reviewerMemberId === submission.submittedByMemberId ||
+      reviewerMemberId === submission.assignment.assignedToMemberId
+    ) {
+      throw new ForbiddenException(
+        'Reviewer cannot review their own task submission',
+      );
+    }
   }
 
   private async assertDeputyNotAssignedToTask(

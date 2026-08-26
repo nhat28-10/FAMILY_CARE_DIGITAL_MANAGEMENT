@@ -185,11 +185,13 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('submissionId') submissionId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
     return this.tasksService.createRewardSettlementForSubmission(
       familyId,
       submissionId,
       memberId,
+      familyRole,
     );
   }
 
@@ -416,6 +418,7 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('disputeId') disputeId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: ResolveRewardDisputeDto,
   ) {
     return this.tasksService.resolveRewardDispute(
@@ -423,6 +426,7 @@ export class TaskRewardsController {
       disputeId,
       memberId,
       dto,
+      familyRole,
     );
   }
 
@@ -438,6 +442,7 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('settlementId') settlementId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
     @Body() dto: MarkRewardPaidDto,
   ) {
     return this.tasksService.markRewardPaid(
@@ -445,6 +450,7 @@ export class TaskRewardsController {
       settlementId,
       memberId,
       dto,
+      familyRole,
     );
   }
 
@@ -479,11 +485,13 @@ export class TaskRewardsController {
     @Param('familyId') familyId: string,
     @Param('settlementId') settlementId: string,
     @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
   ) {
     return this.tasksService.cancelRewardSettlement(
       familyId,
       settlementId,
       memberId,
+      familyRole,
     );
   }
 }
