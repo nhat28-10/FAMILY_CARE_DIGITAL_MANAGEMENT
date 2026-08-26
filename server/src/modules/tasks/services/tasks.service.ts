@@ -144,6 +144,8 @@ const SAFE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
 const TASK_SUBMISSION_ERROR_CODES = {
   SUBMISSION_OVERDUE: 'SUBMISSION_OVERDUE',
 } as const;
+const TASK_REWARD_SETTLEMENT_SOURCE = 'TASK_REWARD_SETTLEMENT';
+const TASK_REWARD_ALLOCATION_SOURCE = 'TASK_REWARD';
 
 export interface UploadedTaskProofFile {
   originalname: string;
@@ -2127,31 +2129,80 @@ export class TasksService {
     settlementId: string,
     currentMemberId: string,
   ) {
-    const settlement = await this.findRewardSettlementInFamily(
-      familyId,
-      settlementId,
-    );
-    if (!settlement) {
-      throw new NotFoundException('Không tìm thấy ghi nhận thưởng');
-    }
-    if (settlement.receiverMemberId !== currentMemberId) {
-      throw new ForbiddenException(
-        'Chỉ người nhận thưởng mới có thể xác nhận đã nhận',
-      );
-    }
-    if (settlement.status !== RewardSettlementStatus.WAITING_CONFIRMATION) {
-      throw new BadRequestException(
-        'Chỉ ghi nhận thưởng đang chờ xác nhận mới được xác nhận đã nhận',
-      );
-    }
+    const updatedSettlement = await this.prisma.$transaction(async (tx) => {
+      const settlement = await tx.rewardSettlement.findFirst({
+        where: {
+          id: settlementId,
+          taskSubmission: { assignment: { task: { familyId } } },
+        },
+        select: {
+          id: true,
+          receiverMemberId: true,
+          amount: true,
+          status: true,
+          rewardSetting: {
+            select: {
+              rewardType: true,
+            },
+          },
+          taskSubmission: {
+            select: {
+              assignment: {
+                select: {
+                  task: {
+                    select: {
+                      id: true,
+                      title: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!settlement) {
+        throw new NotFoundException('Không tìm thấy ghi nhận thưởng');
+      }
+      if (settlement.receiverMemberId !== currentMemberId) {
+        throw new ForbiddenException(
+          'Chỉ người nhận thưởng mới có thể xác nhận đã nhận',
+        );
+      }
+      if (settlement.status !== RewardSettlementStatus.WAITING_CONFIRMATION) {
+        throw new BadRequestException(
+          'Chỉ ghi nhận thưởng đang chờ xác nhận mới được xác nhận đã nhận',
+        );
+      }
 
-    const updatedSettlement = await this.prisma.rewardSettlement.update({
-      where: { id: settlementId },
-      data: {
-        status: RewardSettlementStatus.SETTLED,
-        confirmedAt: new Date(),
-      },
-      select: rewardSettlementResponseSelect,
+      const confirmedAt = new Date();
+      const updateResult = await tx.rewardSettlement.updateMany({
+        where: {
+          id: settlementId,
+          status: RewardSettlementStatus.WAITING_CONFIRMATION,
+        },
+        data: {
+          status: RewardSettlementStatus.SETTLED,
+          confirmedAt,
+        },
+      });
+      if (updateResult.count !== 1) {
+        throw new BadRequestException(
+          'Reward settlement is no longer waiting for confirmation',
+        );
+      }
+
+      await this.ensureSettledMoneyRewardLedgerEntry(
+        tx,
+        familyId,
+        settlement,
+        confirmedAt,
+      );
+
+      return tx.rewardSettlement.findUniqueOrThrow({
+        where: { id: settlementId },
+        select: rewardSettlementResponseSelect,
+      });
     });
 
     return this.mapRewardSettlementResponse(updatedSettlement);
@@ -2267,14 +2318,25 @@ export class TasksService {
         });
         const activeLedger =
           ledger?.status === FinanceLedgerStatus.ACTIVE ? ledger : null;
+        const settlementLedgerEntry = activeLedger
+          ? await tx.ledgerEntry.findFirst({
+              where: {
+                ledgerId: activeLedger.id,
+                sourceType: TASK_REWARD_SETTLEMENT_SOURCE,
+                sourceId: settlement.id,
+                status: LedgerEntryStatus.ACTIVE,
+              },
+              select: { id: true },
+            })
+          : null;
         const now = new Date();
         const createdAllocations: RewardAllocationResponsePayload[] = [];
 
         for (const allocation of dto.allocations) {
           const amount = new Prisma.Decimal(allocation.amount);
-          let ledgerEntryId: string | null = null;
+          let ledgerEntryId: string | null = settlementLedgerEntry?.id ?? null;
 
-          if (activeLedger) {
+          if (activeLedger && !settlementLedgerEntry) {
             const ledgerEntry = await tx.ledgerEntry.create({
               data: {
                 ledgerId: activeLedger.id,
@@ -2284,7 +2346,7 @@ export class TasksService {
                 description: 'Phân bổ thưởng công việc',
                 entryDate: now,
                 status: LedgerEntryStatus.ACTIVE,
-                sourceType: 'TASK_REWARD',
+                sourceType: TASK_REWARD_ALLOCATION_SOURCE,
                 sourceId: settlement.id,
               },
               select: { id: true },
@@ -3314,6 +3376,81 @@ export class TasksService {
         );
       }
     }
+  }
+
+  private async ensureSettledMoneyRewardLedgerEntry(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+    settlement: {
+      id: string;
+      receiverMemberId: string;
+      amount: Prisma.Decimal;
+      rewardSetting: { rewardType: RewardType };
+      taskSubmission: {
+        assignment: {
+          task: {
+            id: string;
+            title: string;
+          };
+        };
+      };
+    },
+    confirmedAt: Date,
+  ) {
+    if (
+      settlement.rewardSetting.rewardType !== RewardType.MONEY_RECORD ||
+      settlement.amount.lte(0)
+    ) {
+      return null;
+    }
+
+    const existingEntry = await tx.ledgerEntry.findFirst({
+      where: {
+        sourceType: TASK_REWARD_SETTLEMENT_SOURCE,
+        sourceId: settlement.id,
+        status: LedgerEntryStatus.ACTIVE,
+        ledger: { familyId },
+      },
+      select: { id: true },
+    });
+    if (existingEntry) {
+      return existingEntry.id;
+    }
+
+    const ledger = await tx.financeLedger.upsert({
+      where: { familyId },
+      create: {
+        familyId,
+        ledgerName: 'Shared Family Ledger',
+        status: FinanceLedgerStatus.ACTIVE,
+      },
+      update: {},
+      select: { id: true },
+    });
+
+    const task = settlement.taskSubmission.assignment.task;
+    const entry = await tx.ledgerEntry.create({
+      data: {
+        ledgerId: ledger.id,
+        createdByMemberId: settlement.receiverMemberId,
+        entryType: LedgerEntryType.REWARD,
+        amount: settlement.amount,
+        description: `Thuong nhiem vu: ${task.title}`,
+        entryDate: confirmedAt,
+        status: LedgerEntryStatus.ACTIVE,
+        sourceType: TASK_REWARD_SETTLEMENT_SOURCE,
+        sourceId: settlement.id,
+        metadata: {
+          rewardSettlementId: settlement.id,
+          taskId: task.id,
+          receiverMemberId: settlement.receiverMemberId,
+          confirmedAt: confirmedAt.toISOString(),
+        },
+      },
+      select: { id: true },
+    });
+
+    return entry.id;
   }
 
   private async createRewardSettlementAfterApproval(
