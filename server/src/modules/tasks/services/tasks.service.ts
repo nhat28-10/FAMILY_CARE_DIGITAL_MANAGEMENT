@@ -144,6 +144,9 @@ const SAFE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
 const TASK_SUBMISSION_ERROR_CODES = {
   SUBMISSION_OVERDUE: 'SUBMISSION_OVERDUE',
 } as const;
+const TASK_REWARD_ERROR_CODES = {
+  CANNOT_MANAGE_OWN_REWARD_SETTLEMENT: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
+} as const;
 const TASK_REWARD_SETTLEMENT_SOURCE = 'TASK_REWARD_SETTLEMENT';
 const TASK_REWARD_ALLOCATION_SOURCE = 'TASK_REWARD';
 
@@ -388,6 +391,19 @@ const rewardSettlementResponseSelect = {
       reviewedAt: true,
       assignment: {
         select: {
+          id: true,
+          assignedToMemberId: true,
+          assignedByMemberId: true,
+          status: true,
+          assignedAt: true,
+          startAt: true,
+          dueAt: true,
+          assignedToMember: {
+            select: unavailabilityMemberSelect,
+          },
+          assignedByMember: {
+            select: unavailabilityMemberSelect,
+          },
           task: {
             select: {
               id: true,
@@ -3919,8 +3935,14 @@ export class TasksService {
 
     return {
       id: member.id,
+      userId: member.userId,
       displayName: member.displayName ?? member.user.fullName,
       familyRole: member.familyRole,
+      user: {
+        id: member.user.id,
+        fullName: member.user.fullName,
+        avatarUrl: member.user.avatarUrl,
+      },
     };
   }
 
@@ -4145,6 +4167,23 @@ export class TasksService {
         taskType: settlement.taskSubmission.assignment.task.taskType,
         priority: settlement.taskSubmission.assignment.task.priority,
         status: settlement.taskSubmission.assignment.task.status,
+      },
+      assignment: {
+        id: settlement.taskSubmission.assignment.id,
+        assignedToMemberId:
+          settlement.taskSubmission.assignment.assignedToMemberId,
+        assignedByMemberId:
+          settlement.taskSubmission.assignment.assignedByMemberId,
+        status: settlement.taskSubmission.assignment.status,
+        assignedAt: settlement.taskSubmission.assignment.assignedAt,
+        startAt: settlement.taskSubmission.assignment.startAt,
+        dueAt: settlement.taskSubmission.assignment.dueAt,
+        assignedToMember: this.mapUnavailabilityMember(
+          settlement.taskSubmission.assignment.assignedToMember,
+        ),
+        assignedByMember: this.mapUnavailabilityMember(
+          settlement.taskSubmission.assignment.assignedByMember,
+        ),
       },
       submission: {
         id: settlement.taskSubmission.id,
@@ -4374,9 +4413,11 @@ export class TasksService {
       this.isDeputyMember(familyRole) &&
       settlement.receiverMemberId === currentMemberId
     ) {
-      throw new ForbiddenException(
-        'Deputy member cannot manage their own reward settlement',
-      );
+      throw new ForbiddenException({
+        message: 'Deputy member cannot manage their own reward settlement',
+        code: TASK_REWARD_ERROR_CODES.CANNOT_MANAGE_OWN_REWARD_SETTLEMENT,
+        errorCode: TASK_REWARD_ERROR_CODES.CANNOT_MANAGE_OWN_REWARD_SETTLEMENT,
+      });
     }
   }
 

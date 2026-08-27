@@ -701,8 +701,8 @@ describe('TasksService deputy self-benefit guards', () => {
     };
     const service = serviceWithPrisma(prisma);
 
-    await expect(
-      service.markRewardPaid(
+    try {
+      await service.markRewardPaid(
         familyId,
         'settlement-id',
         deputyMemberId,
@@ -710,8 +710,15 @@ describe('TasksService deputy self-benefit guards', () => {
           externalMethod: RewardExternalMethod.CASH,
         },
         FamilyRole.DEPUTY_MEMBER,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      );
+      fail('Expected deputy self settlement management to be rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        code: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
+        errorCode: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
+      });
+    }
 
     expect(prisma.rewardSettlement.update).not.toHaveBeenCalled();
   });
@@ -741,15 +748,22 @@ describe('TasksService deputy self-benefit guards', () => {
     };
     const service = serviceWithPrisma(prisma);
 
-    await expect(
-      service.resolveRewardDispute(
+    try {
+      await service.resolveRewardDispute(
         familyId,
         'dispute-id',
         deputyMemberId,
         { action: ResolveRewardDisputeAction.REJECT_DISPUTE },
         FamilyRole.DEPUTY_MEMBER,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      );
+      fail('Expected deputy self dispute resolution to be rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        code: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
+        errorCode: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
+      });
+    }
 
     expect(tx.rewardDispute.update).not.toHaveBeenCalled();
     expect(tx.rewardSettlement.update).not.toHaveBeenCalled();
@@ -773,6 +787,18 @@ describe('TasksService reward settlement ledger entries', () => {
       } as unknown as NotificationsService,
     );
 
+  const rewardMember = (id: string, familyRole = FamilyRole.FAMILY_MEMBER) => ({
+    id,
+    userId: `${id}-user`,
+    displayName: `${id} display`,
+    familyRole,
+    user: {
+      id: `${id}-user`,
+      fullName: `${id} name`,
+      avatarUrl: null,
+    },
+  });
+
   const settlementResponse = () => ({
     id: settlementId,
     taskSubmissionId: 'submission-id',
@@ -795,6 +821,15 @@ describe('TasksService reward settlement ledger entries', () => {
       submittedAt: now,
       reviewedAt: now,
       assignment: {
+        id: 'assignment-id',
+        assignedToMemberId: memberId,
+        assignedByMemberId: 'manager-id',
+        status: TaskAssignmentStatus.APPROVED,
+        assignedAt: now,
+        startAt: null,
+        dueAt: now,
+        assignedToMember: rewardMember(memberId),
+        assignedByMember: rewardMember('manager-id', FamilyRole.FAMILY_MANAGER),
         task: {
           id: taskId,
           title: 'Clean room',
@@ -875,6 +910,66 @@ describe('TasksService reward settlement ledger entries', () => {
         }),
       }),
     );
+  });
+
+  it('returns assignment and assignee details in reward settlement list', async () => {
+    const settlement = settlementResponse();
+    const prisma = {
+      $transaction: jest.fn((operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+      rewardSettlement: {
+        findMany: jest.fn().mockResolvedValue([settlement]),
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const service = serviceWithPrisma(prisma);
+
+    const result = await service.getRewardSettlements(
+      familyId,
+      'manager-id',
+      FamilyRole.FAMILY_MANAGER,
+      {
+        page: 1,
+        limit: 20,
+      },
+    );
+
+    expect(prisma.rewardSettlement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          taskSubmission: expect.objectContaining({
+            select: expect.objectContaining({
+              assignment: expect.objectContaining({
+                select: expect.objectContaining({
+                  assignedToMember: expect.any(Object),
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(result.items[0]).toMatchObject({
+      id: settlementId,
+      task: {
+        id: taskId,
+        title: 'Clean room',
+      },
+      assignment: {
+        id: 'assignment-id',
+        assignedToMemberId: memberId,
+        assignedByMemberId: 'manager-id',
+        status: TaskAssignmentStatus.APPROVED,
+        assignedToMember: {
+          id: memberId,
+          displayName: `${memberId} display`,
+          user: {
+            fullName: `${memberId} name`,
+          },
+        },
+      },
+    });
   });
 
   it('links allocations to the settlement ledger entry without creating a second reward entry', async () => {
