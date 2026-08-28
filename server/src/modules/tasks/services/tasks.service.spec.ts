@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   FamilyRole,
   FinanceLedgerStatus,
@@ -350,6 +350,11 @@ describe('TasksService listTasks', () => {
       avatarUrl: null,
     },
   };
+  const memberSummary = {
+    ...compactMember,
+    familyRole: FamilyRole.FAMILY_MEMBER,
+    status: MemberStatus.ACTIVE,
+  };
 
   it('includes rewardSetting for each task list item', async () => {
     const rewardAmount = new Prisma.Decimal(33000);
@@ -383,6 +388,27 @@ describe('TasksService listTasks', () => {
           createdAt,
           updatedAt,
         },
+        assignments: [
+          {
+            id: 'assignment-id',
+            taskId: 'task-with-reward-id',
+            assignedToMemberId: 'member-id',
+            assignedByMemberId: compactMember.id,
+            status: TaskAssignmentStatus.ASSIGNED,
+            assignedAt: createdAt,
+            startAt: null,
+            dueAt: new Date('2026-08-27T01:00:00.000Z'),
+            createdAt,
+            updatedAt,
+            assignedToMember: memberSummary,
+            assignedByMember: {
+              ...memberSummary,
+              id: compactMember.id,
+              userId: compactMember.userId,
+              familyRole: FamilyRole.FAMILY_MANAGER,
+            },
+          },
+        ],
       },
       {
         id: 'task-without-reward-id',
@@ -400,6 +426,7 @@ describe('TasksService listTasks', () => {
         category: null,
         createdByMember: compactMember,
         rewardSetting: null,
+        assignments: [],
       },
     ];
     const prisma = {
@@ -421,15 +448,23 @@ describe('TasksService listTasks', () => {
       notifications as unknown as NotificationsService,
     );
 
-    const result = await service.listTasks(familyId, {
-      page: 1,
-      limit: 100,
-    });
+    const result = await service.listTasks(
+      familyId,
+      {
+        page: 1,
+        limit: 100,
+      },
+      compactMember.id,
+      FamilyRole.FAMILY_MANAGER,
+    );
 
     expect(prisma.task.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         select: expect.objectContaining({
           rewardSetting: expect.any(Object),
+          assignments: expect.objectContaining({
+            select: expect.any(Object),
+          }),
         }),
       }),
     );
@@ -444,11 +479,57 @@ describe('TasksService listTasks', () => {
         rewardDescription: null,
         autoCreateSettlement: true,
       },
+      assignments: [
+        {
+          id: 'assignment-id',
+          assignedToMemberId: 'member-id',
+          status: TaskAssignmentStatus.ASSIGNED,
+          isOverdue: expect.any(Boolean),
+        },
+      ],
     });
     expect(result.items[1]).toMatchObject({
       id: 'task-without-reward-id',
       rewardSetting: null,
+      assignments: [],
     });
+  });
+
+  it('limits embedded assignments to the current member for regular members', async () => {
+    const prisma = {
+      $transaction: jest.fn((operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+      task: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn(),
+        notifyUsersEphemeral: jest.fn(),
+        dispatch: jest.fn(),
+      } as unknown as NotificationsService,
+    );
+
+    await service.listTasks(
+      familyId,
+      { page: 1, limit: 20 },
+      'member-current',
+      FamilyRole.FAMILY_MEMBER,
+    );
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          assignments: expect.objectContaining({
+            where: { assignedToMemberId: 'member-current' },
+          }),
+        }),
+      }),
+    );
   });
 });
 
@@ -571,6 +652,66 @@ describe('TasksService createTaskAssignment', () => {
     });
     expect(result.assignedToMemberId).toBe(assignedToMemberId);
     expect(result.assignedToMember?.familyRole).toBe(FamilyRole.FAMILY_MANAGER);
+  });
+});
+
+describe('TasksService startTaskAssignment', () => {
+  const familyId = 'family-id';
+  const assignmentId = 'assignment-id';
+  const memberId = 'member-id';
+
+  it('returns a stable error code when the assignment is not startable', async () => {
+    const prisma = {
+      taskAssignment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: assignmentId,
+          taskId: 'task-id',
+          assignedToMemberId: memberId,
+          assignedByMemberId: 'manager-id',
+          status: TaskAssignmentStatus.CANCELED,
+          assignedAt: new Date('2026-08-20T07:00:00.000Z'),
+          startAt: null,
+          dueAt: null,
+          createdAt: new Date('2026-08-20T07:00:00.000Z'),
+          updatedAt: new Date('2026-08-20T07:00:00.000Z'),
+          assignedToMember: null,
+          assignedByMember: null,
+          task: {
+            id: 'task-id',
+            familyId,
+            taskCategoryId: null,
+            title: 'Wash dishes',
+            taskType: TaskType.AD_HOC,
+            priority: TaskPriority.MEDIUM,
+            status: TaskStatus.ACTIVE,
+            dueAt: null,
+            category: null,
+          },
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new TasksService(
+      prisma as unknown as PrismaService,
+      {
+        notify: jest.fn().mockResolvedValue({ ids: [] }),
+        notifyUsersEphemeral: jest.fn().mockResolvedValue(undefined),
+        dispatch: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NotificationsService,
+    );
+
+    await expect(
+      service.startTaskAssignment(familyId, assignmentId, memberId),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'ASSIGNMENT_NOT_STARTABLE',
+        errorCode: 'ASSIGNMENT_NOT_STARTABLE',
+      },
+    });
+    await expect(
+      service.startTaskAssignment(familyId, assignmentId, memberId),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.taskAssignment.update).not.toHaveBeenCalled();
   });
 });
 

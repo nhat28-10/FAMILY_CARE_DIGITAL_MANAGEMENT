@@ -104,12 +104,17 @@ export class TasksAiTools implements AiToolProvider {
         kind: 'read',
         allowedRoles: ALL_ROLES,
         execute: (args, ctx) =>
-          this.tasksService.listTasks(ctx.familyId, {
-            page: 1,
-            limit: clampLimit(args.limit),
-            status: enumOrUndefined(TaskStatus, args.status),
-            priority: enumOrUndefined(TaskPriority, args.priority),
-          }),
+          this.tasksService.listTasks(
+            ctx.familyId,
+            {
+              page: 1,
+              limit: clampLimit(args.limit),
+              status: enumOrUndefined(TaskStatus, args.status),
+              priority: enumOrUndefined(TaskPriority, args.priority),
+            },
+            ctx.memberId,
+            ctx.familyRole,
+          ),
       },
       {
         name: 'list_family_members',
