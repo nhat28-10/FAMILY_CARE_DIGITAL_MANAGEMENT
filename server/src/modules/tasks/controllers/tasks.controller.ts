@@ -52,7 +52,7 @@ export class TasksController {
   @ApiOperation({
     summary: 'Lấy danh sách công việc của gia đình',
     description:
-      'Tất cả thành viên active trong gia đình được xem công việc thuộc gia đình.',
+      'Tất cả thành viên active trong gia đình được xem công việc thuộc gia đình. Mỗi item kèm rewardSetting và assignments summary; manager/deputy thấy toàn bộ assignments, member thường chỉ thấy assignment của chính mình.',
   })
   @ApiQuery({
     name: 'status',
@@ -77,8 +77,13 @@ export class TasksController {
     enum: TaskType,
     description: 'Lọc công việc theo loại công việc',
   })
-  listTasks(@Param('familyId') familyId: string, @Query() query: TaskQueryDto) {
-    return this.tasksService.listTasks(familyId, query);
+  listTasks(
+    @Param('familyId') familyId: string,
+    @CurrentFamilyMember('id') memberId: string,
+    @CurrentFamilyMember('familyRole') familyRole: FamilyRole,
+    @Query() query: TaskQueryDto,
+  ) {
+    return this.tasksService.listTasks(familyId, query, memberId, familyRole);
   }
 
   @Post()

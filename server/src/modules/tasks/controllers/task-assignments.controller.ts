@@ -248,7 +248,8 @@ export class TaskAssignmentsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Chỉ có thể bắt đầu công việc đang ở trạng thái được giao',
+    description:
+      'Chỉ có thể bắt đầu công việc đang ở trạng thái được giao. Khi trạng thái không hợp lệ, response có code/errorCode ASSIGNMENT_NOT_STARTABLE.',
   })
   @ApiOkResponse({ type: TaskAssignmentApiResponseDto })
   startTaskAssignment(

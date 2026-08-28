@@ -144,6 +144,9 @@ const SAFE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
 const TASK_SUBMISSION_ERROR_CODES = {
   SUBMISSION_OVERDUE: 'SUBMISSION_OVERDUE',
 } as const;
+const TASK_ASSIGNMENT_ERROR_CODES = {
+  ASSIGNMENT_NOT_STARTABLE: 'ASSIGNMENT_NOT_STARTABLE',
+} as const;
 const TASK_REWARD_ERROR_CODES = {
   CANNOT_MANAGE_OWN_REWARD_SETTLEMENT: 'CANNOT_MANAGE_OWN_REWARD_SETTLEMENT',
 } as const;
@@ -237,6 +240,25 @@ const rewardSettingResponseSelect = {
   updatedAt: true,
 } satisfies Prisma.RewardSettingSelect;
 
+const taskListAssignmentSelect = {
+  id: true,
+  taskId: true,
+  assignedToMemberId: true,
+  assignedByMemberId: true,
+  status: true,
+  assignedAt: true,
+  startAt: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
+  assignedToMember: {
+    select: memberSummarySelect,
+  },
+  assignedByMember: {
+    select: memberSummarySelect,
+  },
+} satisfies Prisma.TaskAssignmentSelect;
+
 const taskResponseSelect = {
   id: true,
   familyId: true,
@@ -282,6 +304,10 @@ const taskListItemSelect = {
   },
   rewardSetting: {
     select: rewardSettingResponseSelect,
+  },
+  assignments: {
+    select: taskListAssignmentSelect,
+    orderBy: [{ dueAt: 'asc' }, { assignedAt: 'desc' }],
   },
 } satisfies Prisma.TaskSelect;
 
@@ -599,6 +625,10 @@ type TaskSummaryPayload = Prisma.TaskGetPayload<{
   select: typeof taskSummarySelect;
 }>;
 
+type TaskListAssignmentPayload = Prisma.TaskAssignmentGetPayload<{
+  select: typeof taskListAssignmentSelect;
+}>;
+
 type AssignmentResponsePayload = Prisma.TaskAssignmentGetPayload<{
   select: typeof assignmentResponseSelect;
 }>;
@@ -792,7 +822,12 @@ export class TasksService {
     return this.mapCategoryResponse(updatedCategory);
   }
 
-  async listTasks(familyId: string, query: TaskQueryDto) {
+  async listTasks(
+    familyId: string,
+    query: TaskQueryDto,
+    currentMemberId?: string,
+    familyRole?: FamilyRole,
+  ) {
     const where: Prisma.TaskWhereInput = {
       familyId,
       status: query.status,
@@ -800,11 +835,23 @@ export class TasksService {
       priority: query.priority,
       taskType: query.taskType,
     };
+    const assignmentsWhere =
+      currentMemberId && !this.isTaskManager(familyRole)
+        ? { assignedToMemberId: currentMemberId }
+        : undefined;
+    const select = {
+      ...taskListItemSelect,
+      assignments: {
+        select: taskListAssignmentSelect,
+        where: assignmentsWhere,
+        orderBy: [{ dueAt: 'asc' as const }, { assignedAt: 'desc' as const }],
+      },
+    } satisfies Prisma.TaskSelect;
 
     const [tasks, total] = await this.prisma.$transaction([
       this.prisma.task.findMany({
         where,
-        select: taskListItemSelect,
+        select,
         orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
         skip: skipFor(query.page, query.limit),
         take: query.limit,
@@ -1397,9 +1444,11 @@ export class TasksService {
       );
     }
     if (assignment.status !== TaskAssignmentStatus.ASSIGNED) {
-      throw new BadRequestException(
-        'Chỉ có thể bắt đầu công việc đang ở trạng thái được giao',
-      );
+      throw new BadRequestException({
+        message: 'Chỉ có thể bắt đầu công việc đang ở trạng thái được giao',
+        code: TASK_ASSIGNMENT_ERROR_CODES.ASSIGNMENT_NOT_STARTABLE,
+        errorCode: TASK_ASSIGNMENT_ERROR_CODES.ASSIGNMENT_NOT_STARTABLE,
+      });
     }
 
     const updatedAssignment = await this.prisma.taskAssignment.update({
@@ -4014,6 +4063,9 @@ export class TasksService {
       rewardSetting: task.rewardSetting
         ? this.mapRewardSettingResponse(task.rewardSetting)
         : null,
+      assignments: task.assignments.map((assignment) =>
+        this.mapTaskListAssignmentResponse(assignment),
+      ),
     };
   }
 
@@ -4090,6 +4142,24 @@ export class TasksService {
     }
 
     return response;
+  }
+
+  private mapTaskListAssignmentResponse(assignment: TaskListAssignmentPayload) {
+    return {
+      id: assignment.id,
+      taskId: assignment.taskId,
+      assignedToMemberId: assignment.assignedToMemberId,
+      assignedByMemberId: assignment.assignedByMemberId,
+      status: assignment.status,
+      assignedAt: assignment.assignedAt,
+      startAt: assignment.startAt,
+      dueAt: assignment.dueAt,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt,
+      isOverdue: this.isAssignmentOverdue(assignment),
+      assignedToMember: this.mapMemberSummary(assignment.assignedToMember),
+      assignedByMember: this.mapMemberSummary(assignment.assignedByMember),
+    };
   }
 
   private mapTaskUnavailabilityResponse(
@@ -4368,7 +4438,11 @@ export class TasksService {
     );
   }
 
-  private isTaskManager(familyRole: FamilyRole) {
+  private isTaskManager(familyRole?: FamilyRole) {
+    if (!familyRole) {
+      return false;
+    }
+
     const managerRoles: FamilyRole[] = [
       FamilyRole.FAMILY_MANAGER,
       FamilyRole.DEPUTY_MEMBER,
