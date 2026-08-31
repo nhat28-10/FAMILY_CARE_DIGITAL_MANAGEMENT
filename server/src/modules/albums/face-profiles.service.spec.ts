@@ -447,7 +447,7 @@ describe('FaceProfilesService', () => {
       passCount: 0,
       results: [],
       reasonCode: 'FACE_ALREADY_ENROLLED',
-      message: 'Khuon mat nay da duoc dang ky cho mot thanh vien khac.',
+      message: 'Khuôn mặt này đã được đăng ký cho một thành viên khác.',
     });
   });
 

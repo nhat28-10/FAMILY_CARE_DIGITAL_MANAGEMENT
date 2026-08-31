@@ -81,7 +81,7 @@ export class FaceProfilesController {
     schema: {
       example: {
         success: false,
-        message: 'Khuon mat nay da duoc dang ky cho mot thanh vien khac.',
+        message: 'Khuôn mặt này đã được đăng ký cho một thành viên khác.',
         statusCode: 409,
         code: 'FACE_ALREADY_ENROLLED',
         errorCode: 'FACE_ALREADY_ENROLLED',
