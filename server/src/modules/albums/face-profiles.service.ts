@@ -38,7 +38,7 @@ import {
 const FACE_ENROLLMENT_NOT_ENROLLABLE_CODE = 'FACE_IMAGES_NOT_ENROLLABLE';
 const FACE_ALREADY_ENROLLED_CODE = 'FACE_ALREADY_ENROLLED';
 const FACE_ALREADY_ENROLLED_MESSAGE =
-  'Khuon mat nay da duoc dang ky cho mot thanh vien khac.';
+  'Khuôn mặt này đã được đăng ký cho một thành viên khác.';
 const FACE_PROFILE_PREVIEW_DOMAIN = 'face-profile-previews';
 
 export interface FaceEnrollmentValidationError {
