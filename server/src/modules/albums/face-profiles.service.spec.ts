@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
@@ -107,6 +108,7 @@ describe('FaceProfilesService', () => {
     memberFaceProfile: {
       upsert: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
       update: jest.Mock;
     };
     memberFaceEmbedding: {
@@ -119,6 +121,7 @@ describe('FaceProfilesService', () => {
     $transaction: jest.Mock;
   };
   let faceAi: { extractEmbedding: jest.Mock; detectFaces: jest.Mock };
+  let crypto: FaceEmbeddingCryptoService;
   let storage: {
     savePrivateFile: jest.Mock;
     createSignedReadUrl: jest.Mock;
@@ -131,6 +134,7 @@ describe('FaceProfilesService', () => {
       memberFaceProfile: {
         upsert: jest.fn().mockResolvedValue(profile()),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
       },
       memberFaceEmbedding: {
@@ -163,10 +167,11 @@ describe('FaceProfilesService', () => {
     const config = {
       get: jest.fn((key: string, defaultValue?: unknown) => {
         if (key === 'storage.signedUrlTtlSeconds') return defaultValue ?? 600;
+        if (key === 'faceScan.enrollmentDuplicateMinSimilarity') return 0.85;
         return 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
       }),
     } as unknown as ConfigService;
-    const crypto = new FaceEmbeddingCryptoService(config);
+    crypto = new FaceEmbeddingCryptoService(config);
     service = new FaceProfilesService(
       prisma as unknown as PrismaService,
       faceAi as unknown as FaceAiClientService,
@@ -175,6 +180,20 @@ describe('FaceProfilesService', () => {
       config,
     );
   });
+
+  const encryptedEmbeddingRow = (vector: number[]) => {
+    const encrypted = crypto.encryptEmbedding(vector);
+    return {
+      ...encrypted,
+      embeddingDimension: vector.length,
+      detectionScore: 0.98,
+      qualityScore: 0.9,
+      modelName: 'mock-face',
+      modelVersion: 'mock-v1',
+      createdAt: now,
+      revokedAt: null,
+    };
+  };
 
   it('self enrolls 3 images and stores encrypted embeddings only', async () => {
     prisma.familyMember.findFirst.mockResolvedValue(member('target'));
@@ -401,6 +420,82 @@ describe('FaceProfilesService', () => {
     ]);
     expect(prisma.memberFaceProfile.upsert).not.toHaveBeenCalled();
     expect(prisma.memberFaceEmbedding.createMany).not.toHaveBeenCalled();
+  });
+
+  it('blocks validation when the face is already enrolled by another member', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    prisma.memberFaceProfile.findMany.mockResolvedValue([
+      {
+        ...profile({ memberId: 'other' }),
+        member: member('other'),
+        embeddings: [
+          encryptedEmbeddingRow([1, 0, 0]),
+          encryptedEmbeddingRow([1, 0, 0]),
+          encryptedEmbeddingRow([1, 0, 0]),
+        ],
+      },
+    ]);
+
+    await expect(
+      service.validate('family-1', 'target', member('target'), [
+        file(),
+        file(),
+        file(),
+      ]),
+    ).resolves.toMatchObject({
+      canEnroll: false,
+      passCount: 0,
+      results: [],
+      reasonCode: 'FACE_ALREADY_ENROLLED',
+      message: 'Khuon mat nay da duoc dang ky cho mot thanh vien khac.',
+    });
+  });
+
+  it('blocks enroll when the face is already enrolled by another member', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    prisma.memberFaceProfile.findMany.mockResolvedValue([
+      {
+        ...profile({ memberId: 'other' }),
+        member: member('other'),
+        embeddings: [
+          encryptedEmbeddingRow([1, 0, 0]),
+          encryptedEmbeddingRow([1, 0, 0]),
+          encryptedEmbeddingRow([1, 0, 0]),
+        ],
+      },
+    ]);
+
+    await expect(
+      service.enroll('family-1', 'target', member('target'), [
+        file(),
+        file(),
+        file(),
+      ]),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.savePrivateFile).not.toHaveBeenCalled();
+    expect(prisma.memberFaceProfile.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows re-enroll for the same member by excluding the target profile', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+
+    await expect(
+      service.enroll('family-1', 'target', member('target'), [
+        file(),
+        file(),
+        file(),
+      ]),
+    ).resolves.toMatchObject({
+      isEnrolled: true,
+      registeredImageCount: 3,
+    });
+    expect(prisma.memberFaceProfile.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          memberId: { not: 'target' },
+        }),
+      }),
+    );
   });
 
   it('returns per-file enrollment errors for invalid images', async () => {
