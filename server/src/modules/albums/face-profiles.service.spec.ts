@@ -161,7 +161,11 @@ describe('FaceProfilesService', () => {
     expect(result).toMatchObject({
       memberId: 'target',
       status: FaceProfileStatus.ACTIVE,
+      isEnrolled: true,
       sampleCount: 3,
+      registeredImageCount: 3,
+      minRequired: 3,
+      maxAllowed: 5,
     });
     expect(faceAi.detectFaces).toHaveBeenCalledTimes(3);
     const rows = prisma.memberFaceEmbedding.createMany.mock.calls[0][0].data;
@@ -205,6 +209,46 @@ describe('FaceProfilesService', () => {
     await expect(
       service.getProfile('family-1', 'target', member('requester')),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns demo-friendly registration counts for profile status', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    prisma.memberFaceProfile.findUnique.mockResolvedValue({
+      ...profile(),
+      embeddings: [
+        { embeddingId: 'embedding-1' },
+        { embeddingId: 'embedding-2' },
+      ],
+    });
+
+    await expect(
+      service.getProfile('family-1', 'target', member('target')),
+    ).resolves.toMatchObject({
+      memberId: 'target',
+      status: FaceProfileStatus.ACTIVE,
+      isEnrolled: false,
+      sampleCount: 2,
+      registeredImageCount: 2,
+      minRequired: 3,
+      maxAllowed: 5,
+    });
+  });
+
+  it('returns zero counts when profile has not been enrolled', async () => {
+    prisma.familyMember.findFirst.mockResolvedValue(member('target'));
+    prisma.memberFaceProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.getProfile('family-1', 'target', member('target')),
+    ).resolves.toMatchObject({
+      memberId: 'target',
+      status: FaceProfileStatus.DELETED,
+      isEnrolled: false,
+      sampleCount: 0,
+      registeredImageCount: 0,
+      minRequired: 3,
+      maxAllowed: 5,
+    });
   });
 
   it('rejects fewer than 3 or more than 5 images', async () => {
@@ -446,7 +490,11 @@ describe('FaceProfilesService', () => {
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       status: FaceProfileStatus.DELETED,
+      isEnrolled: false,
       sampleCount: 0,
+      registeredImageCount: 0,
+      minRequired: 3,
+      maxAllowed: 5,
     });
     expect(result).not.toHaveProperty('encryptedEmbedding');
     expect(result).not.toHaveProperty('embedding');

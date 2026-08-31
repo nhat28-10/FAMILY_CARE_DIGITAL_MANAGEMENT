@@ -177,7 +177,11 @@ export class FaceProfilesService {
       return {
         memberId: target.id,
         status: FaceProfileStatus.DELETED,
+        isEnrolled: false,
         sampleCount: 0,
+        registeredImageCount: 0,
+        minRequired: FACE_ENROLLMENT_MIN_FILES,
+        maxAllowed: FACE_ENROLLMENT_MAX_FILES,
         modelName: null,
         modelVersion: null,
         consentedAt: null,
@@ -185,7 +189,11 @@ export class FaceProfilesService {
         updatedAt: null,
       };
     }
-    return this.toSummary(profile, profile.embeddings.length);
+    const activeSampleCount =
+      profile.status === FaceProfileStatus.DELETED
+        ? 0
+        : profile.embeddings.length;
+    return this.toSummary(profile, activeSampleCount);
   }
 
   async disable(
@@ -235,7 +243,11 @@ export class FaceProfilesService {
       return {
         memberId: target.id,
         status: FaceProfileStatus.DELETED,
+        isEnrolled: false,
         sampleCount: 0,
+        registeredImageCount: 0,
+        minRequired: FACE_ENROLLMENT_MIN_FILES,
+        maxAllowed: FACE_ENROLLMENT_MAX_FILES,
         modelName: null,
         modelVersion: null,
         consentedAt: null,
@@ -506,7 +518,13 @@ export class FaceProfilesService {
     return {
       memberId: profile.memberId,
       status: profile.status,
+      isEnrolled:
+        profile.status !== FaceProfileStatus.DELETED &&
+        sampleCount >= FACE_ENROLLMENT_MIN_FILES,
       sampleCount,
+      registeredImageCount: sampleCount,
+      minRequired: FACE_ENROLLMENT_MIN_FILES,
+      maxAllowed: FACE_ENROLLMENT_MAX_FILES,
       modelName: profile.modelName,
       modelVersion: profile.modelVersion,
       consentedAt: profile.consentedAt,
