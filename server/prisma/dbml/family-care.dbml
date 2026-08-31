@@ -1368,6 +1368,10 @@ Table member_face_profiles {
   consentedByMemberId String [not null]
   modelName String [not null]
   modelVersion String [not null]
+  previewStorageKey String
+  previewOriginalName String
+  previewMimeType String
+  previewFileSize Int
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [default: `now()`, not null]
   deletedAt DateTime

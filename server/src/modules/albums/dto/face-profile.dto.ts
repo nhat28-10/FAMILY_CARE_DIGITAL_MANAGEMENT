@@ -22,6 +22,26 @@ export class DeleteFaceProfileDto {
   confirmation!: 'DELETE_FACE_PROFILE';
 }
 
+export class FaceProfilePreviewImageResponseDto {
+  @ApiProperty({
+    example:
+      'https://example.r2.cloudflarestorage.com/face-profile-previews/family-id/file.jpg?X-Amz-Signature=...',
+  })
+  url!: string;
+
+  @ApiProperty({ example: 600 })
+  expiresInSeconds!: number;
+
+  @ApiProperty({ example: 'portrait.jpg', nullable: true })
+  originalFileName!: string | null;
+
+  @ApiProperty({ example: 'image/jpeg', nullable: true })
+  mimeType!: string | null;
+
+  @ApiProperty({ example: 245760, nullable: true })
+  fileSize!: number | null;
+}
+
 export class FaceProfileSummaryResponseDto {
   @ApiProperty({ format: 'uuid' })
   memberId!: string;
@@ -55,6 +75,14 @@ export class FaceProfileSummaryResponseDto {
 
   @ApiProperty({ example: 5 })
   maxAllowed!: number;
+
+  @ApiProperty({
+    type: () => FaceProfilePreviewImageResponseDto,
+    nullable: true,
+    description:
+      'Private signed preview URL for the representative enrollment image. Null when the profile has no stored preview image.',
+  })
+  previewImage!: FaceProfilePreviewImageResponseDto | null;
 
   @ApiProperty({ example: 'mock-face', nullable: true })
   modelName!: string | null;

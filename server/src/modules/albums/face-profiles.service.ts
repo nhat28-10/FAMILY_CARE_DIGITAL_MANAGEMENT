@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   FaceProfileStatus,
   FamilyMember,
@@ -14,7 +15,11 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import type { UploadedFilePayload } from '../storage/storage.service';
+import {
+  StorageService,
+  type SavedPrivateFileResult,
+  type UploadedFilePayload,
+} from '../storage/storage.service';
 import {
   FaceAiClientService,
   FaceDetectionBoundingBox,
@@ -23,11 +28,14 @@ import {
 import { FaceEmbeddingCryptoService } from './face-embedding-crypto.service';
 import {
   FACE_ENROLLMENT_MAX_FILES,
+  FACE_ENROLLMENT_MAX_FILE_SIZE,
   FACE_ENROLLMENT_MIN_FILES,
+  FACE_ENROLLMENT_MIME_TO_EXT,
   getFaceEnrollmentFileIssue,
 } from './face-enrollment.validator';
 
 const FACE_ENROLLMENT_NOT_ENROLLABLE_CODE = 'FACE_IMAGES_NOT_ENROLLABLE';
+const FACE_PROFILE_PREVIEW_DOMAIN = 'face-profile-previews';
 
 export interface FaceEnrollmentValidationError {
   index: number;
@@ -65,11 +73,20 @@ interface FaceEnrollmentAnalysis {
 
 @Injectable()
 export class FaceProfilesService {
+  private readonly signedUrlTtlSeconds: number;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly faceAi: FaceAiClientService,
     private readonly crypto: FaceEmbeddingCryptoService,
-  ) {}
+    private readonly storage: StorageService,
+    config: ConfigService,
+  ) {
+    this.signedUrlTtlSeconds = config.get<number>(
+      'storage.signedUrlTtlSeconds',
+      600,
+    );
+  }
 
   async enroll(
     workspaceId: string,
@@ -87,52 +104,83 @@ export class FaceProfilesService {
       .filter((item): item is FaceEmbeddingExtractResult => Boolean(item));
     const prepared = this.prepareEmbeddings(extracted);
     const now = new Date();
-
-    const profile = await this.prisma.$transaction(async (tx) => {
-      const savedProfile = await tx.memberFaceProfile.upsert({
-        where: { workspaceId_memberId: { workspaceId, memberId: target.id } },
-        create: {
-          workspaceId,
-          memberId: target.id,
-          status: FaceProfileStatus.ACTIVE,
-          consentedAt: now,
-          consentedByMemberId: requester.id,
-          modelName: prepared[0].modelName,
-          modelVersion: prepared[0].modelVersion,
-          deletedAt: null,
-        },
-        update: {
-          status: FaceProfileStatus.ACTIVE,
-          consentedAt: now,
-          consentedByMemberId: requester.id,
-          modelName: prepared[0].modelName,
-          modelVersion: prepared[0].modelVersion,
-          deletedAt: null,
-        },
-      });
-
-      await tx.memberFaceEmbedding.updateMany({
-        where: { profileId: savedProfile.profileId, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      await tx.memberFaceEmbedding.createMany({
-        data: prepared.map((item) => ({
-          profileId: savedProfile.profileId,
-          encryptedEmbedding: item.encryptedEmbedding,
-          encryptionIv: item.encryptionIv,
-          encryptionAuthTag: item.encryptionAuthTag,
-          embeddingDimension: item.embeddingDimension,
-          detectionScore: item.detectionScore,
-          qualityScore: item.qualityScore,
-          modelName: item.modelName,
-          modelVersion: item.modelVersion,
-        })),
-      });
-
-      return savedProfile;
+    const existingProfile = await this.prisma.memberFaceProfile.findUnique({
+      where: { workspaceId_memberId: { workspaceId, memberId: target.id } },
+      select: { previewStorageKey: true },
     });
+    const previewImage = await this.savePreviewImage(
+      workspaceId,
+      validatedFiles[0],
+    );
 
-    return this.toSummary(profile, prepared.length);
+    try {
+      const profile = await this.prisma.$transaction(async (tx) => {
+        const savedProfile = await tx.memberFaceProfile.upsert({
+          where: { workspaceId_memberId: { workspaceId, memberId: target.id } },
+          create: {
+            workspaceId,
+            memberId: target.id,
+            status: FaceProfileStatus.ACTIVE,
+            consentedAt: now,
+            consentedByMemberId: requester.id,
+            modelName: prepared[0].modelName,
+            modelVersion: prepared[0].modelVersion,
+            previewStorageKey: previewImage.storageKey,
+            previewOriginalName: previewImage.fileName,
+            previewMimeType: previewImage.mimeType,
+            previewFileSize: previewImage.size,
+            deletedAt: null,
+          },
+          update: {
+            status: FaceProfileStatus.ACTIVE,
+            consentedAt: now,
+            consentedByMemberId: requester.id,
+            modelName: prepared[0].modelName,
+            modelVersion: prepared[0].modelVersion,
+            previewStorageKey: previewImage.storageKey,
+            previewOriginalName: previewImage.fileName,
+            previewMimeType: previewImage.mimeType,
+            previewFileSize: previewImage.size,
+            deletedAt: null,
+          },
+        });
+
+        await tx.memberFaceEmbedding.updateMany({
+          where: { profileId: savedProfile.profileId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        await tx.memberFaceEmbedding.createMany({
+          data: prepared.map((item) => ({
+            profileId: savedProfile.profileId,
+            encryptedEmbedding: item.encryptedEmbedding,
+            encryptionIv: item.encryptionIv,
+            encryptionAuthTag: item.encryptionAuthTag,
+            embeddingDimension: item.embeddingDimension,
+            detectionScore: item.detectionScore,
+            qualityScore: item.qualityScore,
+            modelName: item.modelName,
+            modelVersion: item.modelVersion,
+          })),
+        });
+
+        return savedProfile;
+      });
+
+      if (
+        existingProfile?.previewStorageKey &&
+        existingProfile.previewStorageKey !== previewImage.storageKey
+      ) {
+        await this.storage.deleteFileByKey(
+          existingProfile.previewStorageKey,
+          false,
+        );
+      }
+
+      return this.toSummary(profile, prepared.length);
+    } catch (error) {
+      await this.storage.deleteFileByKey(previewImage.storageKey, false);
+      throw error;
+    }
   }
 
   async validate(
@@ -182,6 +230,7 @@ export class FaceProfilesService {
         registeredImageCount: 0,
         minRequired: FACE_ENROLLMENT_MIN_FILES,
         maxAllowed: FACE_ENROLLMENT_MAX_FILES,
+        previewImage: null,
         modelName: null,
         modelVersion: null,
         consentedAt: null,
@@ -248,6 +297,7 @@ export class FaceProfilesService {
         registeredImageCount: 0,
         minRequired: FACE_ENROLLMENT_MIN_FILES,
         maxAllowed: FACE_ENROLLMENT_MAX_FILES,
+        previewImage: null,
         modelName: null,
         modelVersion: null,
         consentedAt: null,
@@ -275,9 +325,16 @@ export class FaceProfilesService {
         data: {
           status: FaceProfileStatus.DELETED,
           deletedAt,
+          previewStorageKey: null,
+          previewOriginalName: null,
+          previewMimeType: null,
+          previewFileSize: null,
         },
       });
     });
+    if (profile.previewStorageKey) {
+      await this.storage.deleteFileByKey(profile.previewStorageKey, false);
+    }
     return this.toSummary(updated, 0);
   }
 
@@ -503,12 +560,31 @@ export class FaceProfilesService {
     };
   }
 
-  private toSummary(
+  private async savePreviewImage(
+    workspaceId: string,
+    file: UploadedFilePayload,
+  ): Promise<SavedPrivateFileResult> {
+    return this.storage.savePrivateFile(
+      FACE_PROFILE_PREVIEW_DOMAIN,
+      workspaceId,
+      file,
+      {
+        allowedMimeToExt: FACE_ENROLLMENT_MIME_TO_EXT,
+        maxSize: FACE_ENROLLMENT_MAX_FILE_SIZE,
+      },
+    );
+  }
+
+  private async toSummary(
     profile: {
       memberId: string;
       status: FaceProfileStatus;
       modelName: string | null;
       modelVersion: string | null;
+      previewStorageKey?: string | null;
+      previewOriginalName?: string | null;
+      previewMimeType?: string | null;
+      previewFileSize?: number | null;
       consentedAt: Date | null;
       createdAt: Date | null;
       updatedAt: Date | null;
@@ -525,6 +601,20 @@ export class FaceProfilesService {
       registeredImageCount: sampleCount,
       minRequired: FACE_ENROLLMENT_MIN_FILES,
       maxAllowed: FACE_ENROLLMENT_MAX_FILES,
+      previewImage:
+        profile.status !== FaceProfileStatus.DELETED &&
+        profile.previewStorageKey
+          ? {
+              url: await this.storage.createSignedReadUrl(
+                profile.previewStorageKey,
+                this.signedUrlTtlSeconds,
+              ),
+              expiresInSeconds: this.signedUrlTtlSeconds,
+              originalFileName: profile.previewOriginalName ?? null,
+              mimeType: profile.previewMimeType ?? null,
+              fileSize: profile.previewFileSize ?? null,
+            }
+          : null,
       modelName: profile.modelName,
       modelVersion: profile.modelVersion,
       consentedAt: profile.consentedAt,

@@ -15,6 +15,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import {
   DeleteFaceProfileDto,
   EnrollFaceProfileDto,
@@ -88,6 +89,10 @@ function profile(overrides: Record<string, unknown> = {}) {
     consentedByMemberId: 'requester',
     modelName: 'mock-face',
     modelVersion: 'mock-v1',
+    previewStorageKey: 'face-profile-previews/family-1/preview.jpg',
+    previewOriginalName: 'face.png',
+    previewMimeType: 'image/png',
+    previewFileSize: png.length,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -114,6 +119,11 @@ describe('FaceProfilesService', () => {
     $transaction: jest.Mock;
   };
   let faceAi: { extractEmbedding: jest.Mock; detectFaces: jest.Mock };
+  let storage: {
+    savePrivateFile: jest.Mock;
+    createSignedReadUrl: jest.Mock;
+    deleteFileByKey: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -138,13 +148,31 @@ describe('FaceProfilesService', () => {
       extractEmbedding: jest.fn(),
       detectFaces: jest.fn().mockResolvedValue(detectResponse()),
     };
-    const crypto = new FaceEmbeddingCryptoService({
-      get: jest.fn(() => 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='),
-    } as unknown as ConfigService);
+    storage = {
+      savePrivateFile: jest.fn().mockResolvedValue({
+        storageKey: 'face-profile-previews/family-1/new-preview.png',
+        fileName: 'face.png',
+        mimeType: 'image/png',
+        size: png.length,
+      }),
+      createSignedReadUrl: jest
+        .fn()
+        .mockResolvedValue('https://signed.example/preview.png'),
+      deleteFileByKey: jest.fn().mockResolvedValue(true),
+    };
+    const config = {
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        if (key === 'storage.signedUrlTtlSeconds') return defaultValue ?? 600;
+        return 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
+      }),
+    } as unknown as ConfigService;
+    const crypto = new FaceEmbeddingCryptoService(config);
     service = new FaceProfilesService(
       prisma as unknown as PrismaService,
       faceAi as unknown as FaceAiClientService,
       crypto,
+      storage as unknown as StorageService,
+      config,
     );
   });
 
@@ -166,8 +194,21 @@ describe('FaceProfilesService', () => {
       registeredImageCount: 3,
       minRequired: 3,
       maxAllowed: 5,
+      previewImage: {
+        url: 'https://signed.example/preview.png',
+        expiresInSeconds: 600,
+        originalFileName: 'face.png',
+        mimeType: 'image/png',
+        fileSize: png.length,
+      },
     });
     expect(faceAi.detectFaces).toHaveBeenCalledTimes(3);
+    expect(storage.savePrivateFile).toHaveBeenCalledWith(
+      'face-profile-previews',
+      'family-1',
+      expect.objectContaining({ originalname: 'face.png' }),
+      expect.objectContaining({ maxSize: 5 * 1024 * 1024 }),
+    );
     const rows = prisma.memberFaceEmbedding.createMany.mock.calls[0][0].data;
     expect(rows[0].encryptedEmbedding).toBeInstanceOf(Uint8Array);
     expect(rows[0]).not.toHaveProperty('embedding');
@@ -231,6 +272,10 @@ describe('FaceProfilesService', () => {
       registeredImageCount: 2,
       minRequired: 3,
       maxAllowed: 5,
+      previewImage: {
+        url: 'https://signed.example/preview.png',
+        expiresInSeconds: 600,
+      },
     });
   });
 
@@ -248,6 +293,7 @@ describe('FaceProfilesService', () => {
       registeredImageCount: 0,
       minRequired: 3,
       maxAllowed: 5,
+      previewImage: null,
     });
   });
 
@@ -487,6 +533,10 @@ describe('FaceProfilesService', () => {
     expect(prisma.memberFaceEmbedding.deleteMany).toHaveBeenCalledWith({
       where: { profileId: 'profile-1' },
     });
+    expect(storage.deleteFileByKey).toHaveBeenCalledWith(
+      'face-profile-previews/family-1/preview.jpg',
+      false,
+    );
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       status: FaceProfileStatus.DELETED,
@@ -495,6 +545,7 @@ describe('FaceProfilesService', () => {
       registeredImageCount: 0,
       minRequired: 3,
       maxAllowed: 5,
+      previewImage: null,
     });
     expect(result).not.toHaveProperty('encryptedEmbedding');
     expect(result).not.toHaveProperty('embedding');

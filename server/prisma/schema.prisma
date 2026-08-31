@@ -2282,6 +2282,10 @@ model MemberFaceProfile {
   consentedByMemberId String            @map("consented_by_member_id")
   modelName           String            @map("model_name")
   modelVersion        String            @map("model_version")
+  previewStorageKey   String?           @map("preview_storage_key")
+  previewOriginalName String?           @map("preview_original_name")
+  previewMimeType     String?           @map("preview_mime_type")
+  previewFileSize     Int?              @map("preview_file_size")
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt           DateTime?         @map("deleted_at") @db.Timestamptz
