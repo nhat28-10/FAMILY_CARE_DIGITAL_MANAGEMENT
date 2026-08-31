@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -35,6 +36,9 @@ import {
 } from './face-enrollment.validator';
 
 const FACE_ENROLLMENT_NOT_ENROLLABLE_CODE = 'FACE_IMAGES_NOT_ENROLLABLE';
+const FACE_ALREADY_ENROLLED_CODE = 'FACE_ALREADY_ENROLLED';
+const FACE_ALREADY_ENROLLED_MESSAGE =
+  'Khuon mat nay da duoc dang ky cho mot thanh vien khac.';
 const FACE_PROFILE_PREVIEW_DOMAIN = 'face-profile-previews';
 
 export interface FaceEnrollmentValidationError {
@@ -64,6 +68,8 @@ export interface FaceEnrollmentValidationResponse {
   minRequired: number;
   maxAllowed: number;
   results: FaceEnrollmentValidationResult[];
+  reasonCode?: string;
+  message?: string;
 }
 
 interface FaceEnrollmentAnalysis {
@@ -74,6 +80,7 @@ interface FaceEnrollmentAnalysis {
 @Injectable()
 export class FaceProfilesService {
   private readonly signedUrlTtlSeconds: number;
+  private readonly duplicateMinSimilarity: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -85,6 +92,10 @@ export class FaceProfilesService {
     this.signedUrlTtlSeconds = config.get<number>(
       'storage.signedUrlTtlSeconds',
       600,
+    );
+    this.duplicateMinSimilarity = config.get<number>(
+      'faceScan.enrollmentDuplicateMinSimilarity',
+      0.85,
     );
   }
 
@@ -104,6 +115,12 @@ export class FaceProfilesService {
       .filter((item): item is FaceEmbeddingExtractResult => Boolean(item));
     const prepared = this.prepareEmbeddings(extracted);
     const now = new Date();
+    await this.throwIfDuplicateFaceEnrollment(
+      workspaceId,
+      target.id,
+      extracted,
+      this.prisma,
+    );
     const existingProfile = await this.prisma.memberFaceProfile.findUnique({
       where: { workspaceId_memberId: { workspaceId, memberId: target.id } },
       select: { previewStorageKey: true },
@@ -115,6 +132,14 @@ export class FaceProfilesService {
 
     try {
       const profile = await this.prisma.$transaction(async (tx) => {
+        await this.lockFaceEnrollmentFamily(tx, workspaceId);
+        await this.throwIfDuplicateFaceEnrollment(
+          workspaceId,
+          target.id,
+          extracted,
+          tx,
+        );
+
         const savedProfile = await tx.memberFaceProfile.upsert({
           where: { workspaceId_memberId: { workspaceId, memberId: target.id } },
           create: {
@@ -195,6 +220,29 @@ export class FaceProfilesService {
     const analyses = await this.analyzeEnrollmentFiles(validatedFiles);
     const results = analyses.map((item) => item.result);
     const passCount = results.filter((item) => item.ok).length;
+    if (passCount >= FACE_ENROLLMENT_MIN_FILES) {
+      const extracted = analyses
+        .map((item) => item.embedding)
+        .filter((item): item is FaceEmbeddingExtractResult => Boolean(item));
+      const duplicated = await this.hasDuplicateFaceEnrollment(
+        workspaceId,
+        target.id,
+        extracted,
+        this.prisma,
+      );
+      if (duplicated) {
+        return {
+          total: results.length,
+          passCount: 0,
+          canEnroll: false,
+          minRequired: FACE_ENROLLMENT_MIN_FILES,
+          maxAllowed: FACE_ENROLLMENT_MAX_FILES,
+          results: [],
+          reasonCode: FACE_ALREADY_ENROLLED_CODE,
+          message: FACE_ALREADY_ENROLLED_MESSAGE,
+        };
+      }
+    }
     return {
       total: results.length,
       passCount,
@@ -425,6 +473,113 @@ export class FaceProfilesService {
     return this.prisma.memberFaceEmbedding.count({
       where: { profileId, revokedAt: null },
     });
+  }
+
+  private async lockFaceEnrollmentFamily(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+  ) {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`,
+    );
+  }
+
+  private async throwIfDuplicateFaceEnrollment(
+    workspaceId: string,
+    targetMemberId: string,
+    embeddings: FaceEmbeddingExtractResult[],
+    client: Prisma.TransactionClient | PrismaService,
+  ) {
+    const duplicated = await this.hasDuplicateFaceEnrollment(
+      workspaceId,
+      targetMemberId,
+      embeddings,
+      client,
+    );
+    if (!duplicated) return;
+    throw new ConflictException({
+      message: FACE_ALREADY_ENROLLED_MESSAGE,
+      code: FACE_ALREADY_ENROLLED_CODE,
+      errorCode: FACE_ALREADY_ENROLLED_CODE,
+    });
+  }
+
+  private async hasDuplicateFaceEnrollment(
+    workspaceId: string,
+    targetMemberId: string,
+    embeddings: FaceEmbeddingExtractResult[],
+    client: Prisma.TransactionClient | PrismaService,
+  ) {
+    const newVectors = embeddings
+      .map((embedding) => this.normalize(embedding.embedding))
+      .filter((vector): vector is number[] => vector !== null);
+    const newCentroid = this.centroid(newVectors);
+    if (!newCentroid) return false;
+
+    const profiles = await client.memberFaceProfile.findMany({
+      where: {
+        workspaceId,
+        memberId: { not: targetMemberId },
+        status: { not: FaceProfileStatus.DELETED },
+        deletedAt: null,
+        member: { familyId: workspaceId, status: MemberStatus.ACTIVE },
+      },
+      include: {
+        embeddings: { where: { revokedAt: null } },
+      },
+    });
+
+    for (const profile of profiles) {
+      if (profile.embeddings.length < FACE_ENROLLMENT_MIN_FILES) continue;
+      const existingVectors = profile.embeddings
+        .map((embedding) =>
+          this.normalize(
+            this.crypto.decryptEmbedding(
+              embedding.encryptedEmbedding,
+              embedding.encryptionIv,
+              embedding.encryptionAuthTag,
+              embedding.embeddingDimension,
+            ),
+          ),
+        )
+        .filter((vector): vector is number[] => vector !== null);
+      const existingCentroid = this.centroid(existingVectors);
+      if (!existingCentroid) continue;
+      if (
+        this.cosine(newCentroid, existingCentroid) >=
+        this.duplicateMinSimilarity
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private normalize(vector: number[]): number[] | null {
+    const norm = Math.sqrt(
+      vector.reduce((sum, value) => sum + value * value, 0),
+    );
+    if (!Number.isFinite(norm) || norm === 0) return null;
+    return vector.map((value) => value / norm);
+  }
+
+  private centroid(vectors: number[][]): number[] | null {
+    if (vectors.length === 0) return null;
+    const dimension = vectors[0].length;
+    if (vectors.some((vector) => vector.length !== dimension)) return null;
+    const summed = new Array<number>(dimension).fill(0);
+    for (const vector of vectors) {
+      vector.forEach((value, index) => {
+        summed[index] += value;
+      });
+    }
+    return this.normalize(summed.map((value) => value / vectors.length));
+  }
+
+  private cosine(left: number[], right: number[]) {
+    if (left.length !== right.length) return -1;
+    return left.reduce((sum, value, index) => sum + value * right[index], 0);
   }
 
   private score(value: number) {

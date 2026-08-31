@@ -17,6 +17,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -75,6 +76,18 @@ export class FaceProfilesController {
     },
   })
   @ApiCreatedResponse({ type: FaceProfileSummaryApiResponseDto })
+  @ApiConflictResponse({
+    description: 'Face already enrolled by another member in the same family',
+    schema: {
+      example: {
+        success: false,
+        message: 'Khuon mat nay da duoc dang ky cho mot thanh vien khac.',
+        statusCode: 409,
+        code: 'FACE_ALREADY_ENROLLED',
+        errorCode: 'FACE_ALREADY_ENROLLED',
+      },
+    },
+  })
   @ResponseMessage('Dang ky ho so khuon mat thanh cong')
   enroll(
     @Param('familyId') familyId: string,

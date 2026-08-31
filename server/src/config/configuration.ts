@@ -210,6 +210,9 @@ export default () => ({
     singleCandidateMinSimilarity: parseFloat(
       process.env.FACE_MATCH_SINGLE_CANDIDATE_MIN_SIMILARITY || '0.75',
     ),
+    enrollmentDuplicateMinSimilarity: parseFloat(
+      process.env.FACE_ENROLLMENT_DUPLICATE_MIN_SIMILARITY || '0.85',
+    ),
     minMargin: parseFloat(process.env.FACE_MATCH_MIN_MARGIN || '0.08'),
     maxAttempts: parseInt(process.env.FACE_SCAN_MAX_ATTEMPTS || '3', 10),
     staleMinutes: parseInt(process.env.FACE_SCAN_STALE_MINUTES || '10', 10),
