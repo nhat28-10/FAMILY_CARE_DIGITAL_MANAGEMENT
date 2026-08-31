@@ -18,6 +18,8 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
+  ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -32,6 +34,7 @@ import type { UploadedFilePayload } from '../storage/storage.service';
 import {
   DeleteFaceProfileDto,
   EnrollFaceProfileDto,
+  FaceProfileSummaryApiResponseDto,
 } from './dto/face-profile.dto';
 import {
   FACE_ENROLLMENT_MAX_FILE_SIZE,
@@ -71,6 +74,7 @@ export class FaceProfilesController {
       },
     },
   })
+  @ApiCreatedResponse({ type: FaceProfileSummaryApiResponseDto })
   @ResponseMessage('Dang ky ho so khuon mat thanh cong')
   enroll(
     @Param('familyId') familyId: string,
@@ -118,6 +122,7 @@ export class FaceProfilesController {
   @Get(':memberId')
   @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
   @ApiOperation({ summary: 'Get face profile status' })
+  @ApiOkResponse({ type: FaceProfileSummaryApiResponseDto })
   @ResponseMessage('Lay trang thai ho so khuon mat thanh cong')
   getProfile(
     @Param('familyId') familyId: string,
@@ -131,6 +136,7 @@ export class FaceProfilesController {
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
   @ApiOperation({ summary: 'Disable face profile' })
+  @ApiOkResponse({ type: FaceProfileSummaryApiResponseDto })
   @ResponseMessage('Tat ho so khuon mat thanh cong')
   disable(
     @Param('familyId') familyId: string,
@@ -144,6 +150,7 @@ export class FaceProfilesController {
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
   @ApiOperation({ summary: 'Enable face profile' })
+  @ApiOkResponse({ type: FaceProfileSummaryApiResponseDto })
   @ResponseMessage('Bat ho so khuon mat thanh cong')
   enable(
     @Param('familyId') familyId: string,
@@ -157,6 +164,7 @@ export class FaceProfilesController {
   @HttpCode(HttpStatus.OK)
   @ApiParam({ name: 'memberId', description: 'ID thanh vien', format: 'uuid' })
   @ApiOperation({ summary: 'Delete biometric face profile data' })
+  @ApiOkResponse({ type: FaceProfileSummaryApiResponseDto })
   @ResponseMessage('Xoa du lieu sinh trac hoc thanh cong')
   deleteProfile(
     @Param('familyId') familyId: string,
